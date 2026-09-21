@@ -14,4 +14,13 @@ SELECT id, 'GECE', 'Gece', '18:00', 14.5
 FROM units WHERE code = 'ACIL_SERVIS'
 ON CONFLICT (unit_id, code) DO NOTHING;
 
+INSERT INTO shift_types (unit_id, code, name, start_time, duration_hours, is_active)
+SELECT id, 'V24_0830', '24 Saat (08:30)', '08:30', 24, FALSE
+FROM units WHERE code = 'ACIL_SERVIS'
+ON CONFLICT (unit_id, code) DO NOTHING;
+
+INSERT INTO shift_types (unit_id, code, name, start_time, duration_hours, is_active)
+SELECT id, 'V24_1800', '24 Saat (18:00)', '18:00', 24, FALSE
+FROM units WHERE code = 'ACIL_SERVIS'
+ON CONFLICT (unit_id, code) DO NOTHING;
 
