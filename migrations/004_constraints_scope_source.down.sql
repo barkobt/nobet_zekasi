@@ -1,3 +1,4 @@
+-- 004_constraints_scope_source.down.sql
 ALTER TABLE constraints DROP CONSTRAINT ck_constraints_source;
 ALTER TABLE constraints DROP CONSTRAINT ck_constraints_scope;
 ALTER TABLE constraints DROP COLUMN source;

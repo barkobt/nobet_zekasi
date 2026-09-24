@@ -1,3 +1,6 @@
+-- 001_initial_schema.up.sql
+-- Katman 0: referans veri tabloları
+
 CREATE TABLE units (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     code       VARCHAR(50)  NOT NULL,
@@ -50,4 +53,3 @@ CREATE TABLE constraint_params (
     CONSTRAINT fk_constraint_params_constraint FOREIGN KEY (constraint_id) REFERENCES constraints(id) ON DELETE CASCADE,
     CONSTRAINT uq_constraint_params_key UNIQUE (constraint_id, param_key)
 );
-

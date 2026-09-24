@@ -1,6 +1,4 @@
 -- 003_constraints_weight_rule.down.sql
--- up'ın tersi, ters sırayla
-
 ALTER TABLE constraints
     RENAME CONSTRAINT uq_constraints_code TO uq_constraint_code;
 

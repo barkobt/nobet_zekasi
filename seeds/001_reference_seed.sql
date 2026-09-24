@@ -1,5 +1,4 @@
 -- seeds/001_reference_seed.sql
-
 INSERT INTO units (code, name)
 VALUES ('ACIL_SERVIS', 'Erişkin Acil Servis')
 ON CONFLICT (code) DO NOTHING;
@@ -23,4 +22,3 @@ INSERT INTO shift_types (unit_id, code, name, start_time, duration_hours, is_act
 SELECT id, 'V24_1800', '24 Saat (18:00)', '18:00', 24, FALSE
 FROM units WHERE code = 'ACIL_SERVIS'
 ON CONFLICT (unit_id, code) DO NOTHING;
-

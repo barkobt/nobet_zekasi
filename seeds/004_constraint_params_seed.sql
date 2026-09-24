@@ -1,5 +1,4 @@
 -- seeds/004_constraint_params_seed.sql
-
 INSERT INTO constraint_params (constraint_id, param_key, param_value, description)
 SELECT id, 'max_consecutive_nights', 2, 'Üst üste çalışılabilecek en fazla gece sayısı'
 FROM constraints WHERE code = 'consecutive_nights_limit'
@@ -29,4 +28,3 @@ INSERT INTO constraint_params (constraint_id, param_key, param_value, descriptio
 SELECT id, 'weekly_min_rest_events', 1, 'Haftada en az kaç dinlenme olayı gerekir'
 FROM constraints WHERE code = 'weekly_rest_event_required'
 ON CONFLICT (constraint_id, param_key) DO NOTHING;
-
