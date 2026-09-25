@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+
+<html lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_dashboard" name="shell-type"/>
+<title>Acıbadem Smart Planner - Klinik Operasyon Özeti</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-secondary-fixed-variant": "#334860",
+            "surface-variant": "#d8e3fb",
+            "on-surface-variant": "#424753",
+            "on-surface": "#111c2d",
+            "secondary-fixed-dim": "#b3c8e5",
+            "surface-container-high": "#dee8ff",
+            "tertiary": "#4c5b6c",
+            "primary-fixed-dim": "#acc7ff",
+            "on-primary-fixed-variant": "#004591",
+            "inverse-primary": "#acc7ff",
+            "primary": "#0056b3",
+            "secondary-container": "#cce2ff",
+            "surface-container": "#e7eeff",
+            "surface-bright": "#f9f9ff",
+            "error": "#ba1a1a",
+            "surface-container-highest": "#d8e3fb",
+            "surface": "#f9f9ff",
+            "on-error-container": "#93000a",
+            "inverse-surface": "#263143",
+            "surface-container-lowest": "#ffffff",
+            "outline-variant": "#c2c6d5",
+            "secondary-fixed": "#d0e4ff",
+            "on-tertiary-container": "#f5f8ff",
+            "on-error": "#ffffff",
+            "outline": "#727784",
+            "on-secondary-container": "#4f647d",
+            "inverse-on-surface": "#ecf1ff",
+            "on-primary-fixed": "#001a40",
+            "on-tertiary-fixed-variant": "#394859",
+            "on-tertiary-fixed": "#0d1d2c",
+            "surface-tint": "#005cbd",
+            "on-primary-container": "#f7f7ff",
+            "tertiary-container": "#647386",
+            "tertiary-fixed-dim": "#b8c8dd",
+            "surface-dim": "#cfdaf2",
+            "on-tertiary": "#ffffff",
+            "background": "#f4f6f9",
+            "tertiary-fixed": "#d4e4f9",
+            "on-primary": "#ffffff",
+            "on-secondary": "#ffffff",
+            "on-background": "#111c2d",
+            "primary-fixed": "#d7e2ff",
+            "surface-container-low": "#f0f3ff",
+            "error-container": "#ffdad6",
+            "secondary": "#4b6078",
+            "on-secondary-fixed": "#041d32",
+            "primary-container": "#1e6fd9"
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="bg-[#EEF2F6] text-on-surface antialiased flex flex-col min-h-screen">
+<!-- TOP APP BAR -->
+<header class="fixed top-0 left-0 right-0 h-14 bg-[#14202E] border-b border-[#223347] z-50 flex items-center justify-between px-3 md:px-4 text-white select-none">
+<!-- Left: Brand Logo & Department Breadcrumb -->
+<div class="flex items-center gap-3">
+<!-- Logo -->
+<div class="flex items-center justify-center w-8 h-8 rounded bg-[#0D1826] overflow-hidden border border-[#2b3e54] flex-shrink-0 shadow-sm">
+<img alt="Logo" class="w-full h-full object-contain p-1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYPmOOznG9YJnicH6I9HY5jS3xUxBShYHhA2gsJI3FikdULx8ARcrYPIOP_8wN1ZlgOKE1IclhbUSn7YEydRG4pof_x6ePc7WpclnQkM8Fq4ciDXJWFmpud-Ag7yBYpT8grUORlWpLssUl3TzWo8mKx1A4HT4HMdxZOdQ3NL7Q7IZgKLWNqbLdqgZqQmWqKT63cg1SJp2MppXzWuxj-ijZ9axltth1paf14SwYhkRIVtqlcUg8M80rqisRdntGZRnc1Og"/>
+</div>
+<div class="h-4 w-[1px] bg-[#2a3c50]"></div>
+<!-- App Name & Branch / Unit Breadcrumb Selector -->
+<div class="flex items-center gap-2 text-xs md:text-sm">
+<span class="font-semibold text-white tracking-wide flex items-center gap-1.5">
+<span class="text-[#38BDF8]">Smart</span>Planner
+        </span>
+<span class="text-white/40">/</span>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1C2C3F] hover:bg-[#253950] border border-[#2B4059] text-xs font-medium text-slate-200 transition-colors shadow-inner">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+<span>Acıbadem ASG Kent Hastanesi</span>
+<span class="text-white/40 text-[11px]">»</span>
+<span class="text-white font-semibold">Erişkin Acil Servis</span>
+<span class="material-symbols-outlined text-[16px] text-white/60 ml-0.5">expand_more</span>
+</button>
+</div>
+</div>
+<!-- Center/Right Controls: Period View, Alerts & Profile -->
+<div class="flex items-center gap-3">
+<!-- Fast Month / Week Toggle Selector -->
+<div class="hidden lg:flex items-center bg-[#1B293A] border border-[#2C3F55] rounded p-0.5 text-xs text-slate-300">
+<button class="px-2.5 py-1 rounded bg-[#2A3F57] text-white font-medium shadow-sm">Ay: Ekim 2026</button>
+<button class="px-2.5 py-1 hover:text-white transition-colors">Hafta: 21 - 27 Eyl</button>
+</div>
+<!-- Notification pill with counter -->
+<button class="relative flex items-center justify-center w-8 h-8 rounded bg-[#1B293A] hover:bg-[#253950] text-slate-300 hover:text-white border border-[#2C3F55] transition-colors" title="Bekleyen Bildirimler">
+<span class="material-symbols-outlined text-[19px]">notifications</span>
+<span class="absolute -top-1 -right-1 px-1.5 min-w-[18px] h-[18px] bg-red-600 text-white font-bold text-[10px] leading-tight flex items-center justify-center rounded-full border-2 border-[#14202E]">
+          3
+        </span>
+</button>
+<div class="h-5 w-[1px] bg-[#2a3c50] hidden sm:block"></div>
+<!-- User Profile -->
+<div class="flex items-center gap-2 pl-1">
+<div class="text-right hidden sm:block leading-tight">
+<div class="text-xs font-semibold text-white tracking-tight">Ahmet Baran Bozkurt</div>
+<div class="text-[11px] text-emerald-400 font-medium">Acil Sorumlusu (Head Nurse)</div>
+</div>
+<div class="w-8 h-8 rounded bg-gradient-to-tr from-[#1E6FD9] to-[#38BDF8] flex items-center justify-center text-white font-semibold text-xs border border-white/20 shadow">
+          AB
+        </div>
+</div>
+</div>
+</header>
+<!-- BODY LAYOUT -->
+<div class="flex pt-14 min-h-screen">
+<!-- LEFT SIDEBAR (Orquest Dark Charcoal / Slate Style) -->
+<aside class="w-60 bg-[#162232] border-r border-[#223348] text-slate-300 flex-shrink-0 flex flex-col justify-between select-none z-30 fixed left-0 top-14 bottom-0">
+<div class="py-3 flex flex-col">
+<!-- Main Nav items -->
+<div class="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          Klinik Yönetim Modülleri
+        </div>
+<nav class="space-y-0.5 px-2">
+<!-- Ana Sayfa (Active) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold text-white bg-[#1E6FD9] shadow-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[19px]">dashboard</span>
+<span>Ana Sayfa</span>
+</a>
+<!-- Hasta Akışı & Talep Projeksiyonları -->
+<a class="flex items-center justify-between px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[19px] text-[#7DD3FC]">trending_up</span>
+<span>Hasta Akışı &amp; Projeksiyon</span>
+</div>
+<span class="text-[10px] bg-[#121B27] px-1.5 py-0.5 rounded text-slate-400">AI</span>
+</a>
+<!-- İhtiyaç & Görev Şablonları -->
+<a class="flex items-center gap-3 px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<span class="material-symbols-outlined text-[19px] text-slate-400">assignment_turned_in</span>
+<span>İhtiyaç &amp; Görev Şablonu</span>
+</a>
+<!-- Nöbet & Vardiya Çizelgesi -->
+<a class="flex items-center justify-between px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[19px] text-slate-400">calendar_month</span>
+<span>Nöbet &amp; Vardiya Çizelgesi</span>
+</div>
+<span class="w-2 h-2 rounded-full bg-amber-400" title="Taslak Onay Bekliyor"></span>
+</a>
+<!-- Personel & Yetkinlikler -->
+<a class="flex items-center gap-3 px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<span class="material-symbols-outlined text-[19px] text-slate-400">badge</span>
+<span>Personel &amp; Yetkinlikler</span>
+</a>
+<!-- Kural & Mevzuat -->
+<a class="flex items-center gap-3 px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<span class="material-symbols-outlined text-[19px] text-slate-400">gavel</span>
+<span>Kural &amp; Mevzuat</span>
+</a>
+</nav>
+<div class="my-4 border-t border-[#233549] mx-3"></div>
+<div class="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          Analiz &amp; İşlemler
+        </div>
+<nav class="space-y-0.5 px-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<span class="material-symbols-outlined text-[19px] text-slate-400">bar_chart</span>
+<span>İş Yükü &amp; Verimlilik</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded text-xs font-medium text-slate-300 hover:text-white hover:bg-[#1E2E42] transition-colors" href="#">
+<span class="material-symbols-outlined text-[19px] text-slate-400">swap_horiz</span>
+<span>Nöbet Değişim Talepleri</span>
+</a>
+</nav>
+</div>
+<!-- Footer system status & settings -->
+<div class="p-3 border-t border-[#223348] bg-[#121B27]/80">
+<div class="flex items-center justify-between text-[11px] text-slate-400 mb-2">
+<span class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Orquest Optimizer Motoru
+          </span>
+<span class="text-[10px] text-slate-500 font-mono">v4.8</span>
+</div>
+<div class="flex items-center justify-between text-xs text-slate-400 pt-1">
+<button class="hover:text-white flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">tune</span>
+<span>Sistem Ayarları</span>
+</button>
+<button class="hover:text-white" title="Yardım ve Kılavuz">
+<span class="material-symbols-outlined text-[16px]">help</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- MAIN CONTENT AREA -->
+<main class="ml-60 flex-1 p-4 md:p-6 overflow-y-auto">
+<!-- 1. TOP CONTROL BAR -->
+<div class="bg-white border border-[#DDE3EA] rounded-md shadow-sm px-4 py-3 mb-5 flex flex-wrap items-center justify-between gap-3 select-none">
+<!-- Left: Date Range & Measurement Metric Filter -->
+<div class="flex items-center flex-wrap gap-3">
+<!-- Month navigator -->
+<div class="flex items-center border border-[#CFD6DE] rounded bg-[#F8FAFC]">
+<button aria-label="Önceki Ay" class="px-2.5 py-1.5 text-slate-600 hover:bg-slate-200 hover:text-slate-900 border-r border-[#CFD6DE] transition-colors">
+<span class="text-xs font-bold font-mono">‹‹</span>
+</button>
+<div class="px-3 py-1 flex items-center gap-1.5 text-xs font-bold text-slate-800 tracking-tight">
+<span class="material-symbols-outlined text-[16px] text-primary">calendar_month</span>
+<span>Ekim 2026</span>
+</div>
+<button aria-label="Sonraki Ay" class="px-2.5 py-1.5 text-slate-600 hover:bg-slate-200 hover:text-slate-900 border-l border-[#CFD6DE] transition-colors">
+<span class="text-xs font-bold font-mono">››</span>
+</button>
+</div>
+<!-- Unit Selector dropdown -->
+<div class="flex items-center gap-2 text-xs">
+<span class="text-slate-500 font-medium">Ölçüm Birimi:</span>
+<div class="relative">
+<select class="appearance-none bg-[#F8FAFC] border border-[#CFD6DE] rounded px-3 py-1.5 pr-8 font-medium text-slate-800 text-xs hover:border-slate-400 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-sm">
+<option selected="">Hasta Girişleri &amp; Nöbet Saati</option>
+<option>Triyaj Seviyesi Dağılımı (K/S/Y)</option>
+<option>Hemşire/Hasta Oranı Kriteri</option>
+<option>Sadece Net Vardiya Bütçesi</option>
+</select>
+<span class="material-symbols-outlined pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-[16px]">unfold_more</span>
+</div>
+</div>
+</div>
+<!-- Right: Fast Actions -->
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-1.5 px-3 py-1.5 border border-[#CFD6DE] bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded shadow-sm transition-colors">
+<span class="material-symbols-outlined text-[16px] text-slate-500">picture_as_pdf</span>
+<span>Rapor Al</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 border border-[#CFD6DE] bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded shadow-sm transition-colors">
+<span class="material-symbols-outlined text-[16px] text-primary">edit_calendar</span>
+<span>Yeni Taslak Başlat</span>
+</button>
+<button class="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1E6FD9] hover:bg-[#155ab4] text-white text-xs font-semibold rounded shadow-sm transition-colors">
+<span class="material-symbols-outlined text-[16px]">bolt</span>
+<span>Optimizasyonu Çalıştır</span>
+</button>
+</div>
+</div>
+<!-- 2. HERO ORQUEST-STYLE CARD & CLINICAL KPI GRID -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-5">
+<!-- Hero Orquest Card (Echoing Image 5 / Orquest widget with clinical enhancement) -->
+<div class="lg:col-span-7 bg-white rounded-md border-2 border-[#1E6FD9]/30 shadow-sm relative overflow-hidden flex flex-col justify-between">
+<!-- Top badge header bar -->
+<div class="bg-[#F0F5FD] px-5 py-2.5 border-b border-[#D6E4F8] flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 bg-[#1E6FD9] text-white rounded text-[10px] font-bold tracking-wider uppercase">Orquest Projeksiyon &amp; İhtiyaç</span>
+<span class="text-xs font-bold text-slate-800">Erişkin Acil Servis (ASG-3643)</span>
+</div>
+<div class="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>%99.0 Kapsama Sağlandı</span>
+</div>
+</div>
+<!-- Center Content: Numbers -->
+<div class="p-6 text-center">
+<div class="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+              EKİM 2026 TOPLAM PLANLANAN NÖBET SAATİ
+            </div>
+<div class="flex items-baseline justify-center gap-3 my-2">
+<span class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight font-sans">
+                4.158
+              </span>
+<span class="text-2xl text-slate-400 font-light">/</span>
+<span class="text-2xl md:text-3xl font-bold text-slate-500 tracking-tight">
+                4.200 <span class="text-sm font-medium text-slate-500">Saat</span>
+</span>
+</div>
+<div class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+<span>Atanan: 4.158 sa</span>
+<span class="text-slate-400">•</span>
+<span>Klinik Talep: 4.200 sa</span>
+<span class="text-slate-400">•</span>
+<span class="text-amber-600 font-bold">-42 sa Açık</span>
+</div>
+<!-- Progress bar -->
+<div class="w-full max-w-md mx-auto mt-4">
+<div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 99%;"></div>
+</div>
+</div>
+</div>
+<!-- Bottom 4 Sub-metrics (Bordered split columns) -->
+<div class="grid grid-cols-4 border-t border-[#E2E8F0] bg-[#FAFCFF] divide-x divide-[#E2E8F0] text-center py-3">
+<div class="px-2">
+<div class="text-[11px] font-semibold text-slate-500 flex items-center justify-center gap-1">
+<span>Kural İhlali</span>
+<span class="material-symbols-outlined text-[14px] text-emerald-600" title="Yasal ve hastane iç kuralı kontrolü">verified</span>
+</div>
+<div class="text-lg font-bold text-emerald-600 mt-0.5">0</div>
+<div class="text-[10px] text-slate-400">Mevzuata Uygun</div>
+</div>
+<div class="px-2">
+<div class="text-[11px] font-semibold text-slate-500 flex items-center justify-center gap-1">
+<span>Açık Nöbet</span>
+<span class="material-symbols-outlined text-[14px] text-amber-500">warning</span>
+</div>
+<div class="text-lg font-bold text-amber-600 mt-0.5">42 sa</div>
+<div class="text-[10px] text-slate-400">Yedek Havuzdan</div>
+</div>
+<div class="px-2">
+<div class="text-[11px] font-semibold text-slate-500">Fazla Mesai</div>
+<div class="text-lg font-bold text-slate-800 mt-0.5">142 sa</div>
+<div class="text-[10px] text-slate-400">22 Personel Arasında</div>
+</div>
+<div class="px-2">
+<div class="text-[11px] font-semibold text-slate-500 flex items-center justify-center gap-1">
+<span>Adalet Farkı</span>
+<span class="material-symbols-outlined text-[14px] text-blue-500">balance</span>
+</div>
+<div class="text-lg font-bold text-primary mt-0.5">6 sa</div>
+<div class="text-[10px] text-slate-400">Düşük Standart Sapma</div>
+</div>
+</div>
+</div>
+<!-- Right Side: Clinical Demand & Patient Flow Card -->
+<div class="lg:col-span-5 bg-white rounded-md border border-[#DDE3EA] shadow-sm p-5 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#1E6FD9] text-[20px]">monitor_heart</span>
+<h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Tahmini Hasta Akış Projeksiyonu</h3>
+</div>
+<span class="text-[11px] text-slate-500 font-medium">Günlük Ort: 460 Hasta</span>
+</div>
+<div class="grid grid-cols-3 gap-3 my-4">
+<div class="bg-red-50 border border-red-200 rounded p-2.5 text-center">
+<span class="text-[10px] font-bold text-red-700 uppercase">Kırmızı Alan</span>
+<div class="text-lg font-bold text-red-800 mt-0.5">~35 / gün</div>
+<div class="text-[10px] text-red-600 mt-0.5">1:1 Hemşire Oranı</div>
+</div>
+<div class="bg-amber-50 border border-amber-200 rounded p-2.5 text-center">
+<span class="text-[10px] font-bold text-amber-700 uppercase">Sarı Alan</span>
+<div class="text-lg font-bold text-amber-800 mt-0.5">~175 / gün</div>
+<div class="text-[10px] text-amber-600 mt-0.5">1:3 Hemşire Oranı</div>
+</div>
+<div class="bg-emerald-50 border border-emerald-200 rounded p-2.5 text-center">
+<span class="text-[10px] font-bold text-emerald-700 uppercase">Yeşil Alan</span>
+<div class="text-lg font-bold text-emerald-800 mt-0.5">~250 / gün</div>
+<div class="text-[10px] text-emerald-600 mt-0.5">1:6 Hemşire Oranı</div>
+</div>
+</div>
+<p class="text-xs text-slate-600 leading-relaxed">
+              Acil tıp veri motoru, Cuma ve Pazar akşamları pik hasta yoğunluğu öngörmektedir. Vardiya şablonu pik saatlerde (18:00 - 02:00) 2 ek kıdemli triyaj hemşiresi ile takviye edilmiştir.
+            </p>
+</div>
+<div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+<span class="text-slate-500 font-medium">Son Optimizasyon Hesabı:</span>
+<span class="font-mono text-slate-700 font-semibold">24 Eyl 2026 • 19:42</span>
+</div>
+</div>
+</div>
+<!-- 3. GÜNLÜK NÖBET DURUMU ŞERİDİ (7 Günlük Isı Haritası / Bar Grafiği) -->
+<div class="bg-white border border-[#DDE3EA] rounded-md shadow-sm p-4 mb-5">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">date_range</span>
+<h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Haftalık Nöbet Dağılımı ve Vardiya Doluluk Şeridi (21 - 27 Eylül)</h3>
+</div>
+<div class="flex items-center gap-4 text-xs">
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>
+<span class="text-slate-600 text-[11px]">Tam Kadro (%100)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span>
+<span class="text-slate-600 text-[11px]">Kısmi Eksik (-1 Nöbetçi)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span>
+<span class="text-slate-600 text-[11px]">Bugün</span>
+</div>
+</div>
+</div>
+<!-- 7-Day Grid -->
+<div class="grid grid-cols-7 gap-2.5">
+<!-- Pazartesi -->
+<div class="border border-slate-200 rounded p-2.5 bg-slate-50 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between text-xs">
+<span class="font-bold text-slate-700">Pzt</span>
+<span class="text-[11px] text-slate-500">21 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gündüz</span>
+<span class="font-semibold text-emerald-700">18/18</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gece</span>
+<span class="font-semibold text-emerald-700">12/12</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-emerald-500 rounded mt-2.5"></div>
+</div>
+<!-- Salı -->
+<div class="border border-slate-200 rounded p-2.5 bg-slate-50 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between text-xs">
+<span class="font-bold text-slate-700">Sal</span>
+<span class="text-[11px] text-slate-500">22 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gündüz</span>
+<span class="font-semibold text-emerald-700">18/18</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gece</span>
+<span class="font-semibold text-emerald-700">12/12</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-emerald-500 rounded mt-2.5"></div>
+</div>
+<!-- Çarşamba -->
+<div class="border border-slate-200 rounded p-2.5 bg-slate-50 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between text-xs">
+<span class="font-bold text-slate-700">Çar</span>
+<span class="text-[11px] text-slate-500">23 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gündüz</span>
+<span class="font-semibold text-emerald-700">18/18</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gece</span>
+<span class="font-semibold text-emerald-700">12/12</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-emerald-500 rounded mt-2.5"></div>
+</div>
+<!-- Perşembe (Bugün - Vurgulu) -->
+<div class="border-2 border-primary rounded p-2.5 bg-[#F0F5FD] flex flex-col justify-between shadow-sm relative">
+<span class="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.2 bg-primary text-white text-[9px] font-bold rounded">BUGÜN</span>
+<div>
+<div class="flex items-center justify-between text-xs pt-0.5">
+<span class="font-bold text-primary">Per</span>
+<span class="text-[11px] font-semibold text-primary">24 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-[#C2D7FA]">
+<span class="text-slate-700 font-medium">Gündüz</span>
+<span class="font-bold text-emerald-700">18/18</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-[#C2D7FA]">
+<span class="text-slate-700 font-medium">Gece</span>
+<span class="font-bold text-emerald-700">12/12</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-primary rounded mt-2.5"></div>
+</div>
+<!-- Cuma -->
+<div class="border border-amber-300 rounded p-2.5 bg-amber-50/40 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between text-xs">
+<span class="font-bold text-slate-700">Cum</span>
+<span class="text-[11px] text-slate-500">25 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-amber-200">
+<span class="text-slate-600">Gündüz</span>
+<span class="font-semibold text-emerald-700">19/19</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-amber-300">
+<span class="text-slate-600">Gece</span>
+<span class="font-bold text-amber-700">13/14</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-amber-500 rounded mt-2.5"></div>
+</div>
+<!-- Cumartesi -->
+<div class="border border-slate-200 rounded p-2.5 bg-slate-50 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between text-xs">
+<span class="font-bold text-slate-700">Cmt</span>
+<span class="text-[11px] text-slate-500">26 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gündüz</span>
+<span class="font-semibold text-emerald-700">18/18</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gece</span>
+<span class="font-semibold text-emerald-700">14/14</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-emerald-500 rounded mt-2.5"></div>
+</div>
+<!-- Pazar -->
+<div class="border border-slate-200 rounded p-2.5 bg-slate-50 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between text-xs">
+<span class="font-bold text-slate-700">Paz</span>
+<span class="text-[11px] text-slate-500">27 Eyl</span>
+</div>
+<div class="mt-2 space-y-1">
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gündüz</span>
+<span class="font-semibold text-emerald-700">18/18</span>
+</div>
+<div class="flex justify-between items-center text-[11px] bg-white p-1 rounded border border-slate-200">
+<span class="text-slate-600">Gece</span>
+<span class="font-semibold text-emerald-700">13/13</span>
+</div>
+</div>
+</div>
+<div class="h-1.5 w-full bg-emerald-500 rounded mt-2.5"></div>
+</div>
+</div>
+</div>
+<!-- 4. HIZLI GÖREV VE UYARI / ONAY PANELİ -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+<!-- Sol: Aktif Vardiya Durumu (Bugün - Gündüz) -->
+<div class="lg:col-span-6 bg-white border border-[#DDE3EA] rounded-md shadow-sm p-4">
+<div class="flex items-center justify-between pb-3 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">local_hospital</span>
+<h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Aktif Vardiya Durumu (Bugün • 08:00 - 20:00 Gündüz)</h3>
+</div>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">18 / 18 Aktif</span>
+</div>
+<div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+<!-- Triyaj -->
+<div class="p-3 rounded border border-slate-200 bg-[#F8FAFC]">
+<div class="text-[10px] uppercase font-bold text-slate-500">Triyaj</div>
+<div class="flex items-center justify-between mt-1">
+<span class="text-lg font-bold text-slate-800">3 / 3</span>
+<span class="material-symbols-outlined text-emerald-600 text-[18px]">check</span>
+</div>
+<div class="text-[10px] text-slate-500 mt-1 truncate">Kıdemli Triyaj</div>
+</div>
+<!-- Kırmızı Alan -->
+<div class="p-3 rounded border border-red-200 bg-red-50/30">
+<div class="text-[10px] uppercase font-bold text-red-700">Kırmızı Alan</div>
+<div class="flex items-center justify-between mt-1">
+<span class="text-lg font-bold text-slate-800">4 / 4</span>
+<span class="material-symbols-outlined text-emerald-600 text-[18px]">check</span>
+</div>
+<div class="text-[10px] text-slate-500 mt-1 truncate">Resüsitasyon / Travma</div>
+</div>
+<!-- Sarı Alan -->
+<div class="p-3 rounded border border-amber-200 bg-amber-50/30">
+<div class="text-[10px] uppercase font-bold text-amber-700">Sarı Alan</div>
+<div class="flex items-center justify-between mt-1">
+<span class="text-lg font-bold text-slate-800">6 / 6</span>
+<span class="material-symbols-outlined text-emerald-600 text-[18px]">check</span>
+</div>
+<div class="text-[10px] text-slate-500 mt-1 truncate">Müşahede &amp; Tedavi</div>
+</div>
+<!-- Yeşil Alan -->
+<div class="p-3 rounded border border-emerald-200 bg-emerald-50/30">
+<div class="text-[10px] uppercase font-bold text-emerald-700">Yeşil Alan</div>
+<div class="flex items-center justify-between mt-1">
+<span class="text-lg font-bold text-slate-800">5 / 5</span>
+<span class="material-symbols-outlined text-emerald-600 text-[18px]">check</span>
+</div>
+<div class="text-[10px] text-slate-500 mt-1 truncate">Ayaktan Enjeksiyon</div>
+</div>
+</div>
+<!-- Current shift lead info -->
+<div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-slate-400 text-[16px]">person_pin</span>
+<span>Vardiya Amiri: <strong>Uzm. Hemşire Elif Kaya</strong></span>
+</span>
+<button class="text-primary font-semibold hover:underline">Vardiya Listesini Gör ›</button>
+</div>
+</div>
+<!-- Sağ: Yaklaşan Onay & Çözüm Bildirimleri -->
+<div class="lg:col-span-6 bg-white border border-[#DDE3EA] rounded-md shadow-sm p-4 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-amber-600 text-[20px]">notification_important</span>
+<h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Yaklaşan Onay &amp; Çözüm Bildirimleri</h3>
+</div>
+<span class="text-[11px] font-bold text-primary hover:underline cursor-pointer">Tümünü İncele (3)</span>
+</div>
+<div class="mt-2.5 space-y-2">
+<!-- Notification 1 -->
+<div class="flex items-center justify-between p-2 rounded bg-amber-50/60 border border-amber-200 text-xs">
+<div class="flex items-center gap-2.5">
+<span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+<div>
+<div class="font-semibold text-slate-800">Cuma Gece Vardiyası: 1 Açık Nöbet (-14 sa)</div>
+<div class="text-[11px] text-slate-500">25 Eylül Gece • Acil Sarı Alan için takviye önerildi</div>
+</div>
+</div>
+<button class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium text-[11px] rounded transition-colors shadow-sm">
+                  Ata
+                </button>
+</div>
+<!-- Notification 2 -->
+<div class="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-200 text-xs">
+<div class="flex items-center gap-2.5">
+<span class="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></span>
+<div>
+<div class="font-semibold text-slate-800">Nöbet Değişim Talebi: Zeynep D. ⇆ Merve T.</div>
+<div class="text-[11px] text-slate-500">28 Eyl Pazartesi / 30 Eyl Çarşamba Karşılıklı Değişim</div>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="px-2 py-1 bg-emerald-600 text-white font-medium text-[11px] rounded hover:bg-emerald-700 transition-colors">Onayla</button>
+<button class="px-2 py-1 bg-slate-200 text-slate-700 font-medium text-[11px] rounded hover:bg-slate-300 transition-colors">Reddet</button>
+</div>
+</div>
+<!-- Notification 3 -->
+<div class="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-200 text-xs">
+<div class="flex items-center gap-2.5">
+<span class="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0"></span>
+<div>
+<div class="font-semibold text-slate-800">Ekim 2026 Taslak Nöbet Çizelgesi Hazır</div>
+<div class="text-[11px] text-slate-500">Orquest motoru 0 kural ihlali ile çizelgeyi tamamladı</div>
+</div>
+</div>
+<button class="px-2.5 py-1 bg-[#1E6FD9] hover:bg-[#155ab4] text-white font-medium text-[11px] rounded transition-colors shadow-sm">
+                  Taslağı Aç
+                </button>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+<span>Sistem Otomatik Kontrol: <strong>Aktif (Gerçek Zamanlı)</strong></span>
+<span class="text-emerald-700 font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+              Hastane Akreditasyon Kriterlerine Uyumlu
+            </span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

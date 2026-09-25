@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+
+<html lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-container-lowest": "#ffffff", "tertiary-container": "#002e4b", "outline": "#74777d", "secondary": "#3c6a00", "outline-variant": "#c4c6cc", "inverse-primary": "#b9c8dc", "on-error-container": "#93000a", "surface": "#f7f9ff", "on-primary-container": "#8694a8", "inverse-surface": "#203243", "on-secondary-fixed-variant": "#2c5000", "surface-variant": "#d2e4fc", "on-primary-fixed-variant": "#3a4859", "surface-dim": "#c9dcf3", "on-surface-variant": "#44474c", "tertiary": "#00192c", "on-primary": "#ffffff", "primary-fixed-dim": "#b9c8dc", "tertiary-fixed": "#cee5ff", "background": "#f7f9ff", "surface-container-high": "#d9eaff", "tertiary-fixed-dim": "#96ccff", "on-tertiary-fixed-variant": "#004a75", "secondary-container": "#b8f47a", "on-tertiary-fixed": "#001d32", "on-background": "#091d2e", "error": "#ba1a1a", "secondary-fixed-dim": "#9dd761", "primary-container": "#1f2d3d", "primary-fixed": "#d5e4f9", "inverse-on-surface": "#e8f1ff", "surface-container-highest": "#d2e4fc", "surface-container": "#e3efff", "surface-container-low": "#edf4ff", "primary": "#091828", "on-tertiary": "#ffffff", "on-error": "#ffffff", "surface-bright": "#f7f9ff", "on-secondary-container": "#407100", "on-surface": "#091d2e", "on-secondary": "#ffffff", "secondary-fixed": "#b8f47a", "on-tertiary-container": "#2f99e4", "on-primary-fixed": "#0e1d2c", "on-secondary-fixed": "#0e2000", "error-container": "#ffdad6", "surface-tint": "#516071" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "margin": "1rem", "space-md": "0.75rem", "space-xl": "1.5rem", "space-sm": "0.375rem", "space-lg": "1rem", "gutter": "0.75rem", "space-xs": "0.25rem" }, "fontFamily": { "label-lg": [ "Inter" ], "headline-md": [ "Inter" ], "mono-metric": [ "Inter" ], "body-md": [ "Inter" ], "headline-sm": [ "Inter" ], "label-sm": [ "Inter" ], "body-lg": [ "Inter" ], "body-sm": [ "Inter" ], "headline-lg": [ "Inter" ], "label-md": [ "Inter" ] }, "fontSize": { "label-lg": [ "12px", { "lineHeight": "16px", "fontWeight": "600" } ], "headline-md": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "mono-metric": [ "12px", { "lineHeight": "16px", "fontWeight": "700" } ], "body-md": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-sm": [ "15px", { "lineHeight": "20px", "fontWeight": "600" } ], "label-sm": [ "10px", { "lineHeight": "12px", "fontWeight": "600" } ], "body-lg": [ "14px", { "lineHeight": "20px", "fontWeight": "400" } ], "body-sm": [ "12px", { "lineHeight": "16px", "fontWeight": "400" } ], "headline-lg": [ "22px", { "lineHeight": "28px", "fontWeight": "700" } ], "label-md": [ "11px", { "lineHeight": "14px", "fontWeight": "600" } ] } } } }</script></head><body class="bg-surface font-body-md text-on-surface antialiased select-none"><header class="fixed top-0 left-0 right-0 h-[50px] bg-primary-container z-50 flex items-center justify-between px-space-md text-on-primary"><div class="flex items-center gap-space-sm"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1Xwf-AbosbKjx9sx05yc1Ti8FUerSbwEutPjDNXgiShdO_TlIspX0RaQ75L8QTtkAuUyi9XXglpPZS57TCS4nNrOO0fP19V2PzXK-vazI36KJN3csJTGn4fESBVxZ8aQPLL6e6YAkBAItEd6lGIrFUUFUxM7-9n-4tM-CaeDnP85KjIfeAV3eF_yWVhuFJQXPrrDeTf8Gsau6DSCQs8rtyiKUPEVdajBG1JIn1uqrRVE6GXupPDrBM7JrCMRH76L3Ga5GDTLsQMs58"/><button class="w-7 h-7 flex items-center justify-center rounded bg-primary text-on-primary-container hover:text-on-primary transition-colors" title="Geri" type="button"><span class="material-symbols-outlined text-[18px]">arrow_back</span></button><div class="flex items-center gap-space-xs px-space-sm py-space-xs bg-primary rounded cursor-pointer hover:bg-opacity-80 transition-colors"><span class="material-symbols-outlined text-secondary-fixed text-[16px]">local_hospital</span><span class="font-label-lg text-label-lg text-on-primary tracking-wide">3643 - ASG İZMİR HASTANESİ</span><span class="text-on-primary-container text-body-sm">»</span><span class="font-label-lg text-label-lg text-secondary-fixed">Erişkin Acil Servis</span><span class="material-symbols-outlined text-[16px] text-on-primary-container">expand_more</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs"><span class="font-body-sm text-body-sm text-on-primary-container">Hoş geldiniz:</span><span class="font-label-lg text-label-lg text-on-primary">Ahmet Baran Bozkurt</span></div><button class="relative flex items-center justify-center text-on-primary-container hover:text-on-primary transition-colors" title="Bildirimler" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute -top-1.5 -right-2.5 bg-error text-on-error font-mono-metric text-[9px] px-1 py-0.2 rounded-full leading-tight font-bold">+99</span></button><button class="flex items-center justify-center text-on-primary-container hover:text-on-primary transition-colors" title="Ayarlar" type="button"><span class="material-symbols-outlined text-[20px]">settings</span></button><button class="flex items-center justify-center text-on-primary-container hover:text-on-primary transition-colors" title="Tam Ekran" type="button"><span class="material-symbols-outlined text-[20px]">fullscreen</span></button><div class="h-4 w-px bg-outline/30"></div><a class="flex items-center gap-space-xs text-on-primary-container hover:text-error transition-colors" data-path="login" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span class="font-label-md text-label-md">Çıkış</span></a></div></header><aside class="fixed left-0 top-[50px] bottom-0 w-52 bg-primary z-40 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col flex-1 overflow-y-auto py-space-sm"><div class="px-space-md pb-space-sm"><span class="font-label-sm text-label-sm text-on-primary-container uppercase tracking-wider">Klinik İş Gücü</span></div><nav class="flex flex-col space-y-0.5 px-space-xs" data-active-classes="bg-primary-container text-secondary-fixed border-l-2 border-secondary-fixed"><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="dashboard-ana-gosterge" href="#"><span class="material-symbols-outlined text-[19px]">speed</span><span class="font-label-md text-label-md truncate">Ana Gösterge Paneli</span></a><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="talep-projeksiyonlari" href="#"><span class="material-symbols-outlined text-[19px]">stacked_line_chart</span><span class="font-label-md text-label-md truncate">Hasta Akışı &amp; İhtiyaç</span></a><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="gorev-ihtiyac-sablonlari" href="#"><span class="material-symbols-outlined text-[19px]">view_timeline</span><span class="font-label-md text-label-md truncate">Görev Çizelgesi</span></a><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="vardiya-nobet-cizelgesi" href="#"><span class="material-symbols-outlined text-[19px]">calendar_month</span><span class="font-label-md text-label-md truncate">Vardiya &amp; Nöbet</span></a><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="personel-yetkinlik-listesi" href="#"><span class="material-symbols-outlined text-[19px]">group</span><span class="font-label-md text-label-md truncate">Personel &amp; Yetkinlik</span></a><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="vardiya-sablonlari-desenler" href="#"><span class="material-symbols-outlined text-[19px]">tune</span><span class="font-label-md text-label-md truncate">Vardiya Desenleri</span></a><a class="flex items-center gap-space-sm px-space-sm py-2 rounded text-on-primary-container hover:bg-primary-container hover:text-on-primary transition-colors" data-path="kural-ve-ayarlar" href="#"><span class="material-symbols-outlined text-[19px]">gavel</span><span class="font-label-md text-label-md truncate">Kural &amp; Mevzuat</span></a></nav></div><div class="p-space-xs bg-primary-container/40"><button class="w-full flex items-center justify-between px-space-sm py-1.5 rounded text-on-primary-container hover:text-on-primary hover:bg-primary-container transition-colors" title="Menüyü Daralt" type="button"><span class="font-label-sm text-label-sm uppercase tracking-wide">Daralt</span><span class="material-symbols-outlined text-[18px]">first_page</span></button></div></aside><div class="pl-52 w-full"><main class="w-full pt-[50px] min-h-screen bg-background"><div class="flex flex-col w-full">
+<!-- Top Operational Sub-Header Bar -->
+<div class="flex items-center justify-between px-space-md py-space-sm bg-surface-container-lowest shadow-sm z-20">
+<div class="flex items-center gap-space-md">
+<!-- Breadcrumb path -->
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+<span class="font-label-lg text-label-lg text-primary">3643 - ASG İZMİR HASTANESİ</span>
+<span>»</span>
+<span class="text-on-surface-variant">Birim Ayarları</span>
+<span>»</span>
+<span class="text-tertiary-container font-label-lg text-label-lg">Görev &amp; İhtiyaç Şablonları</span>
+</div>
+<div class="h-4 w-px bg-outline-variant"></div>
+<!-- Group By Filter -->
+<div class="flex items-center gap-space-xs">
+<span class="text-on-surface-variant font-label-sm text-label-sm">Grupla:</span>
+<div class="relative inline-block">
+<select class="appearance-none bg-surface-container-low text-on-surface font-label-sm text-label-sm pl-2 pr-6 py-1 rounded cursor-pointer focus:outline-none">
+<option>Görev türüne göre</option>
+<option>Gün türüne göre</option>
+<option>Yetkinlik seviyesine göre</option>
+<option>Klinik Aciliyet / Triage zonuna göre</option>
+</select>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- Quick Metrics Pill -->
+<div class="flex items-center gap-space-xs px-2 py-0.5 bg-surface-container-high rounded text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-secondary">verified_user</span>
+<span>Klinik İhtiyaç Gücü: <strong class="text-primary font-mono-metric text-mono-metric">18 Personel / Gün</strong></span>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-space-sm">
+<button class="flex items-center gap-1 px-2.5 py-1 bg-surface-container text-on-surface hover:bg-surface-container-high rounded font-label-sm text-label-sm transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[15px]">arrow_back</span>
+<span>Geri</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 bg-surface-container text-on-surface hover:bg-surface-container-high rounded font-label-sm text-label-sm transition-colors shadow-sm" id="toggleEmptyRows" type="button">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant" id="checkboxIcon">check_box_outline_blank</span>
+<span>Boşları gizle</span>
+</button>
+<button class="flex items-center gap-1 px-3 py-1 bg-primary text-on-primary hover:bg-primary-container rounded font-label-sm text-label-sm transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[15px] text-secondary-fixed">add_circle</span>
+<span>+ Görev ve gün türü ekle</span>
+</button>
+<button class="flex items-center gap-1 px-3.5 py-1 bg-secondary text-on-secondary hover:bg-secondary/90 rounded font-label-sm text-label-sm transition-colors shadow-sm font-semibold" type="button">
+<span class="material-symbols-outlined text-[15px]">save</span>
+<span>Kaydet</span>
+</button>
+</div>
+</div>
+<!-- Real-time Clinical Capacity vs Demand Micro Visualizer -->
+<div class="px-space-md py-space-xs bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-space-md">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Acil Servis 24 Saatlik İhtiyaç Yükü Eğrisi</span>
+<div class="flex items-center gap-3 font-label-sm text-label-sm">
+<span class="flex items-center gap-1 text-on-surface">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-fixed-dim"></span> Planlanan Min. Personel
+        </span>
+<span class="flex items-center gap-1 text-on-surface">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary-fixed"></span> Karşılanan Kapsam
+        </span>
+<span class="flex items-center gap-1 text-error">
+<span class="w-2.5 h-0.5 bg-error"></span> Tepe Yük Eşiği (Akut)
+        </span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm">
+<span>Pazartesi Şablonu: <strong class="text-primary">Erişkin Triyaj + Kırmızı/Sarı/Yeşil Alanlar</strong></span>
+</div>
+</div>
+<!-- Timeline Grid Container -->
+<div class="w-full overflow-x-auto select-none bg-surface-container-lowest shadow-inner pb-6">
+<div class="min-w-[1540px] flex flex-col">
+<!-- Days & Accordion Strip Header -->
+<div class="flex items-center bg-primary text-on-primary h-8 px-space-sm font-label-md text-label-md">
+<div class="w-[280px] shrink-0 flex items-center justify-between pr-2">
+<div class="flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-secondary-fixed">arrow_drop_down</span>
+<span class="font-headline-sm text-headline-sm tracking-wide">Pazartesi (Genel Acil Servis)</span>
+</div>
+<div class="flex items-center gap-1 text-on-primary-container">
+<button class="hover:text-error transition-colors" title="Şablonu Sil" type="button"><span class="material-symbols-outlined text-[15px]">delete</span></button>
+<button class="hover:text-on-primary transition-colors" title="Kopyala" type="button"><span class="material-symbols-outlined text-[15px]">content_copy</span></button>
+</div>
+</div>
+<!-- Time Axis Columns 00:00 - 23:00 -->
+<div class="grid grid-cols-24 flex-1 h-full text-center">
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">00:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">01:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">02:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">03:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">04:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">05:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">06:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">07:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">08:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">09:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">10:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">11:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">12:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">13:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">14:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">15:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">16:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">17:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">18:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">19:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">20:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">21:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">22:00</div>
+<div class="flex items-center justify-center font-mono-metric text-label-sm text-on-primary-container">23:00</div>
+</div>
+</div>
+<!-- Timeline Task Rows Group -->
+<div class="flex flex-col relative">
+<!-- Faint Hourly Grid Underlay Guide -->
+<div class="absolute inset-y-0 left-[280px] right-0 grid grid-cols-24 pointer-events-none">
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+<div class="h-full bg-surface-container-low/20"></div>
+<div class="h-full bg-surface-container-low/40"></div>
+</div>
+<!-- Task Row 1: Triyaj 1 -->
+<div class="task-row flex items-center h-9 hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-tertiary-fixed-dim"></span>
+<span class="material-symbols-outlined text-[16px] text-tertiary-container">emergency</span>
+<span class="font-label-md text-label-md text-on-surface truncate">🚑 TRİYAJ 1 (Acil Kabul)</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- Time block: 08:00 to 20:00 (Starts col 9, spans 12 cols) -->
+<div class="col-start-9 col-span-12 h-6 flex items-center relative z-10">
+<div class="w-2 h-4 rounded-l bg-surface-container-highest flex items-center justify-center cursor-ew-resize opacity-80 hover:opacity-100"></div>
+<div class="flex-1 h-full bg-tertiary-fixed-dim/70 hover:bg-tertiary-fixed-dim text-on-tertiary-fixed rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm transition-all">
+<span class="font-label-sm text-label-sm truncate">08:00 - 20:00 (12 Sa.)</span>
+<span class="px-1.5 py-0.2 bg-surface-container-lowest/80 text-primary font-mono-metric text-label-sm rounded-full shadow-xs">2</span>
+</div>
+<div class="w-2 h-4 rounded-r bg-surface-container-highest flex items-center justify-center cursor-ew-resize opacity-80 hover:opacity-100"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 2: Resüsitasyon / Kırmızı Alan -->
+<div class="task-row flex items-center h-9 bg-surface-container-lowest hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-error"></span>
+<span class="material-symbols-outlined text-[16px] text-error">monitor_heart</span>
+<span class="font-label-md text-label-md text-on-surface truncate">💉 RESÜSİTASYON (Kırmızı Alan)</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- 09:00 to 21:00 (Starts col 10, spans 12 cols) -->
+<div class="col-start-10 col-span-12 h-6 flex items-center relative z-10">
+<div class="w-2 h-4 rounded-l bg-error-container flex items-center justify-center cursor-ew-resize"></div>
+<div class="flex-1 h-full bg-error-container text-on-error-container rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm hover:brightness-95 transition-all">
+<span class="font-label-sm text-label-sm truncate">09:00 - 21:00 (Akut Müdahale)</span>
+<span class="px-1.5 py-0.2 bg-error text-on-error font-mono-metric text-label-sm rounded-full shadow-xs">2</span>
+</div>
+<div class="w-2 h-4 rounded-r bg-error-container flex items-center justify-center cursor-ew-resize"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 3: Acil Müdahale / Sarı Alan -->
+<div class="task-row flex items-center h-9 hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-secondary-fixed"></span>
+<span class="material-symbols-outlined text-[16px] text-secondary">stethoscope</span>
+<span class="font-label-md text-label-md text-on-surface truncate">🩺 ACİL MÜDAHALE (Sarı Alan)</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- 10:00 to 22:00 (Starts col 11, spans 12 cols) -->
+<div class="col-start-11 col-span-12 h-6 flex items-center relative z-10">
+<div class="w-2 h-4 rounded-l bg-secondary-container flex items-center justify-center cursor-ew-resize"></div>
+<div class="flex-1 h-full bg-secondary-container text-on-secondary-container rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm hover:brightness-95 transition-all">
+<span class="font-label-sm text-label-sm truncate">10:00 - 22:00 (Yoğun Bakı)</span>
+<span class="px-1.5 py-0.2 bg-secondary text-on-secondary font-mono-metric text-label-sm rounded-full shadow-xs">3</span>
+</div>
+<div class="w-2 h-4 rounded-r bg-secondary-container flex items-center justify-center cursor-ew-resize"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 4: Gözlem & Hasta Kabul -->
+<div class="task-row flex items-center h-9 bg-surface-container-lowest hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-surface-tint"></span>
+<span class="material-symbols-outlined text-[16px] text-tertiary">assignment</span>
+<span class="font-label-md text-label-md text-on-surface truncate">📋 GÖZLEM &amp; HASTA KABUL</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- 08:00 to 18:00 (Starts col 9, spans 10 cols) -->
+<div class="col-start-9 col-span-10 h-6 flex items-center relative z-10">
+<div class="w-2 h-4 rounded-l bg-surface-container-highest flex items-center justify-center cursor-ew-resize"></div>
+<div class="flex-1 h-full bg-surface-variant text-on-surface rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm hover:brightness-95 transition-all">
+<span class="font-label-sm text-label-sm truncate">08:00 - 18:00</span>
+<span class="px-1.5 py-0.2 bg-surface-container-lowest text-on-surface font-mono-metric text-label-sm rounded-full shadow-xs">1</span>
+</div>
+<div class="w-2 h-4 rounded-r bg-surface-container-highest flex items-center justify-center cursor-ew-resize"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 5: Eczane & İlaç Hazırlık -->
+<div class="task-row flex items-center h-9 hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-tertiary-container"></span>
+<span class="material-symbols-outlined text-[16px] text-on-tertiary-container">medication</span>
+<span class="font-label-md text-label-md text-on-surface truncate">💊 ECZANE &amp; İLAÇ HAZIRLIK</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- 07:00 to 15:00 (Starts col 8, spans 8 cols) -->
+<div class="col-start-8 col-span-8 h-6 flex items-center relative z-10">
+<div class="w-2 h-4 rounded-l bg-surface-container-high flex items-center justify-center cursor-ew-resize"></div>
+<div class="flex-1 h-full bg-tertiary-container text-on-tertiary-container rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm hover:brightness-110 transition-all">
+<span class="font-label-sm text-label-sm truncate text-surface">07:00 - 15:00 (Sabah İlaç)</span>
+<span class="px-1.5 py-0.2 bg-on-tertiary-container text-surface-container-lowest font-mono-metric text-label-sm rounded-full shadow-xs">1</span>
+</div>
+<div class="w-2 h-4 rounded-r bg-surface-container-high flex items-center justify-center cursor-ew-resize"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 6: Kan Alma & IV Girişim -->
+<div class="task-row flex items-center h-9 bg-surface-container-lowest hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-tertiary"></span>
+<span class="material-symbols-outlined text-[16px] text-error">water_drop</span>
+<span class="font-label-md text-label-md text-on-surface truncate">🩸 KAN ALMA &amp; IV GİRİŞİM</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- 09:00 to 21:00 (Starts col 10, spans 12 cols) -->
+<div class="col-start-10 col-span-12 h-6 flex items-center relative z-10">
+<div class="w-2 h-4 rounded-l bg-primary-fixed flex items-center justify-center cursor-ew-resize"></div>
+<div class="flex-1 h-full bg-primary-fixed text-on-primary-fixed rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm hover:brightness-95 transition-all">
+<span class="font-label-sm text-label-sm truncate">09:00 - 21:00</span>
+<span class="px-1.5 py-0.2 bg-primary text-on-primary font-mono-metric text-label-sm rounded-full shadow-xs">2</span>
+</div>
+<div class="w-2 h-4 rounded-r bg-primary-fixed flex items-center justify-center cursor-ew-resize"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 7: Gece Sterilizasyon & Devir Teslim -->
+<div class="task-row flex items-center h-9 hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-inverse-surface"></span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">cleaning_services</span>
+<span class="font-label-md text-label-md text-on-surface truncate">🧹 GECE STERİLİZASYON &amp; DEVİR</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- 22:00 to 24:00 (col 23 to 24) and 00:00 to 07:00 (col 1 to 7) to show multi-segment night duty -->
+<div class="col-start-23 col-span-2 h-6 flex items-center relative z-10">
+<div class="flex-1 h-full bg-surface-dim text-on-surface rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm">
+<span class="font-label-sm text-label-sm truncate">22:00-00:00</span>
+<span class="px-1.5 py-0.2 bg-surface-container-lowest text-primary font-mono-metric text-label-sm rounded-full">2</span>
+</div>
+</div>
+<div class="col-start-1 col-span-7 h-6 flex items-center relative z-10">
+<div class="flex-1 h-full bg-surface-dim text-on-surface rounded-sm flex items-center justify-between px-2 cursor-grab shadow-sm">
+<span class="font-label-sm text-label-sm truncate">00:00 - 07:00 (Gece Vardiyası)</span>
+<span class="px-1.5 py-0.2 bg-surface-container-lowest text-primary font-mono-metric text-label-sm rounded-full">2</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Task Row 8 (Empty state to test 'Boşları Gizle' functionality) -->
+<div class="task-row empty-row flex items-center h-9 bg-surface-container-lowest hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-outline-variant"></span>
+<span class="material-symbols-outlined text-[16px] text-outline">vaccines</span>
+<span class="font-label-md text-label-md text-outline truncate">💉 AŞI &amp; PROFLAKSİ ODASI</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- No active blocks scheduled -->
+<span class="col-start-1 col-span-24 text-center font-label-sm text-label-sm text-outline-variant italic">Atanmış vardiya/ihtiyaç bloğu yok</span>
+</div>
+</div>
+<!-- Task Row 9 (Empty state) -->
+<div class="task-row empty-row flex items-center h-9 hover:bg-surface-container-low/50 transition-colors relative group">
+<div class="w-[280px] shrink-0 flex items-center gap-2 px-space-sm z-10 bg-surface-container-lowest">
+<span class="w-3 h-3 rounded-sm bg-outline-variant"></span>
+<span class="material-symbols-outlined text-[16px] text-outline">psychiatry</span>
+<span class="font-label-md text-label-md text-outline truncate">🧠 PSİKİYATRİK ACİL İZLEM</span>
+</div>
+<div class="flex-1 h-full relative grid grid-cols-24 items-center">
+<!-- No active blocks scheduled -->
+<span class="col-start-1 col-span-24 text-center font-label-sm text-label-sm text-outline-variant italic">Atanmış vardiya/ihtiyaç bloğu yok</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Detailed Demand Analytics & Legend Panel -->
+<div class="grid grid-cols-1 xl:grid-cols-4 gap-space-md p-space-md bg-surface">
+<!-- Card 1: Shift Allocation KPI -->
+<div class="p-space-md bg-surface-container-lowest rounded shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Toplam Karşılanan Saat</span>
+<span class="material-symbols-outlined text-secondary text-[20px]">timelapse</span>
+</div>
+<div class="mt-2 flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg text-primary">156.0</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">saat / gün</span>
+</div>
+<div class="mt-2 flex items-center text-secondary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span class="ml-1">%100 Acil Servis Akreditasyon Uyumu</span>
+</div>
+</div>
+<!-- Card 2: Peak Hour Warning -->
+<div class="p-space-md bg-surface-container-lowest rounded shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant">Pik Yük Zaman Dilimi</span>
+<span class="material-symbols-outlined text-error text-[20px]">crisis_alert</span>
+</div>
+<div class="mt-2 flex items-baseline gap-2">
+<span class="font-headline-lg text-headline-lg text-error">14:00 - 19:00</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Hasta Giriş Yoğunluğu</span>
+</div>
+<div class="mt-2 flex items-center text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px] text-secondary">check_circle</span>
+<span class="ml-1">8 Personel Eşzamanlı Görevde</span>
+</div>
+</div>
+<!-- Card 3: Color Legend & Zone Classifications -->
+<div class="p-space-md bg-surface-container-lowest rounded shadow-sm xl:col-span-2 flex flex-col justify-between">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-md text-label-md text-primary">Klinik Renk Kodları ve Yetki Dağılımı</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Sağlık Bakanlığı Acil Standartları</span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<div class="flex items-center gap-2 p-1.5 bg-tertiary-fixed-dim/30 rounded">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-fixed-dim"></span>
+<span class="font-label-sm text-label-sm text-on-surface truncate">Triyaj &amp; Danışma</span>
+</div>
+<div class="flex items-center gap-2 p-1.5 bg-error-container/40 rounded">
+<span class="w-2.5 h-2.5 rounded-full bg-error"></span>
+<span class="font-label-sm text-label-sm text-on-surface truncate">Kırmızı Alan (CPR)</span>
+</div>
+<div class="flex items-center gap-2 p-1.5 bg-secondary-container/40 rounded">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm text-on-surface truncate">Sarı Alan (Müdahale)</span>
+</div>
+<div class="flex items-center gap-2 p-1.5 bg-surface-variant/40 rounded">
+<span class="w-2.5 h-2.5 rounded-full bg-surface-tint"></span>
+<span class="font-label-sm text-label-sm text-on-surface truncate">Yeşil Alan (Poliklinik)</span>
+</div>
+<div class="flex items-center gap-2 p-1.5 bg-tertiary-container/20 rounded">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-container"></span>
+<span class="font-label-sm text-label-sm text-on-surface truncate">Eczane &amp; Narkotik</span>
+</div>
+<div class="flex items-center gap-2 p-1.5 bg-primary-fixed/40 rounded">
+<span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-on-surface truncate">Hemşire &amp; Girişim</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive JavaScript for Drag simulation and Filter toggle -->
+<script>
+    (function() {
+      // Toggle Empty Rows
+      const toggleBtn = document.getElementById('toggleEmptyRows');
+      const checkboxIcon = document.getElementById('checkboxIcon');
+      let hideEmpty = false;
+
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+          hideEmpty = !hideEmpty;
+          const emptyRows = document.querySelectorAll('.empty-row');
+          emptyRows.forEach(row => {
+            row.style.display = hideEmpty ? 'none' : 'flex';
+          });
+          checkboxIcon.textContent = hideEmpty ? 'check_box' : 'check_box_outline_blank';
+          checkboxIcon.classList.toggle('text-secondary', hideEmpty);
+        });
+      }
+
+      // Visual feedback on shift block hover
+      const shiftBlocks = document.querySelectorAll('.cursor-grab');
+      shiftBlocks.forEach(block => {
+        block.addEventListener('click', function() {
+          const title = this.querySelector('span:first-child')?.innerText || 'Görev Bloğu';
+          const count = this.querySelector('span:last-child')?.innerText || '1';
+          console.log(`Düzenleme Modu: ${title} [Personel İhtiyacı: ${count}]`);
+        });
+      });
+    })();
+  </script>
+</div></main></div></body></html>
