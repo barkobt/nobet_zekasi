@@ -1,22 +1,67 @@
 #!/bin/bash
-# scripts/rebuild.sh
-# nobet_zekasi veritabanını sıfırdan kurar: şemayı temizler, tüm migration'ları ve seed'leri sırayla çalıştırır.
-# Kullanım (repo klasöründe):   ./scripts/rebuild.sh
-# Farklı kullanıcı/port için:    PGUSER=postgres PGPORT=5432 ./scripts/rebuild.sh
-set -e                                   # bir dosya hata verirse dur, devam etme
-DB="${PGDATABASE:-nobet_zekasi}"
-PSQL="psql -d $DB -v ON_ERROR_STOP=1 -q"  # ON_ERROR_STOP: SQL hatasında psql'i durdur
+# db/scripts/rebuild.sh
+# Veritabanını sıfırdan kurar: public şemasını temizler, tüm migration ve seed'leri sırayla çalıştırır.
+#
+# Kullanım (nereden çağrıldığı önemli değil):
+#   ./db/scripts/rebuild.sh                     → yerel veritabanı (PGDATABASE, varsayılan nobet_zekasi)
+#   DATABASE_URL_DIRECT="postgres://..." ./db/scripts/rebuild.sh   → Neon / uzak veritabanı
+#   ./db/scripts/rebuild.sh --yes               → onay sorma (CI, ilk kurulum)
+#
+# NEON'DA POOLED DEĞİL, DIRECT BAĞLANTI KULLAN.
+# Pooled uç (…-pooler.…) PgBouncer'ın transaction modunda çalışır: bağlantı her
+# ifadeden sonra başka bir istemciye geçebilir. Şema kurulumu buna dayanmaz —
+# CREATE EXTENSION, geçici tablolar (seeds/007 ve 009 kullanıyor) ve uzun
+# transaction'lar oturumun aynı kalmasını ister. Bu yüzden:
+#   DATABASE_URL_DIRECT → şema/migration (yalnız kurulum anında, yerelden)
+#   DATABASE_URL        → uygulama (pooled, Railway'de)
+# Betik ikisini de kabul eder ama DIRECT olanı tercih eder.
+set -euo pipefail
 
-echo "Hedef veritabanı: $DB"
-read -p "public şemasındaki HER ŞEY silinecek. Devam? (e/h) " ok
-[ "$ok" = "e" ] || { echo "İptal."; exit 1; }
+# Betik nerede olursa olsun db/ kökünden çalış: migrations/ ve seeds/ göreli yolları sabit kalsın.
+DB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$DB_ROOT"
 
-$PSQL -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-for f in migrations/*.up.sql; do echo "↑ $f"; $PSQL -f "$f"; done
-for f in seeds/*.sql;         do echo "• $f"; $PSQL -f "$f" > /dev/null; done
+ASSUME_YES=0
+[ "${1:-}" = "--yes" ] && ASSUME_YES=1
 
-$PSQL -c "SELECT (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE') AS tablo,
-                 (SELECT count(*) FROM information_schema.views  WHERE table_schema='public') AS view,
-                 (SELECT count(*) FROM staff) AS personel,
-                 (SELECT count(*) FROM assignments) AS atama;"
-echo "Bitti. Beklenen: 22 tablo, 5 view, 20 personel, 91 atama."
+# Bağlantı: DATABASE_URL varsa onu kullan (Neon pooled + sslmode=require dahil),
+# yoksa yerel psql varsayılanlarına düş.
+KURULUM_URL="${DATABASE_URL_DIRECT:-${DATABASE_URL:-}}"
+
+if [ -n "$KURULUM_URL" ]; then
+    PSQL=(psql "$KURULUM_URL" -v ON_ERROR_STOP=1 -q)
+    # Parolayı ekrana basma: yalnız host ve veritabanı adını göster.
+    HEDEF="$(printf '%s' "$KURULUM_URL" | sed -E 's#^[^:]+://([^@]*@)?#\1#; s#^[^@]*@##; s#\?.*##')"
+
+    # Pooled uçla şema kurmaya çalışırsa uyar: hata mesajları kafa karıştırıcı olur.
+    case "$KURULUM_URL" in
+      *-pooler.*)
+        echo "UYARI: pooled (PgBouncer) bir uç kullanıyorsun." >&2
+        echo "       Şema kurulumu DIRECT bağlantı ister; Neon konsolunda" >&2
+        echo "       'Connection pooling' kapalıyken görünen adresi kullan." >&2
+        echo "       Devam edersen CREATE EXTENSION veya geçici tablolarda hata alabilirsin." >&2
+        ;;
+    esac
+else
+    PSQL=(psql -d "${PGDATABASE:-nobet_zekasi}" -v ON_ERROR_STOP=1 -q)
+    HEDEF="${PGDATABASE:-nobet_zekasi} (yerel)"
+fi
+
+echo "Hedef veritabanı: $HEDEF"
+if [ "$ASSUME_YES" -eq 0 ]; then
+    read -r -p "public şemasındaki HER ŞEY silinecek. Devam? (e/h) " ok
+    [ "$ok" = "e" ] || { echo "İptal."; exit 1; }
+fi
+
+"${PSQL[@]}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+for f in migrations/*.up.sql; do echo "↑ $f"; "${PSQL[@]}" -f "$f"; done
+# Seed 009 referans haftayı kağıttan aktarır ve bilinen tek uygunluk ihlalini içerir
+# (Güven Göl, 26.09, AMBULANS). Trigger bunu WARNING olarak geçirir — beklenen davranış.
+for f in seeds/*.sql;         do echo "• $f"; "${PSQL[@]}" -f "$f" > /dev/null; done
+
+"${PSQL[@]}" -c "SELECT (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE') AS tablo,
+                        (SELECT count(*) FROM information_schema.views  WHERE table_schema='public') AS view,
+                        (SELECT count(*) FROM staff) AS personel,
+                        (SELECT count(*) FROM assignments) AS atama,
+                        (SELECT count(*) FROM v_task_eligibility_violations) AS uygunluk_ihlali;"
+echo "Bitti. Beklenen: 22 tablo, 6 view, 20 personel, 91 atama, 1 uygunluk ihlali."
