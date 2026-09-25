@@ -1,0 +1,25 @@
+# Gizli bilgiler — .env.example commit edilir, .env edilmez
+.env
+.env.local
+.env.*.local
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Araç çıktıları
+web/src/lib/api-types.ts.tmp
+.vercel
+
+# macOS
+.DS_Store

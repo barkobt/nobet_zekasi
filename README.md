@@ -1,54 +1,46 @@
-# Nöbet Zekâsı — Veritabanı
+# Nöbet Zekâsı — Acıbadem Smart Planner
 
-PostgreSQL şeması: numaralı migration dosyaları + seed verisi.
+Acıbadem Kent ASG erişkin acil servisi için CP-SAT tabanlı hemşire nöbet planlama sistemi.
 
-## Klasörler
+Kurallar veritabanında yaşar, kodda değil: "bu ay gece kuralını gevşetelim" demek için
+deploy gerekmez. Çözücü aylık çalışır, çizelge haftalık gösterilir.
 
-| Klasör | İçerik | Kural |
+## Monorepo
+
+| Klasör | Ne var | Nasıl çalıştırılır |
 |---|---|---|
-| `migrations/` | Yapı (`CREATE`, `ALTER`, `DROP`) | Çalışmış dosya düzenlenmez, yeni numara eklenir |
-| `seeds/` | Başlangıç verisi (`INSERT`) | Tekrar çalıştırılabilir olmalı (çift kayıt üretmez) |
-| `queries/` | Kontrol ve rapor sorguları | Hiçbir şeyi kalıcı değiştirmez |
+| `db/` | PostgreSQL şeması: 10 migration, 10 seed, 22 tablo, 6 view | `./db/scripts/rebuild.sh` |
+| `api/` | FastAPI + psycopg 3 + CP-SAT solver | `cd api && uv run fastapi dev app/main.py` |
+| `web/` | Next.js + TypeScript + Tailwind + shadcn/ui | `cd web && pnpm dev` |
+| `docs/` | Ekran haritası, kısıt kataloğu, marka varlıkları, düzen taslakları | — |
 
-## Sıfırdan kurulum sırası
+Tasarım dili: kökteki [`DESIGN.md`](DESIGN.md).
+Çalışma kuralları: [`CLAUDE.md`](CLAUDE.md).
 
-1. `migrations/001` → `009` arası tüm `.up.sql` dosyaları, numara sırasıyla
-2. `seeds/001` → `009`, numara sırasıyla
-3. `queries/checks.sql` ile doğrulama, `queries/reference_week_audit.sql` ile gerçek çizelge denetimi
+## Hızlı başlangıç
 
-## Geri alma
+```bash
+# 1) Veritabanı
+createdb nobet_zekasi
+./db/scripts/rebuild.sh --yes
+# Beklenen: 22 tablo, 6 view, 20 personel, 91 atama, 1 uygunluk ihlali
 
-`.down.sql` dosyaları **ters** sırayla: 009 → 001.
+# 2) API
+cd api && uv sync && uv run fastapi dev app/main.py   # → http://localhost:8000
 
-## Katmanlar
+# 3) Web
+cd web && pnpm install && pnpm dev                    # → http://localhost:3000
+```
 
-| Katman | Migration | Tablolar |
-|---|---|---|
-| 0 · Referans | 001–004 | units, shift_types, competencies, constraints, constraint_params |
-| 1 · Kadro | 005 | roles, staff, contracts, staff_competencies, availability_rules, absences, staff_conflicts |
-| 2 · İhtiyaç | 006 | need_templates, need_template_rows, need_template_row_competencies, need_periods |
-| 3 · Çözüm | 007 | schedule_drafts, solver_runs, assignments, assignment_tasks, solver_diagnostics, actual_times |
-| Bütünlük + raporlar | 008 | staff.is_active, CHECK'ler, 5 view |
-| Kapsama düzeltmesi | 009 | v_daily_coverage: sorumlu ve oryantasyon GENEL mevcuda sayılmaz |
+Uzak veritabanı için: `DATABASE_URL="postgres://..." ./db/scripts/rebuild.sh --yes`
 
-## Görünümler (view)
+## Kapsam
 
-| View | Ekran | Ne gösterir |
-|---|---|---|
-| `v_staff_conflict_pairs` | E-04 | Uyumsuz çiftler, iki yönlü |
-| `v_assignment_hours` | — | Atama başına planlanan / gerçekleşen / geç çıkış saati |
-| `v_monthly_hours` | E-11 | Kişi × ay puantajı, eksik saat, iki fazla mesai tanımı |
-| `v_fairness` | E-12 | Gece / hafta sonu sayısı, ortalamadan sapma |
-| `v_daily_coverage` | E-09 | Gün × vardiya × slot: atanan / gereken |
+**MVP (1 Ekim 2026 demosu):** E-01 Vardiya Tanımları · E-02 Yetkinlik Matrisi ·
+E-03 Kural Seti · E-04 Personel · E-06 İhtiyaç Şablonu · E-08 Taslaklar ·
+E-09 Nöbet Çizelgesi (ana ekran) · E-10 Çözüm Teşhisi
 
-## Seed'ler ve migration'lar arasındaki fark
+**Sonraki faz:** E-05 İzin Yönetimi · E-07 Dönem Planlaması · E-11 Saat Bütçesi · E-12 Adalet Panosu
 
-Migration çalıştıktan sonra düzenlenmez. Seed ise **güncel doğruyu** anlatır ve düzenlenebilir,
-yeter ki tekrar çalıştırılabilir kalsın. Sahadan gelen kararlar tarihli seed olarak eklenir
-(`008_decisions_2026_09_24.sql`), böylece "o gün ne değişti?" sorusunun cevabı tek dosyada durur.
-
-| Seed | İçerik |
-|---|---|
-| 007 | Gerçek kadro (20 kişi), yetkinlikler, sözleşmeler, oryantasyon eşleşmesi |
-| 008 | 24.09 kararları: ambulans kuralı, sayım zorunluluğu, gündüz mevcudu 5 (sorumlu ve oryantasyon hariç) |
-| 009 | Elle hazırlanan referans çizelge (21–27 Eylül 2026) |
+Ayrıntı: [`docs/ekran-haritasi.md`](docs/ekran-haritasi.md) ve
+[`docs/kisit-katalogu.md`](docs/kisit-katalogu.md).
