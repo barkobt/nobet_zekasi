@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* ===========================================================================
+   Acıbadem Smart Planner — tasarım token'ları
+   TEK KAYNAK: kökteki DESIGN.md. Hex kodu YALNIZCA bu dosyada bulunur;
+   bileşenlerde yalnızca token kullanılır (DESIGN §2).
+   =========================================================================== */
+
+:root {
+  /* --- DESIGN §2: renk --- */
+  --brand:        #1D265F;   /* Acıbadem logo laciverti: sol menü, birincil buton */
+  --brand-hover:  #28337A;
+  --brand-soft:   #EDEEF6;   /* aktif satır / seçili hücre zemini */
+  --accent:       #1C7ED6;   /* link, odak halkası, bugün vurgusu. Başka hiçbir şey */
+
+  --bg:           #F5F7FA;
+  --surface:      #FFFFFF;
+  --border-c:     #E3E8EF;
+  --text:         #0F1B2D;
+  --text-muted:   #5B6B7F;
+
+  --ok:           #1E8E5A;
+  --warn:         #C77700;
+  --danger:       #C62828;
+  --ok-soft:      color-mix(in srgb, var(--ok) 8%, transparent);
+  --warn-soft:    color-mix(in srgb, var(--warn) 8%, transparent);
+  --danger-soft:  color-mix(in srgb, var(--danger) 8%, transparent);
+
+  /* --- shadcn/ui eşlemesi: bileşenler bu değişkenleri okur --- */
+  /* DİKKAT: shadcn'in kendi --accent'i "hover zemini" demektir, DESIGN'ın --accent'i
+     ise mavi vurgudur. Çakışmayı burada çözüyoruz: shadcn tarafı --brand-soft'a
+     bağlanır (DESIGN §5 zaten tablo hover'ını brand-soft istiyor), DESIGN'ın mavisi
+     aşağıda --color-focus adıyla açılır. */
+  --background:           var(--bg);
+  --foreground:           var(--text);
+  --card:                 var(--surface);
+  --card-foreground:      var(--text);
+  --popover:              var(--surface);
+  --popover-foreground:   var(--text);
+  --primary:              var(--brand);
+  --primary-foreground:   var(--surface);
+  --secondary:            var(--brand-soft);
+  --secondary-foreground: var(--brand);
+  --muted:                var(--bg);
+  --muted-foreground:     var(--text-muted);
+  --destructive:          var(--danger);
+  --border:               var(--border-c);
+  --input:                var(--border-c);
+  --ring:                 var(--accent);
+
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  /* DESIGN token'ları Tailwind yardımcı sınıfı olarak: bg-brand, text-danger, ring-focus… */
+  --color-brand:       var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft:  var(--brand-soft);
+  --color-focus:       var(--accent);
+  --color-surface:     var(--surface);
+  --color-ok:          var(--ok);
+  --color-warn:        var(--warn);
+  --color-danger:      var(--danger);
+  --color-ok-soft:     var(--ok-soft);
+  --color-warn-soft:   var(--warn-soft);
+  --color-danger-soft: var(--danger-soft);
+
+  /* shadcn'in beklediği adlar */
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --color-card:                 var(--card);
+  --color-card-foreground:      var(--card-foreground);
+  --color-popover:              var(--popover);
+  --color-popover-foreground:   var(--popover-foreground);
+  --color-primary:              var(--primary);
+  --color-primary-foreground:   var(--primary-foreground);
+  --color-secondary:            var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:                var(--muted);
+  --color-muted-foreground:     var(--muted-foreground);
+  --color-accent:               var(--brand-soft);   /* bkz. yukarıdaki not */
+  --color-accent-foreground:    var(--brand);
+  --color-destructive:          var(--destructive);
+  --color-border:               var(--border);
+  --color-input:                var(--input);
+  --color-ring:                 var(--ring);
+
+  /* --- DESIGN §3: tipografi. Ölçek 12/13/14/16/20/28, başka boyut yok. --- */
+  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --text-xs:   0.75rem;    /* 12 — bölüm etiketi, tablo başlığı, rozet */
+  --text-sm:   0.8125rem;  /* 13 — yardımcı metin */
+  --text-base: 0.875rem;   /* 14 — ana metin, kart başlığı */
+  --text-md:   1rem;       /* 16 */
+  --text-lg:   1.25rem;    /* 20 — sayfa başlığı */
+  --text-xl:   1.75rem;    /* 28 — KPI */
+
+  /* --- DESIGN §5: radius. Kart 8, buton/input 6, rozet 4. Başka değer yok. --- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-size: var(--text-base);
+    /* DESIGN §3: sayılar her yerde hizalı. tabular-nums gövdede açılır. */
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  /* DESIGN §8: klavye odağı görünür, halka --accent, 2px. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* DESIGN §4.1: hareket azaltma tercihi geçişleri anlık yapar. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
+  }
+}
