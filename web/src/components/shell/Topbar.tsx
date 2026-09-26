@@ -10,7 +10,7 @@ import { NAV } from "@/lib/navigation";
  */
 export function Topbar({ period }: { period?: React.ReactNode }) {
   const pathname = usePathname();
-  const sayfa = NAV.find((n) => pathname.startsWith(n.href));
+  const sayfa = NAV.find((n) => (n.href === "/" ? pathname === "/" : pathname.startsWith(n.href)));
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-6">

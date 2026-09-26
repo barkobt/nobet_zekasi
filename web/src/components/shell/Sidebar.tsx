@@ -31,7 +31,12 @@ export function Sidebar({
 
       <ul className="flex flex-1 flex-col gap-0.5 px-2 py-2">
         {NAV.map((item) => {
-          const aktif = pathname === item.href || pathname.startsWith(item.href + "/");
+          // "/" her yolun ön eki: ana sayfa yalnızca TAM eşleşmede aktif olmalı,
+          // yoksa her ekranda iki menü öğesi aktif görünür.
+          const aktif =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
 
           const link = (

@@ -108,7 +108,8 @@ Bileşen: `web/src/components/shell/BrandLogo.tsx` (tek yerde; başka hiçbir ye
 
 | Ekran | Ana soru | Düzen referansı |
 |---|---|---|
-| E-09 Nöbet Çizelgesi (**ana ekran**) | "Bu hafta/ay kim hangi vardiyada, eksik var mı?" | `mockups/05` ızgara iskeleti |
+| E-00 Ana Sayfa | "Bu dönemde kadro yetiyor mu?" | Orquest ana ekranı: ortada tek kart |
+| E-09 Nöbet Çizelgesi | "Bu hafta/ay kim hangi vardiyada, eksik var mı?" | `mockups/05` ızgara iskeleti |
 | E-08 Taslaklar | "Hangi taslak daha iyi?" | `mockups/02` sadeliği + metrik tablosu |
 | E-10 Çözüm Teşhisi | "Neden çözülemedi, hangi kuralı gevşetmeliyim?" | yok, E-08 kart dilinde |
 | E-04 Personel | "Bu kişinin sözleşmesi, yetkinliği, müsaitliği ne?" | `mockups/08` tablo + Orquest sol liste/sağ sekme |
@@ -117,8 +118,25 @@ Bileşen: `web/src/components/shell/BrandLogo.tsx` (tek yerde; başka hiçbir ye
 | E-06 İhtiyaç Şablonu | "Vardiya başına kaç kişi/görev gerekiyor?" | `mockups/06` zaman çizelgesi, iki vardiyaya indirgenmiş |
 | E-01 Vardiya Tanımları | "Vardiyalar ve saatleri neler?" | basit liste |
 
-Ana sayfa (dashboard) MVP'de **yoktur**. Uygulama doğrudan E-09 ile açılır.
-`mockups/01, 03, 04, 07` (dashboard ve hasta akışı projeksiyonu) kapsam dışıdır.
+Uygulama **E-00 ana sayfasıyla** açılır (26.09 kararı; eski karar "doğrudan E-09" idi).
+`mockups/01, 03, 04, 07` (dashboard ve hasta akışı projeksiyonu) kapsam dışıdır —
+bizim ana sayfamız onlara benzemez: tek kart, tek soru, grafik yok.
+
+### E-00 detay
+- Üst şerit: `‹ dönem ›` · Hafta/Ay geçişi · birim adı.
+- Ortada TEK kart: dönem adı (yayınlanmamışsa "taslak" rozeti), büyük sayı
+  **atanan / gereken saat**, altında üç küçük değer: Kural ihlali · Fazla mesai ·
+  Adalet farkı. Yalnızca kural ihlali sıfırdan büyükse `--danger`.
+- Veri: dönemle ÇAKIŞAN taslak; önce yayınlanmış, yoksa en yeni taslak.
+  Hiç yoksa tek cümlelik boş durum + "Taslak oluştur".
+- Kart bir link: çizelgeye gider.
+- **Gereken saat** ihtiyaç şablonundan türetilir: her gün × her aktif vardiya için
+  GENEL slotunun `min_count`'u × vardiyanın `duration_hours`'ı. Yalnızca GENEL
+  sayılır; triyaj/gözlem/ambulans aynı kadronun içinden atanır (C-019), onları da
+  toplamak aynı kişiyi birkaç kez saymak olurdu.
+  Örnek: 21–27 Eylül = 7 × (5×9,5 + 5×14,5) = **840 sa**.
+- Atanan saatin gerekenden büyük olması normaldir: sorumlu hemşire ve
+  oryantasyondakiler GENEL mevcuda sayılmaz ama saatleri atanan tarafa girer.
 
 ### E-09 detay
 - Satır = personel (rol grubuna göre katlanabilir bölümler: Sorumlu & Eğitim, Ekip Liderleri, Hemşireler).

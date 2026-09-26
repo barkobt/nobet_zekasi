@@ -175,6 +175,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ana sayfa kartı */
+        get: operations["ozet_api_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -445,8 +462,73 @@ export interface components {
              * @description Veritabanı şeması deploy edilen kodun beklediği migration'ları içeriyor mu
              */
             sema_guncel?: boolean | null;
+            /**
+             * Eksik Migration
+             * @description Veritabanında eksik olan migration'lar
+             */
+            eksik_migration?: string | null;
             /** Detay */
             detay?: string | null;
+        };
+        /** Overview */
+        Overview: {
+            /** Unit Name */
+            unit_name: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description DIŞLAYICI bitiş
+             */
+            period_end: string;
+            /** Period Label */
+            period_label: string;
+            draft?: components["schemas"]["OverviewDraft"] | null;
+            /**
+             * Assigned Hours
+             * @description Dönemdeki atamaların toplam planlanan saati
+             */
+            assigned_hours: number;
+            /**
+             * Required Hours
+             * @description İhtiyaç şablonundan türetilen gereken saat: her gün, her vardiya için GENEL min_count × vardiya süresi
+             */
+            required_hours: number;
+            /**
+             * Coverage Ratio
+             * @description assigned / required, 0 ise 0
+             */
+            coverage_ratio: number;
+            /**
+             * Violation Count
+             * @description Kapsama eksiği olan gün-vardiya-slot sayısı
+             */
+            violation_count: number;
+            /** Overtime Hours */
+            overtime_hours: number;
+            /**
+             * Fairness Gap
+             * @description En çok − en az çalışan saat farkı
+             */
+            fairness_gap: number;
+        };
+        /** OverviewDraft */
+        OverviewDraft: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /**
+             * Is Published
+             * @description Yayınlanmış mı, yoksa yalnızca taslak mı
+             */
+            is_published: boolean;
         };
         /** Row */
         Row: {
@@ -1030,6 +1112,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiagnosticGroup"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ozet_api_overview_get: {
+        parameters: {
+            query: {
+                from: string;
+                /** @description DAHİL — API dışlayıcıya çevirir */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Overview"];
                 };
             };
             /** @description Validation Error */

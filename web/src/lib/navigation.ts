@@ -1,5 +1,5 @@
 import {
-  CalendarDays, Layers, Stethoscope, Users, Grid3x3, Scale, ClipboardList, Clock,
+  Home, CalendarDays, Layers, Stethoscope, Users, Grid3x3, Scale, ClipboardList, Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -7,6 +7,7 @@ import {
 export type NavItem = { href: string; label: string; kod: string; icon: LucideIcon };
 
 export const NAV: NavItem[] = [
+  { href: "/",           label: "Ana Sayfa",         kod: "E-00", icon: Home },
   { href: "/cizelge",    label: "Nöbet Çizelgesi",   kod: "E-09", icon: CalendarDays },
   { href: "/taslaklar",  label: "Taslaklar",         kod: "E-08", icon: Layers },
   { href: "/teshis",     label: "Çözüm Teşhisi",     kod: "E-10", icon: Stethoscope },
