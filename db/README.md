@@ -10,6 +10,25 @@ PostgreSQL şeması: numaralı migration dosyaları + seed verisi.
 | `seeds/` | Başlangıç verisi (`INSERT`) | Tekrar çalıştırılabilir olmalı (çift kayıt üretmez) |
 | `queries/` | Kontrol ve rapor sorguları | Hiçbir şeyi kalıcı değiştirmez |
 
+## Ortam ve altyapı
+
+- **RDBMS:** PostgreSQL 16+ (geliştirmede 18.4, Neon'da yönetilen sürüm)
+- **Veritabanı adı:** `nobet_zekasi` (yerel)
+- **Gerekli eklenti:** `btree_gist` — zaman aralıkları ve çakışma kısıtları
+  (`EXCLUDE USING gist`) için. Migration 005 kuruyor, Neon destekliyor.
+
+## Migration stratejisi ve gerekçe
+
+**Yöntem:** numaralandırılmış düz `.sql` dosyaları. ORM ve migration aracı yok.
+
+**Neden:**
+- ORM soyutlamasına girmeden PostgreSQL'in gelişmiş özelliklerini saf SQL ile
+  doğrudan yönetmek: `EXCLUDE USING gist`, üretilen kolonlar, kısmi indeksler,
+  view'lar, trigger'lar.
+- Şemadaki her DDL üzerinde tam denetim ve DBeaver/psql üzerinden deterministik
+  yürütme sırası.
+- Şema tek doğruluk kaynağıdır; API katmanı onu tekrar tanımlamaz.
+
 ## Sıfırdan kurulum sırası
 
 1. `migrations/001` → `009` arası tüm `.up.sql` dosyaları, numara sırasıyla
