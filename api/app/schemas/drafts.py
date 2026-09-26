@@ -66,6 +66,10 @@ class DraftCreate(BaseModel):
     )
 
 
+class DraftCopy(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
 class SolveRequest(BaseModel):
     time_limit_s: int = Field(default=60, ge=5, le=600)
 

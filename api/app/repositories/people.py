@@ -14,7 +14,8 @@ _LISTE = """
 SELECT s.id, s.sicil_no, s.full_name, s.shift_eligibility, s.is_active,
        s.is_orientation, s.seniority_years, s.note,
        r.code AS role_code, r.name AS role_name,
-       b.full_name AS buddy_name,
+       s.buddy_staff_id, b.full_name AS buddy_name,
+       (SELECT count(*) FROM assignments a WHERE a.staff_id = s.id) AS assignment_count,
        c.monthly_target_hours, c.valid_period AS contract_period,
        -- Sözleşmede hedef boşsa kural varsayılanı geçerli (monthly_min_hours).
        -- Sütunu boş bırakmak yerine ETKİN hedefi gösteriyoruz; hangisi olduğu
@@ -206,3 +207,44 @@ async def uyumsuzluk_sil(a: int, b: int) -> None:
             "DELETE FROM staff_conflicts WHERE staff_id_low = %s AND staff_id_high = %s",
             (dusuk, yuksek),
         )
+
+
+async def sil(staff_id: int) -> bool:
+    """Ataması olan personel SİLİNMEZ (fk_assignments_staff RESTRICT).
+
+    Çağıran önce assignment_count'a bakıp "Pasife al" önermeli; bu fonksiyon
+    yalnız gerçekten silinebilir olanı siler.
+    """
+    async with cursor() as cur:
+        await cur.execute("DELETE FROM staff WHERE id = %s RETURNING id", (staff_id,))
+        return await cur.fetchone() is not None
+
+
+async def sozlesme_guncelle(contract_id: int, bas, bitis, hedef, note) -> dict | None:
+    async with cursor() as cur:
+        await cur.execute(
+            """UPDATE contracts
+                  SET valid_period = daterange(%s, %s, '[)'),
+                      monthly_target_hours = %s, note = %s
+                WHERE id = %s RETURNING id""",
+            (bas, bitis, hedef, note, contract_id),
+        )
+        return await cur.fetchone()
+
+
+async def sozlesme_sil(contract_id: int) -> dict | None:
+    async with cursor() as cur:
+        await cur.execute("DELETE FROM contracts WHERE id = %s RETURNING id", (contract_id,))
+        return await cur.fetchone()
+
+
+async def izin_guncelle(absence_id: int, bas, bitis, tur: str, note) -> dict | None:
+    """bitis KAPSAYICI gelir."""
+    async with cursor() as cur:
+        await cur.execute(
+            """UPDATE absences
+                  SET period = daterange(%s, %s, '[)'), absence_type = %s, note = %s
+                WHERE id = %s RETURNING id""",
+            (bas, bitis + timedelta(days=1), tur, note, absence_id),
+        )
+        return await cur.fetchone()

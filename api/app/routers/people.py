@@ -7,7 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.repositories import people as repo
 from app.schemas.people import (
     Absence, AbsenceCreate, AvailabilityCreate, AvailabilityRule, Conflict, ConflictCreate,
-    Contract, ContractUpsert, PersonCreate, PersonDetail, PersonRow, PersonUpdate, Role,
+    Contract, ContractUpsert, DeleteResult, PersonCreate, PersonDetail, PersonRow,
+    PersonUpdate, Role,
 )
 
 router = APIRouter(prefix="/people", tags=["personel"])
@@ -83,6 +84,9 @@ async def detay(staff_id: int) -> PersonDetail:
 
     return PersonDetail(
         **_satir(s).model_dump(),
+        buddy_staff_id=s["buddy_staff_id"],
+        assignment_count=s["assignment_count"],
+        can_delete=s["assignment_count"] == 0,
         seniority_years=float(s["seniority_years"]) if s["seniority_years"] else None,
         note=s["note"],
         contracts=[
@@ -138,12 +142,54 @@ async def guncelle(staff_id: int, istek: PersonUpdate) -> PersonDetail:
         soyad = alanlar.pop("last_name", eski_soyad)
         alanlar["full_name"] = f"{ad.strip()} {soyad.strip()}".strip()
 
+    # Şema kuralı (ck_staff_orientation_buddy): oryantasyondaysa eğitmen zorunlu.
+    # Hatayı veritabanından beklemek yerine burada anlaşılır biçimde söylüyoruz.
+    hedef_ory = alanlar.get("is_orientation", mevcut["is_orientation"])
+    hedef_buddy = alanlar.get("buddy_staff_id", mevcut["buddy_staff_id"])
+    if hedef_ory and not hedef_buddy:
+        raise HTTPException(status_code=422, detail="Oryantasyondaki personel için eğitmen seçin.")
+    if hedef_buddy == staff_id:
+        raise HTTPException(status_code=422, detail="Kişi kendi eğitmeni olamaz.")
+    if not hedef_ory and "is_orientation" in alanlar:
+        alanlar["buddy_staff_id"] = None   # oryantasyon bitince eğitmen bağı da düşer
+
     try:
         await repo.guncelle(staff_id, alanlar)
     except Exception as hata:  # noqa: BLE001
         if "uq_staff_sicil_no" in str(hata):
             raise HTTPException(status_code=409, detail="Bu sicil numarası zaten kayıtlı.") from hata
         raise HTTPException(status_code=422, detail="Personel güncellenemedi.") from hata
+    return await detay(staff_id)
+
+
+@router.delete("/{staff_id}", response_model=DeleteResult, summary="Personeli sil veya pasife al")
+async def sil(staff_id: int) -> DeleteResult:
+    """Ataması olan personel silinmez, pasife alınır.
+
+    Veritabanı da buna zorluyor (fk_assignments_staff RESTRICT): geçmiş çizelgeler
+    korunmalı. Pasif kişi listelerden ve solver'dan düşer ama kaydı durur.
+    """
+    if (s := await repo.getir(staff_id)) is None:
+        raise HTTPException(status_code=404, detail="Personel bulunamadı.")
+
+    if s["assignment_count"] > 0:
+        await repo.guncelle(staff_id, {"is_active": False})
+        return DeleteResult(
+            deleted=False, deactivated=True,
+            message=f"{s['full_name']} pasife alındı. "
+                    f"{s['assignment_count']} atamada geçtiği için kaydı silinmedi.",
+        )
+
+    if not await repo.sil(staff_id):
+        raise HTTPException(status_code=409, detail="Personel silinemedi.")
+    return DeleteResult(deleted=True, deactivated=False, message=f"{s['full_name']} silindi.")
+
+
+@router.post("/{staff_id}/activate", response_model=PersonDetail, summary="Pasif personeli aktife al")
+async def aktife_al(staff_id: int) -> PersonDetail:
+    if await repo.getir(staff_id) is None:
+        raise HTTPException(status_code=404, detail="Personel bulunamadı.")
+    await repo.guncelle(staff_id, {"is_active": True})
     return await detay(staff_id)
 
 
@@ -217,4 +263,48 @@ async def uyumsuzluk_ekle(staff_id: int, istek: ConflictCreate) -> PersonDetail:
                summary="Uyumsuz kişi sil")
 async def uyumsuzluk_sil(staff_id: int, other_id: int) -> PersonDetail:
     await repo.uyumsuzluk_sil(staff_id, other_id)
+    return await detay(staff_id)
+
+
+@router.patch("/{staff_id}/contracts/{contract_id}", response_model=PersonDetail,
+              summary="Sözleşme düzenle")
+async def sozlesme_guncelle(staff_id: int, contract_id: int, istek: ContractUpsert) -> PersonDetail:
+    try:
+        sonuc = await repo.sozlesme_guncelle(
+            contract_id, istek.valid_from,
+            istek.valid_to + timedelta(days=1) if istek.valid_to else None,
+            istek.monthly_target_hours, istek.note,
+        )
+    except Exception as hata:  # noqa: BLE001
+        if "ex_contracts_no_overlap" in str(hata):
+            raise HTTPException(status_code=409, detail="Bu tarihlerde zaten bir sözleşme var.") from hata
+        raise HTTPException(status_code=422, detail="Sözleşme güncellenemedi.") from hata
+    if sonuc is None:
+        raise HTTPException(status_code=404, detail="Sözleşme bulunamadı.")
+    return await detay(staff_id)
+
+
+@router.delete("/{staff_id}/contracts/{contract_id}", response_model=PersonDetail,
+               summary="Sözleşme sil")
+async def sozlesme_sil(staff_id: int, contract_id: int) -> PersonDetail:
+    if await repo.sozlesme_sil(contract_id) is None:
+        raise HTTPException(status_code=404, detail="Sözleşme bulunamadı.")
+    return await detay(staff_id)
+
+
+@router.patch("/{staff_id}/absences/{absence_id}", response_model=PersonDetail,
+              summary="Devamsızlık düzenle")
+async def izin_guncelle(staff_id: int, absence_id: int, istek: AbsenceCreate) -> PersonDetail:
+    if istek.end < istek.start:
+        raise HTTPException(status_code=422, detail="Bitiş tarihi başlangıçtan önce olamaz.")
+    try:
+        sonuc = await repo.izin_guncelle(
+            absence_id, istek.start, istek.end, istek.absence_type, istek.note
+        )
+    except Exception as hata:  # noqa: BLE001
+        if "ex_absences_no_overlap" in str(hata):
+            raise HTTPException(status_code=409, detail="Bu tarihlerde zaten bir kayıt var.") from hata
+        raise HTTPException(status_code=422, detail="Devamsızlık güncellenemedi.") from hata
+    if sonuc is None:
+        raise HTTPException(status_code=404, detail="Kayıt bulunamadı.")
     return await detay(staff_id)

@@ -1,0 +1,67 @@
+"use client";
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
+import type { PersonDetail } from "@/lib/personel";
+import type { components } from "@/lib/api-types";
+
+type DeleteResult = components["schemas"]["DeleteResult"];
+
+/**
+ * Ataması olan personel SİLİNMEZ, pasife alınır — geçmiş çizelgeler korunmalı
+ * (veritabanı da fk_assignments_staff RESTRICT ile buna zorluyor).
+ * Düğme bu yüzden duruma göre ad değiştiriyor: sessizce farklı bir şey yapmak yerine
+ * ne olacağını baştan söylüyor.
+ */
+export function SilmeBolumu({
+  kisi, onSilindi,
+}: { kisi: PersonDetail; onSilindi: () => void }) {
+  const qc = useQueryClient();
+  const silinebilir = kisi.can_delete;
+
+  const sil = useMutation({
+    mutationFn: () => api<DeleteResult>(`/people/${kisi.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["people"] });
+      onSilindi();
+    },
+  });
+
+  return (
+    <section className="border-t pt-4">
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="ghost" size="sm" className="text-danger hover:text-danger">
+            {silinebilir ? "Personeli sil" : "Pasife al"}
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ fontSize: "var(--text-base)" }}>
+              {silinebilir ? `${kisi.full_name} silinsin mi?` : `${kisi.full_name} pasife alınsın mı?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription style={{ fontSize: "var(--text-xs)" }}>
+              {silinebilir
+                ? "Bu kişinin hiç ataması yok; kaydı tamamen silinecek. Geri alınamaz."
+                : `${kisi.assignment_count} atamada geçtiği için kaydı silinemez. Pasife alınırsa ` +
+                  "listelerden ve çözümden düşer, geçmiş çizelgeler olduğu gibi kalır."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction onClick={() => sil.mutate()}>
+              {silinebilir ? "Sil" : "Pasife al"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
+}

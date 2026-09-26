@@ -2,21 +2,20 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CalendarClock, CalendarOff, FileText, IdCard, Plus, Trash2, UserX,
-} from "lucide-react";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import {
-  CALISMA_TIPI, IZIN_TURU, MUSAITLIK_TURU, basHarf, bugun, tarih,
-  type PersonDetail, type PersonRow, type Role,
+  IZIN_TURU, MUSAITLIK_TURU, basHarf, bugun, tarih,
+  type PersonDetail, type PersonRow,
 } from "@/lib/personel";
+import { Kunye } from "./Kunye";
+import { Alan, Bolum, Bos, EkleDugmesi, Hata, Ikili, SatirKart } from "./parcalar";
 
 /** E-04 sağ panel: Künye · Sözleşme · Müsaitlik · Devamsızlık · Uyumsuzluk. */
 export function DetayPaneli({
@@ -28,10 +27,6 @@ export function DetayPaneli({
     queryFn: () => api<PersonDetail>(`/people/${staffId}`),
     enabled: staffId !== null,
   });
-  const { data: roller } = useQuery({
-    queryKey: ["roles"],
-    queryFn: () => api<Role[]>("/people/roles"),
-  });
 
   const tazele = (yeni: PersonDetail) => {
     qc.setQueryData(["person", staffId], yeni);
@@ -40,7 +35,7 @@ export function DetayPaneli({
 
   return (
     <Sheet open={staffId !== null} onOpenChange={(a) => !a && onKapat()}>
-      <SheetContent className="flex w-[520px] flex-col gap-0 p-0 sm:max-w-[520px]">
+      <SheetContent className="flex w-[600px] flex-col gap-0 p-0 sm:max-w-[600px]">
         <SheetHeader className="border-b p-6">
           <div className="flex items-center gap-3">
             <span
@@ -85,31 +80,39 @@ export function DetayPaneli({
         {data && (
           <Tabs defaultValue="kunye" className="flex min-h-0 flex-1 flex-col">
             {/* Sekmeler kesilmesin: dar panelde yatay kaydırılır */}
-            <TabsList className="mx-6 mt-4 w-[calc(100%-3rem)] justify-start overflow-x-auto">
-              <TabsTrigger value="kunye"><IdCard size={16} strokeWidth={1.75} />Künye</TabsTrigger>
-              <TabsTrigger value="sozlesme"><FileText size={16} strokeWidth={1.75} />Sözleşme</TabsTrigger>
-              <TabsTrigger value="musaitlik"><CalendarClock size={16} strokeWidth={1.75} />Müsaitlik</TabsTrigger>
-              <TabsTrigger value="devamsizlik"><CalendarOff size={16} strokeWidth={1.75} />Devamsızlık</TabsTrigger>
-              <TabsTrigger value="uyumsuzluk"><UserX size={16} strokeWidth={1.75} />Uyumsuzluk</TabsTrigger>
+            {/* Sade metin sekmeler, hepsi tek satırda. Yatay kaydırma YOK. */}
+            <TabsList className="mx-6 mt-4 h-auto w-[calc(100%-3rem)] justify-start gap-1 rounded-none border-b bg-transparent p-0">
+              {[
+                ["kunye", "Künye"], ["sozlesme", "Sözleşme"], ["musaitlik", "Müsaitlik"],
+                ["devamsizlik", "İzinler"], ["uyumsuzluk", "Uyumsuzluk"],
+              ].map(([deger, ad]) => (
+                <TabsTrigger
+                  key={deger}
+                  value={deger}
+                  className="rounded-none border-b-2 border-transparent bg-transparent px-2 pb-2 pt-1 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                >
+                  {ad}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
-            <TabsContent value="kunye" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              <Kunye kisi={data} roller={roller ?? []} onKaydet={tazele} />
+            <TabsContent value="kunye" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+              <Kunye kisi={data} herkes={herkes} onKaydet={tazele} onSilindi={onKapat} />
             </TabsContent>
 
-            <TabsContent value="sozlesme" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <TabsContent value="sozlesme" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               <Sozlesme kisi={data} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="musaitlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <TabsContent value="musaitlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               <Musaitlik kisi={data} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="devamsizlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <TabsContent value="devamsizlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               <Devamsizlik kisi={data} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="uyumsuzluk" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <TabsContent value="uyumsuzluk" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
               <Uyumsuzluk kisi={data} herkes={herkes} onKaydet={tazele} />
             </TabsContent>
           </Tabs>
@@ -119,127 +122,59 @@ export function DetayPaneli({
   );
 }
 
-/* ---------------------------------------------------------------- Künye */
-function Kunye({
-  kisi, roller, onKaydet,
-}: { kisi: PersonDetail; roller: Role[]; onKaydet: (d: PersonDetail) => void }) {
-  const [form, setForm] = useState({
-    first_name: kisi.first_name, last_name: kisi.last_name,
-    sicil_no: kisi.sicil_no ?? "", role_code: kisi.role_code,
-    shift_eligibility: kisi.shift_eligibility, note: kisi.note ?? "",
-  });
-
-  const kaydet = useMutation({
-    mutationFn: () =>
-      api<PersonDetail>(`/people/${kisi.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...form, sicil_no: form.sicil_no || null }),
-      }),
-    onSuccess: onKaydet,
-  });
-
-  return (
-    <div className="grid gap-4">
-      <Bolum baslik="Kimlik">
-      <Ikili>
-        <Alan etiket="Ad">
-          <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
-        </Alan>
-        <Alan etiket="Soyad">
-          <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-        </Alan>
-      </Ikili>
-
-      <Ikili>
-        <Alan etiket="Sicil">
-          {/* Boşsa boş kalır; uydurma değer yazılmaz (DESIGN §7) */}
-          <Input value={form.sicil_no} placeholder="—"
-                 onChange={(e) => setForm({ ...form, sicil_no: e.target.value })} />
-        </Alan>
-        <Alan etiket="Rol">
-          <select
-            className="h-9 w-full rounded-md border bg-card px-2"
-            value={form.role_code}
-            onChange={(e) => setForm({ ...form, role_code: e.target.value })}
-          >
-            {roller.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
-          </select>
-        </Alan>
-      </Ikili>
-      </Bolum>
-
-      <Bolum baslik="Çalışma">
-
-      <Alan etiket="Çalışma tipi">
-        <select
-          className="h-9 w-full rounded-md border bg-card px-2"
-          value={form.shift_eligibility}
-          onChange={(e) => setForm({ ...form, shift_eligibility: e.target.value as never })}
-        >
-          {CALISMA_TIPI.map((c) => <option key={c.deger} value={c.deger}>{c.ad}</option>)}
-        </select>
-      </Alan>
-
-      {kisi.buddy_name && (
-        <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-          Eğitmen: {kisi.buddy_name}
-        </p>
-      )}
-      </Bolum>
-
-      <Bolum baslik="Not">
-        <Alan etiket="Serbest not">
-          <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-        </Alan>
-      </Bolum>
-
-      {/* Kaydet panelin altında sabit: içerik kayarken yerinde kalır */}
-      <AltBar
-        kaydediliyor={kaydet.isPending}
-        onKaydet={() => kaydet.mutate()}
-        onVazgec={() => setForm({
-          first_name: kisi.first_name, last_name: kisi.last_name,
-          sicil_no: kisi.sicil_no ?? "", role_code: kisi.role_code,
-          shift_eligibility: kisi.shift_eligibility, note: kisi.note ?? "",
-        })}
-      />
-      {kaydet.isError && <Hata>{(kaydet.error as Error).message}</Hata>}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------ Sözleşme */
 function Sozlesme({ kisi, onKaydet }: { kisi: PersonDetail; onKaydet: (d: PersonDetail) => void }) {
   const [ac, setAc] = useState(false);
+  const [duzenlenen, setDuzenlenen] = useState<number | null>(null);
   const [form, setForm] = useState({ valid_from: bugun(), valid_to: "", monthly_target_hours: "" });
+
+  const sil = useMutation({
+    mutationFn: (id: number) =>
+      api<PersonDetail>(`/people/${kisi.id}/contracts/${id}`, { method: "DELETE" }),
+    onSuccess: onKaydet,
+  });
 
   const ekle = useMutation({
     mutationFn: () =>
-      api<PersonDetail>(`/people/${kisi.id}/contracts`, {
-        method: "POST",
+      // Aynı form hem ekleme hem düzenleme için: yalnız yol ve yöntem değişiyor.
+      api<PersonDetail>(
+        duzenlenen ? `/people/${kisi.id}/contracts/${duzenlenen}` : `/people/${kisi.id}/contracts`,
+        {
+        method: duzenlenen ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           valid_from: form.valid_from,
           valid_to: form.valid_to || null,
           monthly_target_hours: form.monthly_target_hours ? Number(form.monthly_target_hours) : null,
         }),
-      }),
-    onSuccess: (d) => { onKaydet(d); setAc(false); },
+        },
+      ),
+    onSuccess: (d) => { onKaydet(d); setAc(false); setDuzenlenen(null); },
   });
 
   return (
     <div className="grid gap-2">
       {(kisi.contracts ?? []).length === 0 && <Bos>Sözleşme kaydı yok.</Bos>}
       {(kisi.contracts ?? []).map((c) => (
-        <div key={c.id} className="rounded-md border px-3 py-2">
-          <div className="flex items-baseline justify-between">
+        <SatirKart
+          key={c.id}
+          onSil={() => sil.mutate(c.id)}
+          onDuzenle={() => {
+            setForm({
+              valid_from: c.valid_from, valid_to: c.valid_to ?? "",
+              monthly_target_hours: c.monthly_target_hours ? String(c.monthly_target_hours) : "",
+            });
+            setDuzenlenen(c.id);
+            setAc(true);
+          }}
+        >
+          <span className="flex items-baseline justify-between gap-3">
             <span>{tarih(c.valid_from)} – {c.valid_to ? tarih(c.valid_to) : "açık"}</span>
             <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
               {c.monthly_target_hours ? `${c.monthly_target_hours} sa` : "kural varsayılanı"}
             </span>
-          </div>
-        </div>
+          </span>
+        </SatirKart>
       ))}
 
       {ac ? (
@@ -260,13 +195,16 @@ function Sozlesme({ kisi, onKaydet }: { kisi: PersonDetail; onKaydet: (d: Person
                    onChange={(e) => setForm({ ...form, monthly_target_hours: e.target.value })} />
           </Alan>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => ekle.mutate()} disabled={ekle.isPending}>Ekle</Button>
-            <Button size="sm" variant="outline" onClick={() => setAc(false)}>İptal</Button>
+            <Button size="sm" onClick={() => ekle.mutate()} disabled={ekle.isPending}>
+              {duzenlenen ? "Güncelle" : "Ekle"}
+            </Button>
+            <Button size="sm" variant="outline"
+                    onClick={() => { setAc(false); setDuzenlenen(null); }}>İptal</Button>
           </div>
           {ekle.isError && <Hata>{(ekle.error as Error).message}</Hata>}
         </div>
       ) : (
-        <EkleDugmesi onClick={() => setAc(true)}>Sözleşme ekle</EkleDugmesi>
+        <EkleDugmesi onClick={() => { setDuzenlenen(null); setAc(true); }}>Sözleşme ekle</EkleDugmesi>
       )}
     </div>
   );
@@ -443,71 +381,5 @@ function Uyumsuzluk({
         secilebilir.length > 0 && <EkleDugmesi onClick={() => setAc(true)}>Kişi ekle</EkleDugmesi>
       )}
     </div>
-  );
-}
-
-/* ------------------------------------------------------ küçük parçalar */
-function Bolum({ baslik, children }: { baslik: string; children: React.ReactNode }) {
-  return (
-    <section className="grid gap-2">
-      <h3 className="text-muted-foreground" style={{ fontSize: "var(--text-xs)", letterSpacing: "0.04em" }}>
-        {baslik.toLocaleUpperCase("tr")}
-      </h3>
-      <div className="grid gap-3">{children}</div>
-    </section>
-  );
-}
-
-function AltBar({
-  kaydediliyor, onKaydet, onVazgec,
-}: { kaydediliyor: boolean; onKaydet: () => void; onVazgec: () => void }) {
-  return (
-    <div className="sticky bottom-0 -mx-6 mt-2 flex gap-2 border-t bg-card px-6 py-3">
-      <Button onClick={onKaydet} disabled={kaydediliyor}>
-        {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
-      </Button>
-      <Button variant="outline" onClick={onVazgec}>Vazgeç</Button>
-    </div>
-  );
-}
-
-const Ikili = ({ children }: { children: React.ReactNode }) => (
-  <div className="grid grid-cols-2 gap-2">{children}</div>
-);
-
-function Alan({ etiket, children }: { etiket: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1.5">
-      <Label style={{ fontSize: "var(--text-xs)" }}>{etiket}</Label>
-      {children}
-    </div>
-  );
-}
-
-const Bos = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>{children}</p>
-);
-
-const Hata = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-danger" style={{ fontSize: "var(--text-xs)" }}>{children}</p>
-);
-
-function SatirKart({ children, onSil }: { children: React.ReactNode; onSil: () => void }) {
-  return (
-    <div className="flex items-center justify-between rounded-md border px-3 py-2">
-      <span>{children}</span>
-      <Button variant="ghost" size="icon" onClick={onSil} aria-label="Sil">
-        <Trash2 size={16} strokeWidth={1.75} />
-      </Button>
-    </div>
-  );
-}
-
-function EkleDugmesi({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <Button variant="outline" size="sm" onClick={onClick} className="justify-start">
-      <Plus size={16} strokeWidth={1.75} />
-      {children}
-    </Button>
   );
 }

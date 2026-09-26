@@ -101,7 +101,11 @@ export interface paths {
         get: operations["getir_api_drafts__draft_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Taslağı sil
+         * @description Atamalar, koşular ve teşhisler de gider (şemadaki ON DELETE CASCADE).
+         */
+        delete: operations["taslak_sil_api_drafts__draft_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -175,6 +179,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/drafts/{draft_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Taslağı kopyala */
+        post: operations["taslak_kopyala_api_drafts__draft_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Taslağı yayınla */
+        post: operations["taslak_yayinla_api_drafts__draft_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/overview": {
         parameters: {
             query?: never;
@@ -236,11 +274,29 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Şablon satırını sil */
+        delete: operations["satir_sil_api_need_template_rows__row_id__delete"];
         options?: never;
         head?: never;
         /** Şablon satırının kişi sayısını değiştir */
         patch: operations["satir_guncelle_api_need_template_rows__row_id__patch"];
+        trace?: never;
+    };
+    "/api/need-templates/{template_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Şablona satır ekle */
+        post: operations["satir_ekle_api_need_templates__template_id__rows_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/people": {
@@ -289,11 +345,35 @@ export interface paths {
         get: operations["detay_api_people__staff_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Personeli sil veya pasife al
+         * @description Ataması olan personel silinmez, pasife alınır.
+         *
+         *     Veritabanı da buna zorluyor (fk_assignments_staff RESTRICT): geçmiş çizelgeler
+         *     korunmalı. Pasif kişi listelerden ve solver'dan düşer ama kaydı durur.
+         */
+        delete: operations["sil_api_people__staff_id__delete"];
         options?: never;
         head?: never;
         /** Personel düzenle */
         patch: operations["guncelle_api_people__staff_id__patch"];
+        trace?: never;
+    };
+    "/api/people/{staff_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pasif personeli aktife al */
+        post: operations["aktife_al_api_people__staff_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/people/{staff_id}/contracts": {
@@ -344,7 +424,8 @@ export interface paths {
         delete: operations["izin_sil_api_people__staff_id__absences__absence_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Devamsızlık düzenle */
+        patch: operations["izin_guncelle_api_people__staff_id__absences__absence_id__patch"];
         trace?: never;
     };
     "/api/people/{staff_id}/availability": {
@@ -413,6 +494,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/contracts/{contract_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Sözleşme sil */
+        delete: operations["sozlesme_sil_api_people__staff_id__contracts__contract_id__delete"];
+        options?: never;
+        head?: never;
+        /** Sözleşme düzenle */
+        patch: operations["sozlesme_guncelle_api_people__staff_id__contracts__contract_id__patch"];
         trace?: never;
     };
     "/api/competencies": {
@@ -801,6 +900,18 @@ export interface components {
             /** Shifts */
             shifts: components["schemas"]["ShiftHeader"][];
         };
+        /**
+         * DeleteResult
+         * @description Silme mi oldu, pasife mi alındı — arayüz doğru mesajı gösterebilsin.
+         */
+        DeleteResult: {
+            /** Deleted */
+            deleted: boolean;
+            /** Deactivated */
+            deactivated: boolean;
+            /** Message */
+            message: string;
+        };
         /** Demand */
         Demand: {
             /** Period Label */
@@ -970,6 +1081,11 @@ export interface components {
              */
             covers_full_month: boolean;
             last_run?: components["schemas"]["SolverRun"] | null;
+        };
+        /** DraftCopy */
+        DraftCopy: {
+            /** Name */
+            name: string;
         };
         /** DraftCreate */
         DraftCreate: {
@@ -1254,6 +1370,20 @@ export interface components {
              * @description Oryantasyon / Pasif / boş
              */
             status_label: string;
+            /** Buddy Staff Id */
+            buddy_staff_id?: number | null;
+            /**
+             * Assignment Count
+             * @description Kaç atamada geçiyor — silinebilir mi, pasife mi alınmalı
+             * @default 0
+             */
+            assignment_count: number;
+            /**
+             * Can Delete
+             * @description Ataması yoksa gerçekten silinebilir
+             * @default true
+             */
+            can_delete: boolean;
             /** Seniority Years */
             seniority_years?: number | null;
             /** Note */
@@ -1342,6 +1472,13 @@ export interface components {
             note?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** Is Orientation */
+            is_orientation?: boolean | null;
+            /**
+             * Buddy Staff Id
+             * @description Oryantasyondaysa eğitmen. Şema kuralı: oryantasyon → eğitmen zorunlu.
+             */
+            buddy_staff_id?: number | null;
         };
         /**
          * QualificationFlag
@@ -1660,6 +1797,20 @@ export interface components {
             /** Is Hard */
             is_hard?: boolean | null;
         };
+        /** TemplateRowCreate */
+        TemplateRowCreate: {
+            /**
+             * Shift Code
+             * @description GUNDUZ / GECE
+             */
+            shift_code: string;
+            /** Slot Code */
+            slot_code: string;
+            /** Min Count */
+            min_count: number;
+            /** Competency Codes */
+            competency_codes?: string[];
+        };
         /** TemplateRowUpdate */
         TemplateRowUpdate: {
             /** Min Count */
@@ -1890,6 +2041,35 @@ export interface operations {
             };
         };
     };
+    taslak_sil_api_drafts__draft_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     coz_api_drafts__draft_id__solve_post: {
         parameters: {
             query?: never;
@@ -2018,6 +2198,72 @@ export interface operations {
             };
         };
     };
+    taslak_kopyala_api_drafts__draft_id__copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftCopy"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    taslak_yayinla_api_drafts__draft_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ozet_api_overview_get: {
         parameters: {
             query: {
@@ -2104,6 +2350,37 @@ export interface operations {
             };
         };
     };
+    satir_sil_api_need_template_rows__row_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NeedTemplate"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     satir_guncelle_api_need_template_rows__row_id__patch: {
         parameters: {
             query?: never;
@@ -2126,6 +2403,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    satir_ekle_api_need_templates__template_id__rows_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRowCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NeedTemplate"][];
                 };
             };
             /** @description Validation Error */
@@ -2256,6 +2568,37 @@ export interface operations {
             };
         };
     };
+    sil_api_people__staff_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     guncelle_api_people__staff_id__patch: {
         parameters: {
             query?: never;
@@ -2270,6 +2613,37 @@ export interface operations {
                 "application/json": components["schemas"]["PersonUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    aktife_al_api_people__staff_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -2372,6 +2746,42 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    izin_guncelle_api_people__staff_id__absences__absence_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                absence_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AbsenceCreate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2506,6 +2916,74 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sozlesme_sil_api_people__staff_id__contracts__contract_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                contract_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sozlesme_guncelle_api_people__staff_id__contracts__contract_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                contract_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractUpsert"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

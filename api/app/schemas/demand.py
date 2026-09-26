@@ -52,5 +52,12 @@ class NeedTemplate(BaseModel):
     rows: list[TemplateRow]
 
 
+class TemplateRowCreate(BaseModel):
+    shift_code: str = Field(description="GUNDUZ / GECE")
+    slot_code: str = Field(min_length=1, max_length=30)
+    min_count: int = Field(ge=1, le=50)
+    competency_codes: list[str] = Field(default_factory=list)
+
+
 class TemplateRowUpdate(BaseModel):
     min_count: int = Field(ge=1, le=50)

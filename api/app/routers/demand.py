@@ -10,7 +10,8 @@ from app.repositories import schedule as schedule_repo
 from app.routers.overview import _etiket
 from app.routers.schedule import gun_basliklari
 from app.schemas.demand import (
-    Demand, DemandDraft, DemandTotal, NeedTemplate, TemplateRow, TemplateRowUpdate,
+    Demand, DemandDraft, DemandTotal, NeedTemplate, TemplateRow, TemplateRowCreate,
+    TemplateRowUpdate,
 )
 
 router = APIRouter(tags=["ihtiyaç"])
@@ -101,3 +102,30 @@ async def satir_guncelle(row_id: int, istek: TemplateRowUpdate) -> TemplateRow:
             if r.id == row_id:
                 return r
     raise HTTPException(status_code=404, detail="Şablon satırı bulunamadı.")
+
+
+@router.post("/need-templates/{template_id}/rows", response_model=list[NeedTemplate],
+             status_code=201, summary="Şablona satır ekle")
+async def satir_ekle(template_id: int, istek: TemplateRowCreate) -> list[NeedTemplate]:
+    try:
+        yeni = await repo.satir_ekle(
+            template_id, istek.shift_code, istek.slot_code.upper(),
+            istek.min_count, [c.upper() for c in istek.competency_codes],
+        )
+    except Exception as hata:  # noqa: BLE001
+        if "uq_ntr_template_shift_slot" in str(hata):
+            raise HTTPException(
+                status_code=409, detail="Bu vardiyada aynı slot zaten tanımlı."
+            ) from hata
+        raise HTTPException(status_code=422, detail="Satır eklenemedi.") from hata
+    if yeni is None:
+        raise HTTPException(status_code=404, detail="Vardiya bulunamadı.")
+    return await sablon()
+
+
+@router.delete("/need-template-rows/{row_id}", response_model=list[NeedTemplate],
+               summary="Şablon satırını sil")
+async def satir_sil(row_id: int) -> list[NeedTemplate]:
+    if await repo.satir_sil(row_id) is None:
+        raise HTTPException(status_code=404, detail="Şablon satırı bulunamadı.")
+    return await sablon()

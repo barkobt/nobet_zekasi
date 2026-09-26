@@ -25,9 +25,11 @@ export default function PersonelSayfasi() {
   const [tipFiltre, setTipFiltre] = useState("");
   const [secili, setSecili] = useState<number | null>(null);
 
+  const [pasifleriGoster, setPasifleriGoster] = useState(false);
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["people"],
-    queryFn: () => api<PersonRow[]>("/people"),
+    queryKey: ["people", pasifleriGoster],
+    queryFn: () => api<PersonRow[]>(`/people?sadece_aktif=${!pasifleriGoster}`),
   });
 
   // Arama ve filtreler istemcide: 20 kişi, sunucuya gitmeye değmez.
@@ -109,6 +111,17 @@ export default function PersonelSayfasi() {
           {CALISMA_TIPI.map((c) => <option key={c.deger} value={c.deger}>{c.ad}</option>)}
         </select>
 
+        <label className="flex cursor-pointer items-center gap-2 text-muted-foreground"
+               style={{ fontSize: "var(--text-xs)" }}>
+          <input
+            type="checkbox"
+            className="size-4 accent-brand"
+            checked={pasifleriGoster}
+            onChange={(e) => setPasifleriGoster(e.target.checked)}
+          />
+          Pasifleri göster
+        </label>
+
         {satirlar.length !== (data?.length ?? 0) && (
           <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
             {satirlar.length} / {data?.length} kişi
@@ -153,7 +166,7 @@ export default function PersonelSayfasi() {
                   {grup.satirlar.map((p) => (
                     <TableRow
                       key={p.id}
-                      className="h-11 cursor-pointer"
+                      className={"h-11 cursor-pointer " + (p.is_active ? "" : "opacity-55")}
                       onClick={() => setSecili(p.id)}
                       tabIndex={0}
                       onKeyDown={(e) => e.key === "Enter" && setSecili(p.id)}

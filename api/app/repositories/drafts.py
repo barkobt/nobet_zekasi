@@ -213,3 +213,55 @@ async def baslangic_verisi_kopyala(draft_id: int, kaynak_id: int, kilitle: bool)
         sayi = cur.rowcount
         await cur.execute(_ROZET_KOPYALA, {"draft_id": draft_id, "kaynak_id": kaynak_id})
     return sayi
+
+
+async def sil(draft_id: int) -> dict | None:
+    """Taslak silinince atamaları, koşuları ve teşhisleri de gider (ON DELETE CASCADE)."""
+    async with cursor() as cur:
+        await cur.execute("DELETE FROM schedule_drafts WHERE id = %s RETURNING id", (draft_id,))
+        return await cur.fetchone()
+
+
+async def yayinla(draft_id: int) -> dict | None:
+    async with cursor() as cur:
+        await cur.execute(
+            """UPDATE schedule_drafts
+                  SET status = 'yayinlandi', published_at = CURRENT_TIMESTAMP
+                WHERE id = %s RETURNING id""",
+            (draft_id,),
+        )
+        return await cur.fetchone()
+
+
+async def kopyala(draft_id: int, yeni_ad: str) -> dict | None:
+    """Aynı dönem, aynı atamalar, yeni taslak. Koşu geçmişi kopyalanmaz —
+    kopya henüz çözülmemiştir; atamalar 'manuel' olarak taşınır."""
+    async with cursor() as cur:
+        await cur.execute(
+            """INSERT INTO schedule_drafts (unit_id, period, name)
+               SELECT unit_id, period, %s FROM schedule_drafts WHERE id = %s
+               RETURNING id""",
+            (yeni_ad, draft_id),
+        )
+        if (yeni := await cur.fetchone()) is None:
+            return None
+
+        await cur.execute(
+            """INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date,
+                                        source, is_locked)
+               SELECT %s, staff_id, shift_type_id, work_date, 'manuel', is_locked
+               FROM assignments WHERE draft_id = %s""",
+            (yeni["id"], draft_id),
+        )
+        await cur.execute(
+            """INSERT INTO assignment_tasks (assignment_id, competency_id)
+               SELECT y.id, t.competency_id
+               FROM assignments y
+               JOIN assignments k ON k.draft_id = %s AND k.staff_id = y.staff_id
+                                 AND k.work_date = y.work_date
+               JOIN assignment_tasks t ON t.assignment_id = k.id
+               WHERE y.draft_id = %s
+               ON CONFLICT DO NOTHING""",
+            (draft_id, yeni["id"]),
+        )
+        return yeni

@@ -54,3 +54,36 @@ async def satir_guncelle(row_id: int, min_count: int) -> dict | None:
             (min_count, row_id),
         )
         return await cur.fetchone()
+
+
+async def satir_ekle(template_id: int, shift_code: str, slot_code: str,
+                     min_count: int, competency_codes: list[str]) -> dict | None:
+    """Yeni şablon satırı. slot_code ile aynı adlı yetkinlik varsa otomatik bağlanır
+    (seeds/006'daki kalıp: slot kodu = yetkinlik kodu)."""
+    async with cursor() as cur:
+        await cur.execute(
+            """INSERT INTO need_template_rows (need_template_id, shift_type_id, slot_code, min_count)
+               SELECT %s, st.id, %s, %s
+               FROM shift_types st JOIN units u ON u.id = st.unit_id
+               WHERE st.code = %s AND u.code = 'ACIL_SERVIS'
+               RETURNING id""",
+            (template_id, slot_code, min_count, shift_code),
+        )
+        if (yeni := await cur.fetchone()) is None:
+            return None
+        if competency_codes:
+            await cur.execute(
+                """INSERT INTO need_template_row_competencies (need_template_row_id, competency_id)
+                   SELECT %s, id FROM competencies WHERE code = ANY(%s)
+                   ON CONFLICT DO NOTHING""",
+                (yeni["id"], competency_codes),
+            )
+        return yeni
+
+
+async def satir_sil(row_id: int) -> dict | None:
+    async with cursor() as cur:
+        await cur.execute(
+            "DELETE FROM need_template_rows WHERE id = %s RETURNING id", (row_id,)
+        )
+        return await cur.fetchone()

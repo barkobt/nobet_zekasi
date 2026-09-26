@@ -7,7 +7,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from app.repositories import drafts as repo
 from app.schemas.drafts import (
-    Diagnostic, DiagnosticGroup, Draft, DraftCreate, SolveAccepted, SolveRequest, SolverRun,
+    Diagnostic, DiagnosticGroup, Draft, DraftCopy, DraftCreate, SolveAccepted,
+    SolveRequest, SolverRun,
 )
 from app.settings import get_settings
 
@@ -203,3 +204,34 @@ async def teshisler(run_id: int) -> list[DiagnosticGroup]:
                 g.samples.append(d)
 
     return sorted(gruplar.values(), key=lambda g: (-g.count, g.catalog_code or "zz"))
+
+
+@router.delete("/drafts/{draft_id}", status_code=204, summary="Taslağı sil")
+async def taslak_sil(draft_id: int) -> None:
+    """Atamalar, koşular ve teşhisler de gider (şemadaki ON DELETE CASCADE)."""
+    if await repo.sil(draft_id) is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+
+
+@router.post("/drafts/{draft_id}/copy", response_model=Draft, status_code=201,
+             summary="Taslağı kopyala")
+async def taslak_kopyala(draft_id: int, istek: DraftCopy) -> Draft:
+    if (yeni := await repo.kopyala(draft_id, istek.name)) is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+    return await getir(yeni["id"])
+
+
+@router.post("/drafts/{draft_id}/publish", response_model=Draft, summary="Taslağı yayınla")
+async def taslak_yayinla(draft_id: int) -> Draft:
+    try:
+        sonuc = await repo.yayinla(draft_id)
+    except Exception as hata:  # noqa: BLE001
+        if "ex_drafts_one_published" in str(hata):
+            raise HTTPException(
+                status_code=409,
+                detail="Bu tarih aralığında zaten yayınlanmış bir çizelge var.",
+            ) from hata
+        raise HTTPException(status_code=422, detail="Taslak yayınlanamadı.") from hata
+    if sonuc is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+    return await getir(draft_id)

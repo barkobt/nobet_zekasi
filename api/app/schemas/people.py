@@ -69,6 +69,11 @@ class PersonRow(BaseModel):
 
 
 class PersonDetail(PersonRow):
+    buddy_staff_id: int | None = None
+    assignment_count: int = Field(
+        default=0, description="Kaç atamada geçiyor — silinebilir mi, pasife mi alınmalı"
+    )
+    can_delete: bool = Field(default=True, description="Ataması yoksa gerçekten silinebilir")
     seniority_years: float | None = None
     note: str | None = None
     contracts: list[Contract] = Field(default_factory=list)
@@ -96,6 +101,10 @@ class PersonUpdate(BaseModel):
     seniority_years: float | None = None
     note: str | None = None
     is_active: bool | None = None
+    is_orientation: bool | None = None
+    buddy_staff_id: int | None = Field(
+        default=None, description="Oryantasyondaysa eğitmen. Şema kuralı: oryantasyon → eğitmen zorunlu."
+    )
 
 
 class ContractUpsert(BaseModel):
@@ -126,3 +135,11 @@ class ConflictCreate(BaseModel):
 class Role(BaseModel):
     code: str
     name: str
+
+
+class DeleteResult(BaseModel):
+    """Silme mi oldu, pasife mi alındı — arayüz doğru mesajı gösterebilsin."""
+
+    deleted: bool
+    deactivated: bool
+    message: str
