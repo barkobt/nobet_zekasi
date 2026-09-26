@@ -269,6 +269,16 @@ export interface components {
             assigned: number;
             /** Required */
             required: number;
+            /**
+             * Qualified
+             * @description O vardiyada slotun yetkinliğine SAHİP kişi sayısı (rozetten bağımsız)
+             */
+            qualified?: number | null;
+            /**
+             * Remaining After Ambulance
+             * @description TRIYAJ/GOZLEM: ambulansa çıkmayanların sayısı. Diğer slotlarda boş.
+             */
+            remaining_after_ambulance?: number | null;
         };
         /** Staff */
         Staff: {

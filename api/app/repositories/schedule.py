@@ -7,7 +7,8 @@ from app.db import cursor
 # Gün başlıklarındaki sayaçlar ve tooltip kırılımı. v_daily_coverage zaten
 # kind'a göre (migration 010) doğru sayıyor; burada yalnızca aralığa süzülüyor.
 _KAPSAMA = """
-SELECT cov.day, cov.shift_code, cov.slot_code, cov.assigned, cov.required
+SELECT cov.day, cov.shift_code, cov.slot_code, cov.assigned, cov.required,
+       cov.qualified, cov.remaining_after_ambulance
 FROM v_daily_coverage cov
 WHERE cov.draft_id = %(draft_id)s
   AND cov.day BETWEEN %(gun_bas)s AND %(gun_son)s

@@ -92,6 +92,8 @@ async def cizelge(
                             label=SLOT_ADI.get(s["slot_code"], s["slot_code"]),
                             assigned=s["assigned"],
                             required=s["required"],
+                            qualified=s["qualified"],
+                            remaining_after_ambulance=s["remaining_after_ambulance"],
                         )
                         for s in satirlar
                         if s["slot_code"] != "GENEL"
@@ -171,8 +173,17 @@ async def cizelge(
 
     # --- Izgara altı notlar -------------------------------------------------
     notlar: list[str] = []
-    if any(k["slot_code"] == "TRIYAJ" and k["assigned"] == 0 for k in veri["kapsama"]):
-        notlar.append("Kağıt çizelgede triyaj görevi kayıtlı değil.")
+    # Triyaj rozetleri artık seeds/011 ile kuraldan türetiliyor; "kağıtta kayıtlı değil"
+    # notu kalktı. Yerine ambulans sonrası alan boşalması uyarısı var (C-009).
+    bos_alan = sum(
+        1 for k in veri["kapsama"]
+        if k["remaining_after_ambulance"] == 0 and k["slot_code"] in ("TRIYAJ", "GOZLEM")
+    )
+    if bos_alan:
+        notlar.append(
+            f"{bos_alan} vardiyada ambulans çıktığında triyaj veya gözlem alanında "
+            "kimse kalmıyor (C-009)."
+        )
     if not tam_ay and t["ilk_gun"]:
         notlar.append(
             f"Bu taslak yalnızca {t['ilk_gun'].strftime('%d.%m')}–{t['son_gun'].strftime('%d.%m')} "

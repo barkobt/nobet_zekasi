@@ -17,6 +17,14 @@ class SlotCoverage(BaseModel):
     label: str
     assigned: int
     required: int
+    qualified: int | None = Field(
+        default=None,
+        description="O vardiyada slotun yetkinliğine SAHİP kişi sayısı (rozetten bağımsız)",
+    )
+    remaining_after_ambulance: int | None = Field(
+        default=None,
+        description="TRIYAJ/GOZLEM: ambulansa çıkmayanların sayısı. Diğer slotlarda boş.",
+    )
 
 
 class ShiftHeader(BaseModel):

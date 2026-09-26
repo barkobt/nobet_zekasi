@@ -137,3 +137,33 @@ ROLLBACK;
 ---------------------------------------------------------------------------
 -- EXPLAIN ANALYZE SELECT * FROM assignments WHERE draft_id = 1 AND work_date = '2026-10-14';
 -- Çıktıda "Index Scan using uq_assignments_draft_staff_date" görüyorsan ek indekse gerek yok.
+
+
+---------------------------------------------------------------------------
+-- E) TRİYAJ / GÖZLEM MODELİ (migration 011)
+---------------------------------------------------------------------------
+
+-- E1) Rozetsiz kalan var mı? Kural: sorumlu ve oryantasyon dışında HER çalışan
+--     ya triyajda ya gözlemdedir. Bu sorgu boş dönmeli.
+--     Satır dönerse: kişinin ne TRIYAJ ne GOZLEM yetkinliği var → kadro sorunu.
+SELECT s.full_name, a.work_date,
+       CASE WHEN st.crosses_midnight THEN 'GECE' ELSE 'GUNDUZ' END AS vardiya
+FROM assignments a
+JOIN staff s        ON s.id  = a.staff_id
+JOIN roles ro       ON ro.id = s.role_id
+JOIN shift_types st ON st.id = a.shift_type_id
+WHERE NOT s.is_orientation
+  AND ro.code <> 'sorumlu_hemsire'
+  AND NOT EXISTS (SELECT 1 FROM assignment_tasks t JOIN competencies c ON c.id = t.competency_id
+                  WHERE t.assignment_id = a.id AND c.code IN ('TRIYAJ', 'GOZLEM'))
+ORDER BY a.work_date, s.full_name;
+
+-- E2) Ambulans çıkınca alan boşalan vardiyalar (C-009 ihlali).
+--     Sayaç tam olsa bile ihlal olabilir: ambulansın ikisi de aynı alandan çıkarsa.
+SELECT day, shift_code, slot_code, assigned, required, remaining_after_ambulance
+FROM v_daily_coverage
+WHERE remaining_after_ambulance = 0
+ORDER BY day, shift_code DESC, slot_code;
+
+-- E3) Görev ihlalleri: yetkinliği olmayana verilen görev + aynı atamada TRIYAJ ve GOZLEM
+SELECT violation_type, count(*) FROM v_task_eligibility_violations GROUP BY 1;

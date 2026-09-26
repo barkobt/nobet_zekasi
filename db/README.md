@@ -49,6 +49,8 @@ PostgreSQL şeması: numaralı migration dosyaları + seed verisi.
 | 3 · Çözüm | 007 | schedule_drafts, solver_runs, assignments, assignment_tasks, solver_diagnostics, actual_times |
 | Bütünlük + raporlar | 008 | staff.is_active, CHECK'ler, 5 view |
 | Kapsama düzeltmesi | 009 | v_daily_coverage: sorumlu ve oryantasyon GENEL mevcuda sayılmaz |
+| Yetkinlik türü | 010 | competencies.kind (TASK/QUALIFICATION), katalog kodu, ihtiyaç↔kural bağı, uygunluk trigger'ı |
+| Triyaj/gözlem modeli | 011 | TRIYAJ–GÖZLEM ayrıklık trigger'ı, kapsamaya `qualified` ve `remaining_after_ambulance` |
 
 ## Görünümler (view)
 
@@ -71,3 +73,5 @@ yeter ki tekrar çalıştırılabilir kalsın. Sahadan gelen kararlar tarihli se
 | 007 | Gerçek kadro (20 kişi), yetkinlikler, sözleşmeler, oryantasyon eşleşmesi |
 | 008 | 24.09 kararları: ambulans kuralı, sayım zorunluluğu, gündüz mevcudu 5 (sorumlu ve oryantasyon hariç) |
 | 009 | Elle hazırlanan referans çizelge (21–27 Eylül 2026) |
+| 010 | Katalog kodları (C-001…O-002), ihtiyaç satırı ↔ kural bağı |
+| 011 | C-009 tek kurala çevrildi, "her çalışan triyaj veya gözlemde" kuralı, referans haftanın triyaj/gözlem rozetleri kuraldan türetildi |

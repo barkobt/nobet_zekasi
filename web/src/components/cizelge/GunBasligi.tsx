@@ -37,12 +37,30 @@ export function GunBasligi({ gun }: { gun: DayHeader }) {
                   </div>
                   {(v.slots ?? []).map((s) => {
                     const slotEksik = s.assigned < s.required;
+                    // C-009: ambulans çıkınca alanda kimse kalmıyorsa bu da bir ihlal,
+                    // sayaç tam olsa bile. Yalnız renkle değil metinle de bildiriliyor.
+                    const alanBosalir = s.remaining_after_ambulance === 0;
                     return (
-                      <div key={s.slot_code} className="flex justify-between gap-4">
-                        <span>{s.label}</span>
-                        <span className={slotEksik ? "text-danger font-semibold" : ""}>
-                          {s.assigned}/{s.required}
-                        </span>
+                      <div key={s.slot_code} className="flex flex-col">
+                        <div className="flex justify-between gap-4">
+                          <span>{s.label}</span>
+                          <span className={slotEksik ? "text-danger font-semibold" : ""}>
+                            {s.assigned}/{s.required}
+                            {s.qualified != null && (
+                              <span className="opacity-70"> · yetkin {s.qualified}</span>
+                            )}
+                          </span>
+                        </div>
+                        {s.remaining_after_ambulance != null && (
+                          <span
+                            className={alanBosalir ? "text-danger font-semibold" : "opacity-70"}
+                            style={{ fontSize: "var(--text-xs)" }}
+                          >
+                            {alanBosalir
+                              ? "ambulans çıkınca kimse kalmıyor"
+                              : `ambulans sonrası ${s.remaining_after_ambulance} kalıyor`}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
