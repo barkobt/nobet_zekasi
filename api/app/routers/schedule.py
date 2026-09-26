@@ -53,6 +53,14 @@ async def cizelge(
     if (t := await repo.taslak(draft_id)) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
 
+    # Ayın son günü: bir sonraki ayın ilkinden bir gün geri.
+    ay_bas = t["month_start"]
+    sonraki = date(ay_bas.year + (ay_bas.month == 12), ay_bas.month % 12 + 1, 1)
+    ay_son = sonraki - timedelta(days=1)
+    tam_ay = bool(
+        t["ilk_gun"] and t["son_gun"] and t["ilk_gun"] <= ay_bas and t["son_gun"] >= ay_son
+    )
+
     veri = await repo.cizelge_verisi(draft_id, gun_bas, gun_son)
 
     # --- Sütun başlıkları ---------------------------------------------------
@@ -165,13 +173,17 @@ async def cizelge(
     notlar: list[str] = []
     if any(k["slot_code"] == "TRIYAJ" and k["assigned"] == 0 for k in veri["kapsama"]):
         notlar.append("Kağıt çizelgede triyaj görevi kayıtlı değil.")
-    if t["status"] == "yayinlandi" and t["name"].startswith("Referans"):
+    if not tam_ay and t["ilk_gun"]:
         notlar.append(
-            "Bu taslak yalnızca 21–27 Eylül haftasını içerir; ay toplamları o haftaya aittir."
+            f"Bu taslak yalnızca {t['ilk_gun'].strftime('%d.%m')}–{t['son_gun'].strftime('%d.%m')} "
+            "aralığını içerir; ay toplamları bu aralığa aittir."
         )
 
     return Schedule(
-        draft=DraftInfo(**t),
+        draft=DraftInfo(
+            id=t["id"], name=t["name"], month_start=t["month_start"],
+            status=t["status"], unit_name=t["unit_name"], covers_full_month=tam_ay,
+        ),
         days=gunler,
         groups=gruplar,
         summary=Summary(

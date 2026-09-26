@@ -15,6 +15,10 @@ import { fark, sayi, type Schedule } from "@/lib/cizelge";
  * İlk sütun ve başlık satırı sabit (sticky).
  */
 export function Izgara({ data }: { data: Schedule }) {
+  // DESIGN §2: kırmızı eyleme dönük eksiği bildirir. Aylık hedef (C-004, hard kural)
+  // yalnızca taslak ayın TAMAMINI kapsıyorsa karşılaştırılabilir; kısmi taslakta
+  // eksik görünmesi kuralın ihlali değil, verinin eksikliğidir → nötr kalır.
+  const ayTam = data.draft.covers_full_month;
   const [kapali, setKapali] = useState<Set<string>>(new Set());
 
   const degistir = (k: string) =>
@@ -129,11 +133,12 @@ export function Izgara({ data }: { data: Schedule }) {
                     <td className="sticky right-0 z-10 border-l bg-card px-3 text-right group-hover:bg-accent">
                       <div className="flex flex-col leading-tight">
                         <span className="font-medium">{sayi(satir.month_hours)} sa</span>
-                        {/* DESIGN §2: kırmızı EYLEME DÖNÜK eksiği bildirir. Aylık fark
-                            bilgilendirmedir (taslak ayın tamamını kapsamayabilir), o yüzden
-                            nötr. Gerçek sinyal sütun başlığındaki kapsama sayacıdır. */}
                         <span
-                          className="text-muted-foreground"
+                          className={
+                            ayTam && satir.month_diff < 0
+                              ? "text-danger font-medium"
+                              : "text-muted-foreground"
+                          }
                           style={{ fontSize: "var(--text-xs)" }}
                         >
                           {fark(satir.month_diff)}

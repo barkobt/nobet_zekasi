@@ -88,6 +88,10 @@ class DraftInfo(BaseModel):
     month_start: date
     status: str
     unit_name: str
+    covers_full_month: bool = Field(
+        description="Atamalar ayın tamamına yayılıyor mu? Aylık hedef karşılaştırması "
+                    "(C-004) yalnızca bu doğruysa anlamlıdır."
+    )
 
 
 class Schedule(BaseModel):

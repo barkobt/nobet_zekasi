@@ -138,6 +138,11 @@ export interface components {
             status: string;
             /** Unit Name */
             unit_name: string;
+            /**
+             * Covers Full Month
+             * @description Atamalar ayın tamamına yayılıyor mu? Aylık hedef karşılaştırması (C-004) yalnızca bu doğruysa anlamlıdır.
+             */
+            covers_full_month: boolean;
         };
         /**
          * Group

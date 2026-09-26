@@ -64,8 +64,12 @@ FROM absences ab
 WHERE ab.period && daterange(%(gun_bas)s, %(gun_son)s, '[]')
 """
 
+# ilk_gun / son_gun: taslak ayın TAMAMINI kapsıyor mu? Aylık hedef karşılaştırması
+# (C-004, kişi başı 200 saat) yalnızca tam aylık taslakta anlamlıdır.
 _TASLAK = """
-SELECT d.id, d.name, d.month_start, d.status, u.name AS unit_name
+SELECT d.id, d.name, d.month_start, d.status, u.name AS unit_name,
+       (SELECT min(work_date) FROM assignments WHERE draft_id = d.id) AS ilk_gun,
+       (SELECT max(work_date) FROM assignments WHERE draft_id = d.id) AS son_gun
 FROM schedule_drafts d
 JOIN units u ON u.id = d.unit_id
 WHERE d.id = %(draft_id)s
