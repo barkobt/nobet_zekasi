@@ -26,12 +26,25 @@ ASSUME_YES=0
 
 # Bağlantı: DATABASE_URL varsa onu kullan (Neon pooled + sslmode=require dahil),
 # yoksa yerel psql varsayılanlarına düş.
+# Değişken TANIMLI ama BOŞ ise sessizce yerele düşme: kullanıcı uzak bir veritabanı
+# hedefliyordu ve yapıştırma tutmamış demektir. Yerele yazmak sessiz bir veri kaybıdır.
+for degisken in DATABASE_URL_DIRECT DATABASE_URL; do
+    if [ -n "${!degisken+tanimli}" ] && [ -z "${!degisken}" ]; then
+        echo "HATA: $degisken tanımlı ama boş." >&2
+        echo "      Uzak bir veritabanı hedeflediysen bağlantı dizesi okunamamış olabilir" >&2
+        echo "      (örn. 'read -s' ile yapıştırma tutmadı). Yerel veritabanına yazmıyorum." >&2
+        echo "      Kontrol:  echo \"uzunluk: \${#$degisken}\"" >&2
+        echo "      Yerel kurulum istiyorsan değişkeni tamamen kaldır:  unset $degisken" >&2
+        exit 1
+    fi
+done
+
 KURULUM_URL="${DATABASE_URL_DIRECT:-${DATABASE_URL:-}}"
 
 if [ -n "$KURULUM_URL" ]; then
     PSQL=(psql "$KURULUM_URL" -v ON_ERROR_STOP=1 -q)
     # Parolayı ekrana basma: yalnız host ve veritabanı adını göster.
-    HEDEF="$(printf '%s' "$KURULUM_URL" | sed -E 's#^[^:]+://([^@]*@)?#\1#; s#^[^@]*@##; s#\?.*##')"
+    HEDEF="UZAK → $(printf '%s' "$KURULUM_URL" | sed -E 's#^[^:]+://([^@]*@)?#\1#; s#^[^@]*@##; s#\?.*##')"
 
     # Pooled uçla şema kurmaya çalışırsa uyar: hata mesajları kafa karıştırıcı olur.
     case "$KURULUM_URL" in
@@ -44,7 +57,7 @@ if [ -n "$KURULUM_URL" ]; then
     esac
 else
     PSQL=(psql -d "${PGDATABASE:-nobet_zekasi}" -v ON_ERROR_STOP=1 -q)
-    HEDEF="${PGDATABASE:-nobet_zekasi} (yerel)"
+    HEDEF="YEREL → ${PGDATABASE:-nobet_zekasi}"
 fi
 
 echo "Hedef veritabanı: $HEDEF"
