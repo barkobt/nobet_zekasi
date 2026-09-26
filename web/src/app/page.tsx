@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** FAZ 1'de personel listesi tek çalışan ekran; FAZ 2'de kök /cizelge'ye döner (DESIGN §6). */
+/** DESIGN §6: uygulama doğrudan E-09 ile açılır; dashboard yok. */
 export default function Home() {
-  redirect("/personel");
+  redirect("/cizelge");
 }

@@ -55,10 +55,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/drafts/{draft_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** E-09 çizelge ızgarası */
+        get: operations["cizelge_api_drafts__draft_id__schedule_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * Cell
+         * @description Bir kişinin bir günü. Vardiya yoksa hücre hiç gönderilmez.
+         */
+        Cell: {
+            /** Shift Code */
+            shift_code: string;
+            /**
+             * Shift Label
+             * @enum {string}
+             */
+            shift_label: "G" | "N";
+            /**
+             * Tasks
+             * @description Görev kodları: TRIYAJ, AMBULANS, GOZLEM
+             */
+            tasks?: string[];
+            /**
+             * Is Locked
+             * @default false
+             */
+            is_locked: boolean;
+            /** Source */
+            source: string;
+        };
+        /** DayHeader */
+        DayHeader: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Weekday
+             * @description Pzt, Sal, …
+             */
+            weekday: string;
+            /**
+             * Label
+             * @description Gün + kısa ay, örn. '21 Eyl'
+             */
+            label: string;
+            /** Is Weekend */
+            is_weekend: boolean;
+            /** Shifts */
+            shifts: components["schemas"]["ShiftHeader"][];
+        };
+        /** DraftInfo */
+        DraftInfo: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Month Start
+             * Format: date
+             */
+            month_start: string;
+            /** Status */
+            status: string;
+            /** Unit Name */
+            unit_name: string;
+        };
+        /**
+         * Group
+         * @description DESIGN §6: rol grubuna göre katlanabilir bölümler.
+         */
+        Group: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: components["schemas"]["Row"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -81,6 +173,97 @@ export interface components {
             aktif_personel?: number | null;
             /** Detay */
             detay?: string | null;
+        };
+        /** Row */
+        Row: {
+            /** Staff Id */
+            staff_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Role Name */
+            role_name: string;
+            /** Is Orientation */
+            is_orientation: boolean;
+            /** Initials */
+            initials: string;
+            /**
+             * Cells
+             * @description ISO tarih → hücre; çalışılmayan gün anahtarı yok
+             */
+            cells: {
+                [key: string]: components["schemas"]["Cell"];
+            };
+            /**
+             * Absences
+             * @description ISO tarih → izin türü
+             */
+            absences?: {
+                [key: string]: string;
+            };
+            /**
+             * Month Hours
+             * @description Taslağın ayındaki toplam planlanan saat
+             */
+            month_hours: number;
+            /** Month Target */
+            month_target: number;
+            /**
+             * Month Diff
+             * @description Hedefe göre fark: pozitif fazla, negatif eksik
+             */
+            month_diff: number;
+            /** Shift Count */
+            shift_count: number;
+        };
+        /** Schedule */
+        Schedule: {
+            draft: components["schemas"]["DraftInfo"];
+            /** Days */
+            days: components["schemas"]["DayHeader"][];
+            /** Groups */
+            groups: components["schemas"]["Group"][];
+            summary: components["schemas"]["Summary"];
+            /**
+             * Notes
+             * @description Izgaranın altındaki açıklama satırları
+             */
+            notes?: string[];
+        };
+        /**
+         * ShiftHeader
+         * @description Gün başlığındaki tek vardiya sayacı: DESIGN §6 'G 6/6' ve 'N 5/5'.
+         *
+         *     assigned/required YALNIZCA genel mevcut (GENEL slotu), kişi sayısı — saat değil.
+         *     Slot kırılımı `slots` içinde, tooltip'e gider; başlık sayacını etkilemez.
+         */
+        ShiftHeader: {
+            /** Code */
+            code: string;
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "G" | "N";
+            /** Assigned */
+            assigned: number;
+            /** Required */
+            required: number;
+            /** Slots */
+            slots?: components["schemas"]["SlotCoverage"][];
+        };
+        /**
+         * SlotCoverage
+         * @description Bir gün-vardiya içindeki tek slotun durumu. Sütun başlığı tooltip'inde gösterilir.
+         */
+        SlotCoverage: {
+            /** Slot Code */
+            slot_code: string;
+            /** Label */
+            label: string;
+            /** Assigned */
+            assigned: number;
+            /** Required */
+            required: number;
         };
         /** Staff */
         Staff: {
@@ -123,6 +306,26 @@ export interface components {
              * @description Yalnızca görev (kind=TASK) olabilecekler
              */
             task_codes?: string[];
+        };
+        /**
+         * Summary
+         * @description DESIGN §6 alt barı.
+         */
+        Summary: {
+            /** Total Hours */
+            total_hours: number;
+            /** Overtime Hours */
+            overtime_hours: number;
+            /**
+             * Fairness Gap
+             * @description Kişiler arası saat farkı: en çok − en az
+             */
+            fairness_gap: number;
+            /**
+             * Shortfall Count
+             * @description Seçili aralıkta eksik kalan slot sayısı
+             */
+            shortfall_count: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -216,6 +419,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Staff"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cizelge_api_drafts__draft_id__schedule_get: {
+        parameters: {
+            query: {
+                /** @description Aralık başlangıcı (dahil) */
+                from: string;
+                /** @description Aralık bitişi (dahil) */
+                to: string;
+            };
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
                 };
             };
             /** @description Validation Error */
