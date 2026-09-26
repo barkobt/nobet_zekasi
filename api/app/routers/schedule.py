@@ -39,6 +39,76 @@ def _bas_harfler(ad: str) -> str:
     return "".join(p[0].upper() for p in parcalar[:2])
 
 
+def gun_basliklari(kapsama_satirlari: list[dict], gun_bas: date, gun_son: date) -> list[DayHeader]:
+    """Kapsama satırlarını gün sütunlarına çevirir.
+
+    Hem E-09 çizelgesi hem E-06 ihtiyaç ekranı bunu kullanır: aynı sayılar,
+    aynı tooltip kuralları. İki yerde yazılsaydı zamanla birbirinden ayrılırdı.
+    """
+    kapsama: dict[tuple[date, str], list[dict]] = {}
+    for k in kapsama_satirlari:
+        kapsama.setdefault((k["day"], k["shift_code"]), []).append(k)
+
+    gunler: list[DayHeader] = []
+    gun = gun_bas
+    while gun <= gun_son:
+        vardiyalar: list[ShiftHeader] = []
+        for kod in ("GUNDUZ", "GECE"):          # okuma sırası: önce gündüz
+            satirlar = kapsama.get((gun, kod))
+            if not satirlar:
+                continue
+            genel = next((s for s in satirlar if s["slot_code"] == "GENEL"), None)
+
+            # Ambulans çıkınca boşalan alan var mı? Tooltip'in tek açıklama satırı.
+            bos_alan = next(
+                (SLOT_ADI[s["slot_code"]].lower()
+                 for s in satirlar
+                 if s["slot_code"] in ("TRIYAJ", "GOZLEM") and s["remaining_after_ambulance"] == 0),
+                None,
+            )
+
+            vardiyalar.append(
+                ShiftHeader(
+                    code=kod,
+                    label=VARDIYA_ETIKET.get(kod, "G"),
+                    assigned=genel["assigned"] if genel else 0,
+                    required=genel["required"] if genel else 0,
+                    slots=[
+                        SlotCoverage(
+                            slot_code=s["slot_code"], label=SLOT_ADI[s["slot_code"]],
+                            assigned=s["assigned"], required=s["required"],
+                        )
+                        for s in sorted(
+                            (x for x in satirlar if x["slot_code"] in SLOT_ADI),
+                            key=lambda x: SLOT_SIRA.index(x["slot_code"]),
+                        )
+                    ],
+                    flags=[
+                        QualificationFlag(
+                            label=YETKI_ADI[s["slot_code"]],
+                            present=s["assigned"] >= s["required"],
+                        )
+                        for s in sorted(
+                            (x for x in satirlar if x["slot_code"] in YETKI_ADI),
+                            key=lambda x: x["slot_code"], reverse=True,
+                        )
+                    ],
+                    empty_area=bos_alan,
+                )
+            )
+        gunler.append(
+            DayHeader(
+                day=gun,
+                weekday=GUN_ADI[gun.weekday()],
+                label=f"{gun.day} {AY_ADI[gun.month - 1]}",
+                is_weekend=gun.weekday() >= 5,
+                shifts=vardiyalar,
+            )
+        )
+        gun += timedelta(days=1)
+    return gunler
+
+
 @router.get("/{draft_id}/schedule", response_model=Schedule, summary="E-09 çizelge ızgarası")
 async def cizelge(
     draft_id: int,
@@ -68,74 +138,7 @@ async def cizelge(
 
     veri = await repo.cizelge_verisi(draft_id, gun_bas, gun_son)
 
-    # --- Sütun başlıkları ---------------------------------------------------
-    # kapsama satırlarını (gün, vardiya) altında topla
-    kapsama: dict[tuple[date, str], list[dict]] = {}
-    for k in veri["kapsama"]:
-        kapsama.setdefault((k["day"], k["shift_code"]), []).append(k)
-
-    gunler: list[DayHeader] = []
-    gun = gun_bas
-    while gun <= gun_son:
-        vardiyalar: list[ShiftHeader] = []
-        # GUNDUZ önce, GECE sonra — okuma sırası
-        for kod in ("GUNDUZ", "GECE"):
-            satirlar = kapsama.get((gun, kod))
-            if not satirlar:
-                continue
-            genel = next((s for s in satirlar if s["slot_code"] == "GENEL"), None)
-
-            # Ambulans çıkınca boşalan alan var mı? Tooltip'in tek açıklama satırı.
-            bos_alan = next(
-                (SLOT_ADI[s["slot_code"]].lower()
-                 for s in satirlar
-                 if s["slot_code"] in ("TRIYAJ", "GOZLEM") and s["remaining_after_ambulance"] == 0),
-                None,
-            )
-
-            vardiyalar.append(
-                ShiftHeader(
-                    code=kod,
-                    label=VARDIYA_ETIKET.get(kod, "G"),
-                    # Başlık sayacı YALNIZCA genel mevcut (DESIGN §6)
-                    assigned=genel["assigned"] if genel else 0,
-                    required=genel["required"] if genel else 0,
-                    slots=[
-                        SlotCoverage(
-                            slot_code=s["slot_code"],
-                            label=SLOT_ADI[s["slot_code"]],
-                            assigned=s["assigned"],
-                            required=s["required"],
-                        )
-                        for s in sorted(
-                            (x for x in satirlar if x["slot_code"] in SLOT_ADI),
-                            key=lambda x: SLOT_SIRA.index(x["slot_code"]),
-                        )
-                    ],
-                    flags=[
-                        QualificationFlag(
-                            label=YETKI_ADI[s["slot_code"]],
-                            present=s["assigned"] >= s["required"],
-                        )
-                        for s in sorted(
-                            (x for x in satirlar if x["slot_code"] in YETKI_ADI),
-                            key=lambda x: x["slot_code"],   # SAYIM, SHIFT_YETKILISI
-                            reverse=True,                   # Ekip lideri önce
-                        )
-                    ],
-                    empty_area=bos_alan,
-                )
-            )
-        gunler.append(
-            DayHeader(
-                day=gun,
-                weekday=GUN_ADI[gun.weekday()],
-                label=f"{gun.day} {AY_ADI[gun.month - 1]}",
-                is_weekend=gun.weekday() >= 5,
-                shifts=vardiyalar,
-            )
-        )
-        gun += timedelta(days=1)
+    gunler = gun_basliklari(veri["kapsama"], gun_bas, gun_son)
 
     # --- Hücreler -----------------------------------------------------------
     hucreler: dict[int, dict[str, Cell]] = {}

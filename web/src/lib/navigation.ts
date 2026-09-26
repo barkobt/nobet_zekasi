@@ -14,6 +14,6 @@ export const NAV: NavItem[] = [
   { href: "/personel",   label: "Personel",          kod: "E-04", icon: Users },
   { href: "/yetkinlik",  label: "Yetkinlik Matrisi", kod: "E-02", icon: Grid3x3 },
   { href: "/kurallar",   label: "Kural Seti",        kod: "E-03", icon: Scale },
-  { href: "/ihtiyac",    label: "İhtiyaç Şablonu",   kod: "E-06", icon: ClipboardList },
+  { href: "/ihtiyac",    label: "İhtiyaç",          kod: "E-06", icon: ClipboardList },
   { href: "/vardiyalar", label: "Vardiya Tanımları", kod: "E-01", icon: Clock },
 ];

@@ -192,6 +192,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/demand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Haftalık ihtiyaç görünümü */
+        get: operations["haftalik_api_demand_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/need-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** İhtiyaç şablonu */
+        get: operations["sablon_api_need_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/need-template-rows/{row_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Şablon satırının kişi sayısını değiştir */
+        patch: operations["satir_guncelle_api_need_template_rows__row_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -242,6 +293,55 @@ export interface components {
             is_weekend: boolean;
             /** Shifts */
             shifts: components["schemas"]["ShiftHeader"][];
+        };
+        /** Demand */
+        Demand: {
+            /** Period Label */
+            period_label: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description DIŞLAYICI
+             */
+            period_end: string;
+            draft?: components["schemas"]["DemandDraft"] | null;
+            total: components["schemas"]["DemandTotal"];
+            /**
+             * Days
+             * @description Çizelgeyle aynı yapı — tek tanım, tek davranış
+             */
+            days: components["schemas"]["DayHeader"][];
+        };
+        /** DemandDraft */
+        DemandDraft: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Is Published */
+            is_published: boolean;
+            /**
+             * Is Reference Copy
+             * @default false
+             */
+            is_reference_copy: boolean;
+        };
+        /** DemandTotal */
+        DemandTotal: {
+            /**
+             * Required Hours
+             * @description Minimum kadro saati: GENEL min_count × vardiya süresi
+             */
+            required_hours: number;
+            /** Assigned Hours */
+            assigned_hours: number;
+            /** Shortfall Count */
+            shortfall_count: number;
         };
         /** Diagnostic */
         Diagnostic: {
@@ -469,6 +569,17 @@ export interface components {
             eksik_migration?: string | null;
             /** Detay */
             detay?: string | null;
+        };
+        /** NeedTemplate */
+        NeedTemplate: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Rows */
+            rows: components["schemas"]["TemplateRow"][];
         };
         /** Overview */
         Overview: {
@@ -798,6 +909,36 @@ export interface components {
              * @description Seçili aralıkta eksik kalan slot sayısı
              */
             shortfall_count: number;
+        };
+        /** TemplateRow */
+        TemplateRow: {
+            /** Id */
+            id: number;
+            /** Shift Code */
+            shift_code: string;
+            /** Shift Name */
+            shift_name: string;
+            /** Slot Code */
+            slot_code: string;
+            /** Slot Label */
+            slot_label: string;
+            /** Min Count */
+            min_count: number;
+            /** Competency Codes */
+            competency_codes?: string[];
+            /** Constraint Code */
+            constraint_code?: string | null;
+            /** Catalog Code */
+            catalog_code?: string | null;
+            /** Constraint Name */
+            constraint_name?: string | null;
+            /** Is Hard */
+            is_hard?: boolean | null;
+        };
+        /** TemplateRowUpdate */
+        TemplateRowUpdate: {
+            /** Min Count */
+            min_count: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -1172,6 +1313,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Overview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    haftalik_api_demand_get: {
+        parameters: {
+            query: {
+                from: string;
+                /** @description DAHİL */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Demand"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sablon_api_need_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NeedTemplate"][];
+                };
+            };
+        };
+    };
+    satir_guncelle_api_need_template_rows__row_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateRowUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateRow"];
                 };
             };
             /** @description Validation Error */
