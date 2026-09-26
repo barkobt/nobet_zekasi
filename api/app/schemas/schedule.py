@@ -120,3 +120,22 @@ class Schedule(BaseModel):
     groups: list[Group]
     summary: Summary
     notes: list[str] = Field(default_factory=list, description="Izgaranın altındaki açıklama satırları")
+
+
+class CellUpdate(BaseModel):
+    """Izgara hücresine elle müdahale (E-09 taslak içi)."""
+
+    staff_id: int
+    work_date: date
+    shift_code: Literal["GUNDUZ", "GECE", "IZIN", "BOS"] = Field(
+        description="IZIN bir devamsızlık kaydı yazar; BOS atamayı siler"
+    )
+    tasks: list[str] = Field(default_factory=list, description="TRIYAJ / GOZLEM / AMBULANS")
+
+
+class CellResult(BaseModel):
+    ok: bool = True
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Kural uyarıları. Engellemez — elle müdahale gerçeği kaydeder (E-09 kararı).",
+    )

@@ -1,6 +1,6 @@
 """E-09 çizelgesi — düz SQL. Üç sorgu: atamalar, kapsama, aylık toplam."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from app.db import cursor
 
@@ -111,3 +111,100 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         "aylik": aylik,
         "izinler": izinler,
     }
+
+
+async def hucre_yaz(draft_id: int, staff_id: int, gun: date,
+                    shift_code: str, tasks: list[str]) -> list[str]:
+    """Elle hücre düzenleme. source='manuel', is_locked=TRUE → solver dokunmaz.
+
+    Kural uyarıları ENGELLEMEZ, yalnız bildirilir (docs/ekran-haritasi.md E-09:
+    "hangi kuralın ihlal edildiğini anında söyler, engellemez"). Veritabanındaki
+    trigger'lar da manuel kaynak için uyarı üretip kaydı alıyor; burada aynı
+    kontrolleri önceden yapıp kullanıcıya Türkçe cümle olarak dönüyoruz.
+    """
+    uyarilar: list[str] = []
+
+    async with cursor() as cur:
+        # Her durumda önce o günün atamasını temizle: hücre tek bir şey olabilir.
+        await cur.execute(
+            "DELETE FROM assignments WHERE draft_id = %s AND staff_id = %s AND work_date = %s",
+            (draft_id, staff_id, gun),
+        )
+
+        if shift_code == "IZIN":
+            # İzin bir ATAMA değil, devamsızlık kaydıdır: absences tablosuna gider.
+            try:
+                await cur.execute(
+                    """INSERT INTO absences (staff_id, period, absence_type, note)
+                       VALUES (%s, daterange(%s, %s, '[)'), 'diger', 'Çizelgeden işaretlendi')""",
+                    (staff_id, gun, gun + timedelta(days=1)),
+                )
+            except Exception:  # noqa: BLE001 — çakışan izin zaten var demektir
+                uyarilar.append("Bu güne ait bir devamsızlık kaydı zaten vardı.")
+            return uyarilar
+
+        # BOŞ: atama silindi, varsa o günün izin kaydını da kaldır
+        if shift_code == "BOS":
+            await cur.execute(
+                """DELETE FROM absences
+                    WHERE staff_id = %s AND period = daterange(%s, %s, '[)')
+                      AND note = 'Çizelgeden işaretlendi'""",
+                (staff_id, gun, gun + timedelta(days=1)),
+            )
+            return uyarilar
+
+        # Vardiya: önce varsa izin kaydını kaldır (ikisi aynı anda olamaz)
+        await cur.execute(
+            """DELETE FROM absences
+                WHERE staff_id = %s AND period && daterange(%s, %s, '[)')
+                  AND note = 'Çizelgeden işaretlendi'""",
+            (staff_id, gun, gun + timedelta(days=1)),
+        )
+
+        await cur.execute(
+            """INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date,
+                                        source, is_locked)
+               SELECT %s, %s, st.id, %s, 'manuel', TRUE
+               FROM shift_types st JOIN units u ON u.id = st.unit_id
+               WHERE st.code = %s AND u.code = 'ACIL_SERVIS'
+               RETURNING id""",
+            (draft_id, staff_id, gun, shift_code),
+        )
+        if (atama := await cur.fetchone()) is None:
+            return ["Vardiya tipi bulunamadı."]
+
+        # Sadece gündüz çalışabilen biri geceye yazılıyorsa (C-017)
+        if shift_code == "GECE":
+            await cur.execute(
+                "SELECT full_name FROM staff WHERE id = %s AND shift_eligibility = 'sadece_gunduz'",
+                (staff_id,),
+            )
+            if (k := await cur.fetchone()) is not None:
+                uyarilar.append(f"{k['full_name']} yalnız gündüz çalışabiliyor.")
+
+        if not tasks:
+            return uyarilar
+
+        # TRIYAJ ve GOZLEM aynı kişide olamaz (C-010, trigger da reddeder)
+        if "TRIYAJ" in tasks and "GOZLEM" in tasks:
+            uyarilar.append("Triyaj ve gözlem aynı vardiyada aynı kişiye verilemez.")
+            tasks = [t for t in tasks if t != "GOZLEM"]
+
+        # Yetkinliği olmayan görev: uyar, ama yaz (manuel kaynak trigger'dan geçer)
+        await cur.execute(
+            """SELECT c.code, c.name FROM competencies c
+                WHERE c.code = ANY(%s)
+                  AND NOT EXISTS (SELECT 1 FROM staff_competencies sc
+                                  WHERE sc.staff_id = %s AND sc.competency_id = c.id)""",
+            (tasks, staff_id),
+        )
+        for eksik in await cur.fetchall():
+            uyarilar.append(f"Bu kişide \"{eksik['name']}\" yetkinliği yok.")
+
+        await cur.execute(
+            """INSERT INTO assignment_tasks (assignment_id, competency_id)
+               SELECT %s, id FROM competencies WHERE code = ANY(%s) AND kind = 'TASK'""",
+            (atama["id"], tasks),
+        )
+
+    return uyarilar

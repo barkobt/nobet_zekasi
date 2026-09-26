@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -10,9 +10,22 @@ import { Izgara } from "@/components/cizelge/Izgara";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { sayi, type Schedule } from "@/lib/cizelge";
+import type { components } from "@/lib/api-types";
 
-/** Referans taslak: elle hazırlanan 21–27 Eylül haftası. */
-const TASLAK_ID = 1;
+type DraftOzet = components["schemas"]["Draft"];
+
+/** pzt + 6 gün (kapsayıcı son gün) */
+const bitisHesap = (pzt: string) => {
+  const d = new Date(pzt + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 6);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * E-09: yalnızca YAYINLANMIŞ çizelgeyi gösterir ve SALT OKUNURDUR.
+ * Düzenleme taslak içinden yapılır (/taslaklar/[id]) — yayınlanmış bir çizelgeyi
+ * kazara değiştirmek, kimsenin haberi olmadan nöbeti değiştirmek demektir.
+ */
 const REFERANS_PZT = "2026-09-21";
 
 const isoGun = (d: Date) => d.toISOString().slice(0, 10);
@@ -41,16 +54,24 @@ export default function CizelgeSayfasi() {
 }
 
 function Icerik() {
-  // E-08'den "Çizelge" ile gelince o taslak açılır; yoksa referans hafta.
-  const draftParam = useSearchParams().get("draft");
-  const taslakId = draftParam ? Number(draftParam) : TASLAK_ID;
   const [pzt, setPzt] = useState(REFERANS_PZT);
+
+  // Seçili haftayla çakışan YAYINLANMIŞ taslak
+  const { data: taslaklar } = useQuery({
+    queryKey: ["drafts"],
+    queryFn: () => api<DraftOzet[]>("/drafts"),
+  });
+  const yayinlanan = (taslaklar ?? []).find(
+    (t) => t.status === "yayinlandi" && t.period_start <= bitisHesap(pzt) && t.period_end > pzt,
+  );
+  const taslakId = yayinlanan?.id;
   const son = haftaKaydir(pzt, 1);
   const bitis = isoGun(new Date(new Date(son + "T00:00:00Z").getTime() - 86400000));
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["schedule", taslakId, pzt],
     queryFn: () => api<Schedule>(`/drafts/${taslakId}/schedule?from=${pzt}&to=${bitis}`),
+    enabled: taslakId !== undefined,
   });
 
   return (
@@ -87,17 +108,24 @@ function Icerik() {
         </div>
       </div>
 
-      {error ? (
+      {taslakId === undefined && taslaklar ? (
+        // DESIGN §5: boş durum tek cümle + tek eylem
+        <div className="flex flex-col items-center gap-3 rounded-lg border bg-card p-12">
+          <p className="text-muted-foreground">Bu hafta için yayınlanmış çizelge yok.</p>
+          <Button asChild><Link href="/taslaklar">Taslaklara git</Link></Button>
+        </div>
+      ) : error ? (
         <div className="rounded-lg border bg-card p-6">
           <p className="text-danger">Çizelge alınamadı.</p>
         </div>
-      ) : isLoading ? (
+      ) : isLoading || !data ? (
         <div className="rounded-lg border bg-card p-6">
           <p className="text-muted-foreground">Yükleniyor…</p>
         </div>
       ) : (
         <>
-          <Izgara data={data!} />
+          {/* draftId verilmiyor → hücreler düzenlenemez */}
+          <Izgara data={data} />
 
           {/* DESIGN §6 alt barı */}
           <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 px-1">
@@ -107,13 +135,13 @@ function Icerik() {
             <Ozet
               etiket="Eksik slot"
               deger={String(data!.summary.shortfall_count)}
-              vurgu={data!.summary.shortfall_count > 0}
+              vurgu={data.summary.shortfall_count > 0}
             />
           </div>
 
-          {(data!.notes ?? []).length > 0 && (
+          {(data.notes ?? []).length > 0 && (
             <div className="mt-2 px-1">
-              {(data!.notes ?? []).map((n) => (
+              {(data.notes ?? []).map((n) => (
                 <p key={n} className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
                   {n}
                 </p>

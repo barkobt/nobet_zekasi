@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.repositories import schedule as repo
 from app.schemas.schedule import (
-    Cell, DayHeader, DraftInfo, Group, QualificationFlag, Row, Schedule, ShiftHeader,
-    SlotCoverage, Summary,
+    Cell, CellResult, CellUpdate, DayHeader, DraftInfo, Group, QualificationFlag, Row,
+    Schedule, ShiftHeader, SlotCoverage, Summary,
 )
 
 router = APIRouter(prefix="/drafts", tags=["çizelge"])
@@ -242,3 +242,19 @@ async def cizelge(
         ),
         notes=notlar,
     )
+
+
+@router.put("/{draft_id}/cells", response_model=CellResult, summary="Hücreye elle müdahale")
+async def hucre_yaz(draft_id: int, istek: CellUpdate) -> CellResult:
+    """Elle yazılan hücre source='manuel', is_locked=TRUE olur: solver dokunmaz.
+
+    Kural uyarıları ENGELLEMEZ. Sorumlu hemşire gerçekliği bildiğinde çizelgeye
+    yazabilmeli; sistem yalnız neyin ihlal edildiğini söyler (E-09 kararı).
+    """
+    if await repo.taslak(draft_id) is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+
+    uyarilar = await repo.hucre_yaz(
+        draft_id, istek.staff_id, istek.work_date, istek.shift_code, istek.tasks
+    )
+    return CellResult(ok=True, warnings=uyarilar)

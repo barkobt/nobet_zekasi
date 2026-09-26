@@ -72,6 +72,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/drafts/{draft_id}/cells": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Hücreye elle müdahale
+         * @description Elle yazılan hücre source='manuel', is_locked=TRUE olur: solver dokunmaz.
+         *
+         *     Kural uyarıları ENGELLEMEZ. Sorumlu hemşire gerçekliği bildiğinde çizelgeye
+         *     yazabilmeli; sistem yalnız neyin ihlal edildiğini söyler (E-09 kararı).
+         */
+        put: operations["hucre_yaz_api_drafts__draft_id__cells_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/drafts": {
         parameters: {
             query?: never;
@@ -741,6 +764,43 @@ export interface components {
             is_locked: boolean;
             /** Source */
             source: string;
+        };
+        /** CellResult */
+        CellResult: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /**
+             * Warnings
+             * @description Kural uyarıları. Engellemez — elle müdahale gerçeği kaydeder (E-09 kararı).
+             */
+            warnings?: string[];
+        };
+        /**
+         * CellUpdate
+         * @description Izgara hücresine elle müdahale (E-09 taslak içi).
+         */
+        CellUpdate: {
+            /** Staff Id */
+            staff_id: number;
+            /**
+             * Work Date
+             * Format: date
+             */
+            work_date: string;
+            /**
+             * Shift Code
+             * @description IZIN bir devamsızlık kaydı yazar; BOS atamayı siler
+             * @enum {string}
+             */
+            shift_code: "GUNDUZ" | "GECE" | "IZIN" | "BOS";
+            /**
+             * Tasks
+             * @description TRIYAJ / GOZLEM / AMBULANS
+             */
+            tasks?: string[];
         };
         /** Competency */
         Competency: {
@@ -1944,6 +2004,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hucre_yaz_api_drafts__draft_id__cells_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CellUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CellResult"];
                 };
             };
             /** @description Validation Error */

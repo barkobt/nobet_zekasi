@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { GunBasligi } from "./GunBasligi";
 import { Hucre } from "./Hucre";
 import { fark, sayi, type Schedule } from "@/lib/cizelge";
+import { HucreDuzenle } from "./HucreDuzenle";
 
 /**
  * E-09 ızgarası (DESIGN §6):
@@ -14,7 +15,14 @@ import { fark, sayi, type Schedule } from "@/lib/cizelge";
  *   satır sonu = aylık toplam + 200 hedefine göre fark
  * İlk sütun ve başlık satırı sabit (sticky).
  */
-export function Izgara({ data }: { data: Schedule }) {
+export function Izgara({
+  data, draftId, onDegisti,
+}: {
+  data: Schedule;
+  /** Verilirse hücreler düzenlenebilir olur (taslak içi ekran). */
+  draftId?: number;
+  onDegisti?: () => void;
+}) {
   // Hedef artık döneme orantılı (aylık hedef × gün sayısı / ayın gün sayısı), ama
   // KIRMIZI yalnızca taslak ayın tamamını kapsıyorsa: C-004 aylık bir kuraldır,
   // bir haftalık çizelgede "hedefin altında" demek kuralın ihlali değildir.
@@ -119,14 +127,37 @@ export function Izgara({ data }: { data: Schedule }) {
                       <td
                         key={g.day}
                         className={
-                          "h-10 border-l align-middle group-hover:bg-accent " +
+                          "h-10 border-l p-0 align-middle group-hover:bg-accent " +
                           (g.is_weekend ? "bg-background/60" : "")
                         }
                       >
-                        <Hucre
-                          cell={satir.cells[g.day] ?? undefined}
-                          absence={(satir.absences ?? {})[g.day] ?? undefined}
-                        />
+                        {draftId ? (
+                          <HucreDuzenle
+                            draftId={draftId}
+                            staffId={satir.staff_id}
+                            staffName={satir.full_name}
+                            gun={g.day}
+                            cell={satir.cells[g.day] ?? undefined}
+                            absence={(satir.absences ?? {})[g.day] ?? undefined}
+                            onKaydedildi={() => onDegisti?.()}
+                          >
+                            <button
+                              type="button"
+                              className="h-full w-full cursor-pointer hover:bg-brand-soft"
+                              aria-label={`${satir.full_name} — ${g.label}`}
+                            >
+                              <Hucre
+                                cell={satir.cells[g.day] ?? undefined}
+                                absence={(satir.absences ?? {})[g.day] ?? undefined}
+                              />
+                            </button>
+                          </HucreDuzenle>
+                        ) : (
+                          <Hucre
+                            cell={satir.cells[g.day] ?? undefined}
+                            absence={(satir.absences ?? {})[g.day] ?? undefined}
+                          />
+                        )}
                       </td>
                     ))}
 
