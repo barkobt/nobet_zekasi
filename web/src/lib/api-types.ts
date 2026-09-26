@@ -415,6 +415,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/competencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Yetkinlik listesi */
+        get: operations["yetkinlikler_api_competencies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/competency-matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** E-02 matrisi */
+        get: operations["matris_api_competency_matrix_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/competencies/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Yetkinlik kutucuğunu aç/kapa */
+        put: operations["yetkinlik_degistir_api_people__staff_id__competencies__code__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/constraints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kural seti */
+        get: operations["kurallar_api_constraints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/constraints/{constraint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Kuralı düzenle */
+        patch: operations["kural_guncelle_api_constraints__constraint_id__patch"];
+        trace?: never;
+    };
+    "/api/constraint-params/{param_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Kural parametresini düzenle */
+        patch: operations["param_guncelle_api_constraint_params__param_id__patch"];
+        trace?: never;
+    };
+    "/api/shift-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vardiya tanımları */
+        get: operations["vardiyalar_api_shift_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -524,6 +643,37 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** Competency */
+        Competency: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "TASK" | "QUALIFICATION";
+            /** Description */
+            description?: string | null;
+            /**
+             * Staff Count
+             * @description Sütun altı toplamı — fizibilite erken görünsün
+             * @default 0
+             */
+            staff_count: number;
+        };
+        /** CompetencyMatrix */
+        CompetencyMatrix: {
+            /** Tasks */
+            tasks: components["schemas"]["Competency"][];
+            /** Qualifications */
+            qualifications: components["schemas"]["Competency"][];
+            /** Rows */
+            rows: components["schemas"]["MatrixRow"][];
+        };
         /** Conflict */
         Conflict: {
             /** Other Staff Id */
@@ -539,6 +689,59 @@ export interface components {
             other_staff_id: number;
             /** Note */
             note?: string | null;
+        };
+        /** Constraint */
+        Constraint: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Catalog Code */
+            catalog_code?: string | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Is Hard */
+            is_hard: boolean;
+            /**
+             * Default Weight
+             * @description Soft kuralda pozitif, hard'da boş
+             */
+            default_weight?: number | null;
+            /** Scope */
+            scope: string;
+            /** Scope Label */
+            scope_label: string;
+            /** Source */
+            source: string;
+            /** Source Label */
+            source_label: string;
+            /**
+             * Locked
+             * @description Kaynağı 'yasal' olanlar gevşetilemez
+             */
+            locked: boolean;
+            /** Params */
+            params?: components["schemas"]["ConstraintParam"][];
+        };
+        /** ConstraintParam */
+        ConstraintParam: {
+            /** Id */
+            id: number;
+            /** Param Key */
+            param_key: string;
+            /** Param Value */
+            param_value: number;
+            /** Description */
+            description?: string | null;
+        };
+        /** ConstraintUpdate */
+        ConstraintUpdate: {
+            /** Is Hard */
+            is_hard?: boolean | null;
+            /** Default Weight */
+            default_weight?: number | null;
         };
         /** Contract */
         Contract: {
@@ -874,6 +1077,22 @@ export interface components {
             /** Detay */
             detay?: string | null;
         };
+        /** MatrixRow */
+        MatrixRow: {
+            /** Staff Id */
+            staff_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Role Name */
+            role_name: string;
+            /** Is Orientation */
+            is_orientation: boolean;
+            /**
+             * Codes
+             * @description Sahip olduğu yetkinlik kodları
+             */
+            codes?: string[];
+        };
         /** NeedTemplate */
         NeedTemplate: {
             /** Id */
@@ -955,6 +1174,11 @@ export interface components {
              * @default false
              */
             is_reference_copy: boolean;
+        };
+        /** ParamUpdate */
+        ParamUpdate: {
+            /** Param Value */
+            param_value: number;
         };
         /** PersonCreate */
         PersonCreate: {
@@ -1228,6 +1452,33 @@ export interface components {
              * @description Ambulans çıkınca boşalan alan adı ('triyaj' / 'gözlem'), yoksa boş
              */
             empty_area?: string | null;
+        };
+        /** ShiftType */
+        ShiftType: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /** Duration Hours */
+            duration_hours: number;
+            /**
+             * End Label
+             * @description Bitiş saati, insan diliyle
+             */
+            end_label: string;
+            /** Crosses Midnight */
+            crosses_midnight: boolean;
+            /** Is Active */
+            is_active: boolean;
+            /** Unit Name */
+            unit_name: string;
         };
         /**
          * SlotCoverage
@@ -2272,6 +2523,190 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    yetkinlikler_api_competencies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Competency"][];
+                };
+            };
+        };
+    };
+    matris_api_competency_matrix_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompetencyMatrix"];
+                };
+            };
+        };
+    };
+    yetkinlik_degistir_api_people__staff_id__competencies__code__put: {
+        parameters: {
+            query: {
+                ver: boolean;
+            };
+            header?: never;
+            path: {
+                staff_id: number;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompetencyMatrix"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kurallar_api_constraints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Constraint"][];
+                };
+            };
+        };
+    };
+    kural_guncelle_api_constraints__constraint_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                constraint_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConstraintUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Constraint"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    param_guncelle_api_constraint_params__param_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                param_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParamUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Constraint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vardiyalar_api_shift_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftType"][];
                 };
             };
         };
