@@ -66,11 +66,23 @@ if [ "$ASSUME_YES" -eq 0 ]; then
     [ "$ok" = "e" ] || { echo "İptal."; exit 1; }
 fi
 
+# Yalnızca KANONİK adlar çalıştırılır: 001_ad.up.sql / 001_ad.sql
+# Senkron araçları (iCloud, Dropbox) "001_ad.up 2.sql" gibi kopyalar bırakabiliyor;
+# bunlar seeds/*.sql kalıbına takılıp iki kez çalışır ve zamanla bayatlayıp
+# ESKİ SQL'i yeni şemanın üstüne uygular. Sessizce atlamak yerine uyarıyoruz.
+gecerli_mi() { [[ "$(basename "$1")" =~ ^[0-9]{3}_[A-Za-z0-9_]+(\.(up|down))?\.sql$ ]]; }
+
+atlanan=0
+for f in migrations/*.sql seeds/*.sql; do
+    gecerli_mi "$f" || { echo "⚠ atlandı (kanonik olmayan ad): $f" >&2; atlanan=$((atlanan+1)); }
+done
+[ "$atlanan" -gt 0 ] && echo "⚠ $atlanan dosya atlandı. Kopya dosyaları silmen önerilir." >&2
+
 "${PSQL[@]}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-for f in migrations/*.up.sql; do echo "↑ $f"; "${PSQL[@]}" -f "$f"; done
+for f in migrations/*.up.sql; do gecerli_mi "$f" || continue; echo "↑ $f"; "${PSQL[@]}" -f "$f"; done
 # Seed 009 referans haftayı kağıttan aktarır ve bilinen tek uygunluk ihlalini içerir
 # (Güven Göl, 26.09, AMBULANS). Trigger bunu WARNING olarak geçirir — beklenen davranış.
-for f in seeds/*.sql;         do echo "• $f"; "${PSQL[@]}" -f "$f" > /dev/null; done
+for f in seeds/*.sql; do gecerli_mi "$f" || continue; echo "• $f"; "${PSQL[@]}" -f "$f" > /dev/null; done
 
 "${PSQL[@]}" -c "SELECT (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE') AS tablo,
                         (SELECT count(*) FROM information_schema.views  WHERE table_schema='public') AS view,
