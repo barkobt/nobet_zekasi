@@ -243,10 +243,262 @@ export interface paths {
         patch: operations["satir_guncelle_api_need_template_rows__row_id__patch"];
         trace?: never;
     };
+    "/api/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Personel listesi */
+        get: operations["listele_api_people_get"];
+        put?: never;
+        /** Personel ekle */
+        post: operations["olustur_api_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rol listesi */
+        get: operations["roller_api_people_roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Personel detayı */
+        get: operations["detay_api_people__staff_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Personel düzenle */
+        patch: operations["guncelle_api_people__staff_id__patch"];
+        trace?: never;
+    };
+    "/api/people/{staff_id}/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sözleşme ekle */
+        post: operations["sozlesme_ekle_api_people__staff_id__contracts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/absences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Devamsızlık ekle */
+        post: operations["izin_ekle_api_people__staff_id__absences_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/absences/{absence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Devamsızlık sil */
+        delete: operations["izin_sil_api_people__staff_id__absences__absence_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Müsaitlik kuralı ekle */
+        post: operations["musaitlik_ekle_api_people__staff_id__availability_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/availability/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Müsaitlik kuralı sil */
+        delete: operations["musaitlik_sil_api_people__staff_id__availability__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Uyumsuz kişi ekle */
+        post: operations["uyumsuzluk_ekle_api_people__staff_id__conflicts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{staff_id}/conflicts/{other_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Uyumsuz kişi sil */
+        delete: operations["uyumsuzluk_sil_api_people__staff_id__conflicts__other_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Absence */
+        Absence: {
+            /** Id */
+            id: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description DAHİL
+             */
+            end: string;
+            /**
+             * Absence Type
+             * @enum {string}
+             */
+            absence_type: "yillik_izin" | "rapor" | "ucretsiz_izin" | "diger";
+            /** Type Label */
+            type_label: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** AbsenceCreate */
+        AbsenceCreate: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             * @description DAHİL
+             */
+            end: string;
+            /**
+             * Absence Type
+             * @enum {string}
+             */
+            absence_type: "yillik_izin" | "rapor" | "ucretsiz_izin" | "diger";
+            /** Note */
+            note?: string | null;
+        };
+        /** AvailabilityCreate */
+        AvailabilityCreate: {
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /**
+             * Rule Type
+             * @enum {string}
+             */
+            rule_type: "off_talebi" | "acilis_tercihi" | "kapanis_tercihi";
+            /** Note */
+            note?: string | null;
+        };
+        /** AvailabilityRule */
+        AvailabilityRule: {
+            /** Id */
+            id: number;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /**
+             * Rule Type
+             * @enum {string}
+             */
+            rule_type: "off_talebi" | "acilis_tercihi" | "kapanis_tercihi";
+            /** Type Label */
+            type_label: string;
+            /** Note */
+            note?: string | null;
+        };
         /**
          * Cell
          * @description Bir kişinin bir günü. Vardiya yoksa hücre hiç gönderilmez.
@@ -271,6 +523,58 @@ export interface components {
             is_locked: boolean;
             /** Source */
             source: string;
+        };
+        /** Conflict */
+        Conflict: {
+            /** Other Staff Id */
+            other_staff_id: number;
+            /** Other Name */
+            other_name: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** ConflictCreate */
+        ConflictCreate: {
+            /** Other Staff Id */
+            other_staff_id: number;
+            /** Note */
+            note?: string | null;
+        };
+        /** Contract */
+        Contract: {
+            /** Id */
+            id: number;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /**
+             * Valid To
+             * @description Açık uçluysa boş
+             */
+            valid_to?: string | null;
+            /**
+             * Monthly Target Hours
+             * @description Boşsa kural varsayılanı (monthly_min_hours) geçerli
+             */
+            monthly_target_hours?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** ContractUpsert */
+        ContractUpsert: {
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /** Valid To */
+            valid_to?: string | null;
+            /** Monthly Target Hours */
+            monthly_target_hours?: number | null;
+            /** Note */
+            note?: string | null;
         };
         /** DayHeader */
         DayHeader: {
@@ -652,6 +956,169 @@ export interface components {
              */
             is_reference_copy: boolean;
         };
+        /** PersonCreate */
+        PersonCreate: {
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Role Code */
+            role_code: string;
+            /**
+             * Shift Eligibility
+             * @default gunduz_gece
+             * @enum {string}
+             */
+            shift_eligibility: "gunduz_gece" | "sadece_gunduz" | "sadece_gece";
+            /** Sicil No */
+            sicil_no?: string | null;
+            /** Seniority Years */
+            seniority_years?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** PersonDetail */
+        PersonDetail: {
+            /** Id */
+            id: number;
+            /**
+             * Sicil No
+             * @description Boşsa boş gösterilir, uydurulmaz
+             */
+            sicil_no?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Full Name */
+            full_name: string;
+            /** Role Code */
+            role_code: string;
+            /** Role Name */
+            role_name: string;
+            /**
+             * Shift Eligibility
+             * @enum {string}
+             */
+            shift_eligibility: "gunduz_gece" | "sadece_gunduz" | "sadece_gece";
+            /** Eligibility Label */
+            eligibility_label: string;
+            /**
+             * Monthly Target Hours
+             * @description Etkin aylık hedef: sözleşmedeki değer, yoksa kural varsayılanı
+             */
+            monthly_target_hours?: number | null;
+            /**
+             * Target Is Default
+             * @description Hedef sözleşmeden değil kuraldan geliyorsa true
+             * @default false
+             */
+            target_is_default: boolean;
+            /**
+             * Contract Label
+             * @description Sözleşme aralığı, insan diliyle
+             */
+            contract_label?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Orientation */
+            is_orientation: boolean;
+            /** Buddy Name */
+            buddy_name?: string | null;
+            /**
+             * Status Label
+             * @description Oryantasyon / Pasif / boş
+             */
+            status_label: string;
+            /** Seniority Years */
+            seniority_years?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Contracts */
+            contracts?: components["schemas"]["Contract"][];
+            /** Absences */
+            absences?: components["schemas"]["Absence"][];
+            /** Availability */
+            availability?: components["schemas"]["AvailabilityRule"][];
+            /** Conflicts */
+            conflicts?: components["schemas"]["Conflict"][];
+        };
+        /**
+         * PersonRow
+         * @description Liste satırı. Yetkinlik rozeti YOK — o E-02'de (26.09 kararı).
+         */
+        PersonRow: {
+            /** Id */
+            id: number;
+            /**
+             * Sicil No
+             * @description Boşsa boş gösterilir, uydurulmaz
+             */
+            sicil_no?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Full Name */
+            full_name: string;
+            /** Role Code */
+            role_code: string;
+            /** Role Name */
+            role_name: string;
+            /**
+             * Shift Eligibility
+             * @enum {string}
+             */
+            shift_eligibility: "gunduz_gece" | "sadece_gunduz" | "sadece_gece";
+            /** Eligibility Label */
+            eligibility_label: string;
+            /**
+             * Monthly Target Hours
+             * @description Etkin aylık hedef: sözleşmedeki değer, yoksa kural varsayılanı
+             */
+            monthly_target_hours?: number | null;
+            /**
+             * Target Is Default
+             * @description Hedef sözleşmeden değil kuraldan geliyorsa true
+             * @default false
+             */
+            target_is_default: boolean;
+            /**
+             * Contract Label
+             * @description Sözleşme aralığı, insan diliyle
+             */
+            contract_label?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Is Orientation */
+            is_orientation: boolean;
+            /** Buddy Name */
+            buddy_name?: string | null;
+            /**
+             * Status Label
+             * @description Oryantasyon / Pasif / boş
+             */
+            status_label: string;
+        };
+        /** PersonUpdate */
+        PersonUpdate: {
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Role Code */
+            role_code?: string | null;
+            /** Shift Eligibility */
+            shift_eligibility?: ("gunduz_gece" | "sadece_gunduz" | "sadece_gece") | null;
+            /** Sicil No */
+            sicil_no?: string | null;
+            /** Seniority Years */
+            seniority_years?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
         /**
          * QualificationFlag
          * @description Tooltip'in alt satırı: 'Ekip lideri ✓' gibi. Sayı değil, var/yok.
@@ -661,6 +1128,13 @@ export interface components {
             label: string;
             /** Present */
             present: boolean;
+        };
+        /** Role */
+        Role: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
         };
         /** Row */
         Row: {
@@ -1401,6 +1875,394 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateRow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listele_api_people_get: {
+        parameters: {
+            query?: {
+                /** @description Ad veya sicilde arama */
+                q?: string | null;
+                sadece_aktif?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    olustur_api_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    roller_api_people_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Role"][];
+                };
+            };
+        };
+    };
+    detay_api_people__staff_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    guncelle_api_people__staff_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sozlesme_ekle_api_people__staff_id__contracts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    izin_ekle_api_people__staff_id__absences_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AbsenceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    izin_sil_api_people__staff_id__absences__absence_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                absence_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    musaitlik_ekle_api_people__staff_id__availability_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvailabilityCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    musaitlik_sil_api_people__staff_id__availability__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uyumsuzluk_ekle_api_people__staff_id__conflicts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConflictCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uyumsuzluk_sil_api_people__staff_id__conflicts__other_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                other_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
                 };
             };
             /** @description Validation Error */
