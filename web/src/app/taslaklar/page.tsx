@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MoreHorizontal } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { HataKutusu } from "@/components/HataKutusu";
 import { YeniTaslak } from "@/components/taslak/YeniTaslak";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -36,7 +37,7 @@ export default function TaslaklarSayfasi() {
   const qc = useQueryClient();
   const [silinecek, setSilinecek] = useState<Draft | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["drafts"], queryFn: () => api<Draft[]>("/drafts"),
   });
 
@@ -65,7 +66,9 @@ export default function TaslaklarSayfasi() {
       </div>
 
       <div className="rounded-lg border bg-card">
-        {isLoading ? (
+        {error ? (
+          <HataKutusu hata={error} onTekrar={() => refetch()} kisa />
+        ) : isLoading ? (
           <p className="p-6 text-muted-foreground">Yükleniyor…</p>
         ) : !data?.length ? (
           <div className="flex flex-col items-center gap-3 p-10">

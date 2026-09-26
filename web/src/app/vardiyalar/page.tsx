@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { HataKutusu } from "@/components/HataKutusu";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -14,7 +15,7 @@ type ShiftType = components["schemas"]["ShiftType"];
 
 /** E-01: salt okunur liste (MVP kapsamı). */
 export default function VardiyalarSayfasi() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["shift-types"],
     queryFn: () => api<ShiftType[]>("/shift-types"),
   });
@@ -26,7 +27,9 @@ export default function VardiyalarSayfasi() {
       </h1>
 
       <div className="rounded-lg border bg-card">
-        {isLoading ? (
+        {error ? (
+          <HataKutusu hata={error} onTekrar={() => refetch()} kisa />
+        ) : isLoading ? (
           <p className="p-6 text-muted-foreground">Yükleniyor…</p>
         ) : (
           <Table>

@@ -1,11 +1,12 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Loader2, Menu, Play } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { HataKutusu } from "@/components/HataKutusu";
 import { Izgara } from "@/components/cizelge/Izgara";
 import { TaslakPaneli } from "@/components/taslak/TaslakPaneli";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     ? (sonrakiHafta > taslakSon ? taslakSon : sonrakiHafta)
     : null;
 
-  const { data: cizelge, isLoading } = useQuery({
+  const { data: cizelge, isLoading, error: hata } = useQuery({
     queryKey: ["schedule", draftId, bas, son],
     queryFn: () => api<Schedule>(`/drafts/${draftId}/schedule?from=${bas}&to=${son}`),
     enabled: !!bas && !!son,
@@ -52,14 +53,26 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     qc.invalidateQueries({ queryKey: ["draft", draftId] });
   };
 
+  // Süre limiti sunucudan gelir (SOLVER_TIME_LIMIT_S, demo: 25 sn);
+  // arayüz geri sayımı ona göre gösterir.
+  const [limit, setLimit] = useState(25);
+  const [gecen, setGecen] = useState(0);
+
   const coz = useMutation({
     mutationFn: () =>
       api<SolveAccepted>(`/drafts/${draftId}/solve`, {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ time_limit_s: 60 }),
+        body: JSON.stringify({}),
       }),
-    onSuccess: (d) => setRunId(d.run_id),
+    onSuccess: (d) => { setLimit(d.time_limit_s); setGecen(0); setRunId(d.run_id); },
   });
+
+  // Geri sayım: yalnız koşu sürerken işler.
+  useEffect(() => {
+    if (runId === null) return;
+    const t = setInterval(() => setGecen((g) => g + 1), 1000);
+    return () => clearInterval(t);
+  }, [runId]);
 
   const { data: kosu } = useQuery({
     queryKey: ["solver-run", runId],
@@ -115,7 +128,10 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
 
           <Button onClick={() => coz.mutate()} disabled={calisiyor} className="ml-1">
             {calisiyor ? (
-              <><Loader2 size={16} strokeWidth={1.75} className="animate-spin" />Çözülüyor…</>
+              <>
+                <Loader2 size={16} strokeWidth={1.75} className="animate-spin" />
+                Çözülüyor… {Math.max(0, limit - gecen)} sn
+              </>
             ) : (
               <><Play size={16} strokeWidth={1.75} />Çöz</>
             )}
@@ -127,7 +143,19 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
         </div>
       </div>
 
-      {isLoading || !cizelge ? (
+      {/* İlerleme çubuğu: süre limiti biliniyor, ilerleme tahmin değil ölçüm */}
+      {calisiyor && (
+        <div className="mb-3 h-1 overflow-hidden rounded-sm bg-background">
+          <div
+            className="h-full bg-brand transition-[width] duration-1000 ease-linear"
+            style={{ width: `${Math.min(100, (gecen / limit) * 100)}%` }}
+          />
+        </div>
+      )}
+
+      {hata ? (
+        <HataKutusu hata={hata} onTekrar={() => tazele()} kisa />
+      ) : isLoading || !cizelge ? (
         <div className="rounded-lg border bg-card p-6">
           <p className="text-muted-foreground">Yükleniyor…</p>
         </div>

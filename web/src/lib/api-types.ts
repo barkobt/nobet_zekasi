@@ -1707,14 +1707,16 @@ export interface components {
             status: "CALISIYOR" | "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "HATA";
             /** Poll Url */
             poll_url: string;
+            /**
+             * Time Limit S
+             * @description Arayüz geri sayımı buna göre gösterir
+             */
+            time_limit_s: number;
         };
         /** SolveRequest */
         SolveRequest: {
-            /**
-             * Time Limit S
-             * @default 60
-             */
-            time_limit_s: number;
+            /** Time Limit S */
+            time_limit_s?: number | null;
         };
         /**
          * SolverRun
@@ -2551,7 +2553,7 @@ export interface operations {
             query?: {
                 /** @description Ad veya sicilde arama */
                 q?: string | null;
-                sadece_aktif?: boolean;
+                durum?: "aktif" | "pasif" | "hepsi";
             };
             header?: never;
             path?: never;

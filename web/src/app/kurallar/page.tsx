@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, Play } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { HataKutusu } from "@/components/HataKutusu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,7 @@ import type { components } from "@/lib/api-types";
 type Constraint = components["schemas"]["Constraint"];
 
 export default function KurallarSayfasi() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["constraints"],
     queryFn: () => api<Constraint[]>("/constraints"),
   });
@@ -35,7 +36,9 @@ export default function KurallarSayfasi() {
       </div>
 
       <div className="rounded-lg border bg-card">
-        {isLoading ? (
+        {error ? (
+          <HataKutusu hata={error} onTekrar={() => refetch()} kisa />
+        ) : isLoading ? (
           <p className="p-6 text-muted-foreground">Yükleniyor…</p>
         ) : (
           <Table>

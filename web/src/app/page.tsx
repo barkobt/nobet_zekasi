@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { HataKutusu } from "@/components/HataKutusu";
 import { DonemGezgini } from "@/components/anasayfa/DonemGezgini";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,7 +27,7 @@ export default function AnaSayfa() {
   const [capa, setCapa] = useState(() => new Date(Date.UTC(2026, 9, 1))); // Ekim 2026
   const [bas, son] = aralik(capa, olcek);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["overview", iso(bas), iso(son)],
     queryFn: () => api<Overview>(`/overview?from=${iso(bas)}&to=${iso(son)}`),
   });
@@ -44,7 +45,9 @@ export default function AnaSayfa() {
           />
         </div>
 
-        {isLoading ? (
+        {error ? (
+          <HataKutusu hata={error} onTekrar={() => refetch()} />
+        ) : isLoading ? (
           <div className="rounded-lg border bg-card p-10">
             <p className="text-muted-foreground">Yükleniyor…</p>
           </div>

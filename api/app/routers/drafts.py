@@ -139,14 +139,15 @@ async def coz(draft_id: int, istek: SolveRequest, arka_plan: BackgroundTasks) ->
             poll_url=f"/api/solver-runs/{suren['id']}",
         )
 
-    run_id = await repo.kosu_ac(draft_id, istek.time_limit_s)
+    sure = istek.time_limit_s or get_settings().solver_time_limit_s
+    run_id = await repo.kosu_ac(draft_id, sure)
 
     def calistir() -> None:
         # run_solver SENKRON ve kendi bağlantısını açar (CP-SAT bloklar).
         # to_thread ile olay döngüsü serbest kalır; yoklama istekleri yanıtlanabilir.
         from solver.interface import run_solver
 
-        run_solver(draft_id=draft_id, time_limit_s=istek.time_limit_s)
+        run_solver(draft_id=draft_id, time_limit_s=sure)
 
     async def gorev() -> None:
         await asyncio.to_thread(calistir)
@@ -154,7 +155,7 @@ async def coz(draft_id: int, istek: SolveRequest, arka_plan: BackgroundTasks) ->
     arka_plan.add_task(gorev)
     return SolveAccepted(
         run_id=run_id, draft_id=draft_id, status="CALISIYOR",
-        poll_url=f"/api/solver-runs/{run_id}",
+        poll_url=f"/api/solver-runs/{run_id}", time_limit_s=sure,
     )
 
 

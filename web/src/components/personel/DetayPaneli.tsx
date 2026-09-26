@@ -36,7 +36,7 @@ export function DetayPaneli({
   return (
     <Sheet open={staffId !== null} onOpenChange={(a) => !a && onKapat()}>
       <SheetContent className="flex w-[600px] flex-col gap-0 p-0 sm:max-w-[600px]">
-        <SheetHeader className="border-b p-6">
+        <SheetHeader className="px-6 pb-3 pt-6">
           <div className="flex items-center gap-3">
             <span
               aria-hidden
@@ -81,7 +81,7 @@ export function DetayPaneli({
           <Tabs defaultValue="kunye" className="flex min-h-0 flex-1 flex-col">
             {/* Sekmeler kesilmesin: dar panelde yatay kaydırılır */}
             {/* Sade metin sekmeler, hepsi tek satırda. Yatay kaydırma YOK. */}
-            <TabsList className="mx-6 mt-4 h-auto w-[calc(100%-3rem)] justify-start gap-1 rounded-none border-b bg-transparent p-0">
+            <TabsList className="mx-6 h-auto w-[calc(100%-3rem)] justify-between gap-0 rounded-none border-b bg-transparent p-0">
               {[
                 ["kunye", "Künye"], ["sozlesme", "Sözleşme"], ["musaitlik", "Müsaitlik"],
                 ["devamsizlik", "İzinler"], ["uyumsuzluk", "Uyumsuzluk"],
@@ -89,7 +89,7 @@ export function DetayPaneli({
                 <TabsTrigger
                   key={deger}
                   value={deger}
-                  className="rounded-none border-b-2 border-transparent bg-transparent px-2 pb-2 pt-1 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                  className="flex-1 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-2 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
                 >
                   {ad}
                 </TabsTrigger>

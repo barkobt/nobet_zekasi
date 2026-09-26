@@ -10,19 +10,24 @@
 #   ./db/scripts/migrate.sh --seed          → seed'leri de çalıştır (ilk kurulum)
 #   ./db/scripts/migrate.sh --mark-applied  → çalıştırmadan "uygulandı" diye işaretle
 #   ./db/scripts/migrate.sh --status        → ne uygulanmış, ne bekliyor
+#   ./db/scripts/migrate.sh --seed-file 012_demo_draft.sql
+#                                           → YALNIZ o seed'i, yalnız bir kez çalıştır
 set -euo pipefail
 
 DB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$DB_ROOT"
 
 MOD="uygula"
-for arg in "$@"; do
-  case "$arg" in
+TEK_SEED=""
+while [ $# -gt 0 ]; do
+  case "$1" in
     --seed)          MOD="seed" ;;
     --mark-applied)  MOD="isaretle" ;;
     --status)        MOD="durum" ;;
-    *) echo "Bilinmeyen seçenek: $arg" >&2; exit 1 ;;
+    --seed-file)     MOD="tek_seed"; TEK_SEED="${2:-}"; shift ;;
+    *) echo "Bilinmeyen seçenek: $1" >&2; exit 1 ;;
   esac
+  shift
 done
 
 for degisken in DATABASE_URL_DIRECT DATABASE_URL; do
@@ -86,11 +91,30 @@ if [ "$MOD" = "isaretle" ]; then
         v="$(basename "$f" .up.sql)"
         uygulanmis "$v" || { kaydet "$v"; echo "  işaretlendi: $v"; sayi=$((sayi+1)); }
     done
-    for f in seeds/*.sql; do
-        gecerli_mi "$f" || continue
-        kaydet "seed:$(basename "$f" .sql)"
-    done
+    # Seed'ler BİLEREK işaretlenmiyor: sonradan eklenen bir veri seed'i
+    # (örn. demo taslağı) --seed-file ile tek tek çalıştırılabilsin.
     echo "Bitti. $sayi migration uygulanmış olarak işaretlendi (hiçbiri çalıştırılmadı)."
+    echo "Not: seed'ler işaretlenmedi. Tek bir seed'i çalıştırmak için --seed-file kullan."
+    exit 0
+fi
+
+# ------------------------------------------------------------ tek seed
+# Canlıya sonradan VERİ eklemek için: yalnız adı verilen seed'i, yalnız bir kez.
+# Şemaya dokunmaz, diğer seed'leri çalıştırmaz, elle girilen veriyi silmez.
+if [ "$MOD" = "tek_seed" ]; then
+    f="seeds/$TEK_SEED"
+    [ -f "$f" ] || { echo "HATA: $f yok." >&2; exit 1; }
+    gecerli_mi "$f" || { echo "HATA: kanonik olmayan dosya adı: $TEK_SEED" >&2; exit 1; }
+
+    v="seed:$(basename "$f" .sql)"
+    if uygulanmis "$v"; then
+        echo "$TEK_SEED zaten çalışmış, atlandı."
+        exit 0
+    fi
+    echo "• $TEK_SEED"
+    "${PSQL[@]}" -f "$f" > /dev/null
+    kaydet "$v"
+    echo "Bitti. $TEK_SEED bir kez çalıştırıldı ve deftere yazıldı."
     exit 0
 fi
 

@@ -171,6 +171,19 @@ Bundan sonra yeni bir migration eklendiğinde yalnız `migrate.sh` yeter.
 > deftere yazılır; ikinci çağrıda atlanır, böylece elle girilen verinin üstüne
 > yazılmaz.
 
+### Canlıya tek bir veri seed'i eklemek
+
+Sonradan eklenen bir veri seed'ini (örn. demo taslağı) şemaya ve mevcut veriye
+dokunmadan, **yalnız bir kez** çalıştırır:
+
+```bash
+DATABASE_URL_DIRECT="postgresql://...@ep-xxx.neon.tech/neondb?sslmode=require" \
+  ./db/scripts/migrate.sh --seed-file 012_demo_draft.sql
+```
+
+İkinci çağrıda "zaten çalışmış, atlandı" der. `--mark-applied` seed'leri
+bilerek işaretlemez; sonradan eklenen veri seed'leri bu komutla koşabilsin diye.
+
 ---
 
 ## Demo günü güvenliği — Neon branch'i

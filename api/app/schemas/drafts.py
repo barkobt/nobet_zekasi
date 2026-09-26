@@ -71,7 +71,8 @@ class DraftCopy(BaseModel):
 
 
 class SolveRequest(BaseModel):
-    time_limit_s: int = Field(default=60, ge=5, le=600)
+    # None → sunucu ayarındaki SOLVER_TIME_LIMIT_S kullanılır (demo: 25 sn)
+    time_limit_s: int | None = Field(default=None, ge=5, le=600)
 
 
 class SolveAccepted(BaseModel):
@@ -81,6 +82,7 @@ class SolveAccepted(BaseModel):
     draft_id: int
     status: RunStatus
     poll_url: str
+    time_limit_s: int = Field(description="Arayüz geri sayımı buna göre gösterir")
 
 
 class Diagnostic(BaseModel):

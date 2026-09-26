@@ -46,10 +46,19 @@ ORDER BY CASE r.code
 """
 
 
-async def listele(*, arama: str | None = None, sadece_aktif: bool = True) -> list[dict]:
+async def listele(*, arama: str | None = None, durum: str = "aktif") -> list[dict]:
+    """durum: 'aktif' | 'pasif' | 'hepsi'.
+
+    Eskiden 'sadece_aktif' bayrağıydı ve arayüzde "Pasifleri göster" diye
+    görünüyordu: kapalıyken 20, açıkken yine 20 kişi geliyordu (pasif yoktu),
+    kullanıcı bunu bozukluk sandı. Üç durumlu filtre ne istendiğini belirsiz
+    bırakmıyor.
+    """
     kosullar, parametreler = [], []
-    if sadece_aktif:
+    if durum == "aktif":
         kosullar.append("s.is_active")
+    elif durum == "pasif":
+        kosullar.append("NOT s.is_active")
     if arama:
         kosullar.append("(s.full_name ILIKE %s OR COALESCE(s.sicil_no,'') ILIKE %s)")
         parametreler += [f"%{arama}%", f"%{arama}%"]

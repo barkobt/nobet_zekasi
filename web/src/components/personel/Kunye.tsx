@@ -76,7 +76,8 @@ export function Kunye({
           </Ikili>
           <Ikili>
             <Alan etiket="Sicil">
-              <Input value={form.sicil_no} placeholder="—"
+              {/* Boşsa alan gerçekten boş: "—" bir DEĞER gibi görünüyordu */}
+              <Input value={form.sicil_no} placeholder="Sicil no"
                      onChange={(e) => guncelle({ sicil_no: e.target.value })} />
             </Alan>
             <Alan etiket="Rol">
@@ -138,7 +139,10 @@ export function Kunye({
         </Bolum>
 
         {kaydet.isError && <Hata>{(kaydet.error as Error).message}</Hata>}
+      </div>
 
+      {/* Silme Not'tan ayrı, en altta, ince çizgiyle */}
+      <div className="mt-6">
         <SilmeBolumu kisi={kisi} onSilindi={onSilindi} />
       </div>
 
@@ -155,18 +159,27 @@ export function Kunye({
   );
 }
 
+/**
+ * Tek anahtar bileşeni — "Oryantasyonda" ve "Aktif" aynı görünsün diye.
+ * Kapalı: açık gri zemin + beyaz topuz. Açık: --brand zemin.
+ */
 function Anahtar({
   etiket, acik, onDegis, not,
 }: { etiket: string; acik: boolean; onDegis: (v: boolean) => void; not?: string }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <div>
+      <div className="min-w-0">
         <Label style={{ fontSize: "var(--text-base)" }}>{etiket}</Label>
         {not && (
           <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>{not}</p>
         )}
       </div>
-      <Switch checked={acik} onCheckedChange={onDegis} aria-label={etiket} />
+      <Switch
+        checked={acik}
+        onCheckedChange={onDegis}
+        aria-label={etiket}
+        className="shrink-0 data-[state=checked]:bg-brand data-[state=unchecked]:bg-muted-foreground/35"
+      />
     </div>
   );
 }

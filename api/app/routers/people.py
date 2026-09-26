@@ -1,6 +1,7 @@
 """E-04 Personel — liste, detay, düzenleme."""
 
 from datetime import date, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -66,9 +67,9 @@ def _satir(s: dict) -> PersonRow:
 @router.get("", response_model=list[PersonRow], summary="Personel listesi")
 async def listele(
     q: str | None = Query(default=None, description="Ad veya sicilde arama"),
-    sadece_aktif: bool = Query(default=True),
+    durum: Literal["aktif", "pasif", "hepsi"] = Query(default="aktif"),
 ) -> list[PersonRow]:
-    return [_satir(s) for s in await repo.listele(arama=q, sadece_aktif=sadece_aktif)]
+    return [_satir(s) for s in await repo.listele(arama=q, durum=durum)]
 
 
 @router.get("/roles", response_model=list[Role], summary="Rol listesi")

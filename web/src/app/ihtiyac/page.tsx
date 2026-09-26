@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { HataKutusu } from "@/components/HataKutusu";
 import { DonemGezgini } from "@/components/anasayfa/DonemGezgini";
 import { GunKarti } from "@/components/ihtiyac/GunKarti";
 import { Sablon } from "@/components/ihtiyac/Sablon";
@@ -33,7 +34,7 @@ function Icerik() {
   const [capa, setCapa] = useState(() => new Date(Date.UTC(2026, 8, 21))); // 21 Eyl 2026
   const [bas, son] = aralik(capa, olcek);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["demand", iso(bas), iso(son)],
     queryFn: () => api<Demand>(`/demand?from=${iso(bas)}&to=${iso(son)}`),
   });
@@ -81,7 +82,9 @@ function Icerik() {
             </div>
           )}
 
-          {isLoading ? (
+          {error ? (
+            <HataKutusu hata={error} onTekrar={() => refetch()} kisa />
+          ) : isLoading ? (
             <div className="rounded-lg border bg-card p-6">
               <p className="text-muted-foreground">Yükleniyor…</p>
             </div>

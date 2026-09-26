@@ -6,6 +6,7 @@ import { Plus, Search } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { DetayPaneli } from "@/components/personel/DetayPaneli";
+import { HataKutusu } from "@/components/HataKutusu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,11 +26,11 @@ export default function PersonelSayfasi() {
   const [tipFiltre, setTipFiltre] = useState("");
   const [secili, setSecili] = useState<number | null>(null);
 
-  const [pasifleriGoster, setPasifleriGoster] = useState(false);
+  const [durum, setDurum] = useState<"aktif" | "pasif" | "hepsi">("aktif");
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["people", pasifleriGoster],
-    queryFn: () => api<PersonRow[]>(`/people?sadece_aktif=${!pasifleriGoster}`),
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["people", durum],
+    queryFn: () => api<PersonRow[]>(`/people?durum=${durum}`),
   });
 
   // Arama ve filtreler istemcide: 20 kişi, sunucuya gitmeye değmez.
@@ -111,16 +112,18 @@ export default function PersonelSayfasi() {
           {CALISMA_TIPI.map((c) => <option key={c.deger} value={c.deger}>{c.ad}</option>)}
         </select>
 
-        <label className="flex cursor-pointer items-center gap-2 text-muted-foreground"
-               style={{ fontSize: "var(--text-xs)" }}>
-          <input
-            type="checkbox"
-            className="size-4 accent-brand"
-            checked={pasifleriGoster}
-            onChange={(e) => setPasifleriGoster(e.target.checked)}
-          />
-          Pasifleri göster
-        </label>
+        {/* "Pasifleri göster" onay kutusu belirsizdi: dahil mi eder, yalnız
+            onları mı gösterir? Üç durumlu filtre soruyu bırakmıyor. */}
+        <select
+          className="h-9 rounded-md border bg-card px-2 text-muted-foreground"
+          value={durum}
+          onChange={(e) => setDurum(e.target.value as never)}
+          aria-label="Durum filtresi"
+        >
+          <option value="aktif">Aktif</option>
+          <option value="pasif">Pasif</option>
+          <option value="hepsi">Hepsi</option>
+        </select>
 
         {satirlar.length !== (data?.length ?? 0) && (
           <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
@@ -131,7 +134,7 @@ export default function PersonelSayfasi() {
 
       <div className="rounded-lg border bg-card">
         {error ? (
-          <p className="p-6 text-danger">Personel listesi alınamadı.</p>
+          <HataKutusu hata={error} onTekrar={() => refetch()} kisa />
         ) : isLoading ? (
           <p className="p-6 text-muted-foreground">Yükleniyor…</p>
         ) : satirlar.length === 0 ? (

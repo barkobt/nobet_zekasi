@@ -18,7 +18,8 @@ class Settings(BaseSettings):
 
     # Hangi solver çağrılacak. model.py bitene kadar 'stub'.
     solver_impl: Literal["stub", "cpsat"] = "stub"
-    solver_time_limit_s: int = 60
+    # Demo ayarı: yöneticiler 25 saniyeden uzun beklemesin.
+    solver_time_limit_s: int = 25
 
     # Web'in sunucu tarafı proxy'si bu token'ı gönderir; tarayıcıya hiç inmez.
     # Boş bırakılırsa doğrulama kapalıdır (yerel geliştirme).

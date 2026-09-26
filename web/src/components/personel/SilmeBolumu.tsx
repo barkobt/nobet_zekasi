@@ -36,6 +36,11 @@ export function SilmeBolumu({
 
   return (
     <section className="border-t pt-4">
+      <p className="mb-2 text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+        {silinebilir
+          ? "Bu kişinin hiç ataması yok, kaydı tamamen silinebilir."
+          : "Personel yeni taslaklarda yer almaz, geçmiş korunur."}
+      </p>
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button variant="ghost" size="sm" className="text-danger hover:text-danger">
