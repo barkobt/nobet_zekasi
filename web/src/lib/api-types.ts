@@ -508,13 +508,18 @@ export interface components {
              * @description Kapsama eksiği olan gün-vardiya-slot sayısı
              */
             violation_count: number;
+            /**
+             * Violation Label
+             * @description Stub'da 'Kapsama eksiği', gerçek çözümde 'Kural ihlali'
+             */
+            violation_label: string;
             /** Overtime Hours */
-            overtime_hours: number;
+            overtime_hours?: number | null;
             /**
              * Fairness Gap
              * @description En çok − en az çalışan saat farkı
              */
-            fairness_gap: number;
+            fairness_gap?: number | null;
         };
         /** OverviewDraft */
         OverviewDraft: {
@@ -529,6 +534,22 @@ export interface components {
              * @description Yayınlanmış mı, yoksa yalnızca taslak mı
              */
             is_published: boolean;
+            /**
+             * Is Reference Copy
+             * @description Son çalıştırma stub mı? Diğer ekranlardaki etiketlerle tutarlı olsun diye.
+             * @default false
+             */
+            is_reference_copy: boolean;
+        };
+        /**
+         * QualificationFlag
+         * @description Tooltip'in alt satırı: 'Ekip lideri ✓' gibi. Sayı değil, var/yok.
+         */
+        QualificationFlag: {
+            /** Label */
+            label: string;
+            /** Present */
+            present: boolean;
         };
         /** Row */
         Row: {
@@ -557,17 +578,20 @@ export interface components {
                 [key: string]: string;
             };
             /**
-             * Month Hours
-             * @description Taslağın ayındaki toplam planlanan saat
+             * Period Hours
+             * @description Taslağın DÖNEMİNDEKİ toplam planlanan saat
              */
-            month_hours: number;
-            /** Month Target */
-            month_target: number;
+            period_hours: number;
             /**
-             * Month Diff
+             * Period Target
+             * @description Aylık hedefin döneme orantılanmış hali: aylık hedef × dönem gün sayısı / ayın gün sayısı
+             */
+            period_target: number;
+            /**
+             * Period Diff
              * @description Hedefe göre fark: pozitif fazla, negatif eksik
              */
-            month_diff: number;
+            period_diff: number;
             /** Shift Count */
             shift_count: number;
         };
@@ -604,8 +628,21 @@ export interface components {
             assigned: number;
             /** Required */
             required: number;
-            /** Slots */
+            /**
+             * Slots
+             * @description Yalnız sayılabilir görevler: triyaj, gözlem, ambulans
+             */
             slots?: components["schemas"]["SlotCoverage"][];
+            /**
+             * Flags
+             * @description Var/yok yetkiler: ekip lideri, sayım yetkilisi
+             */
+            flags?: components["schemas"]["QualificationFlag"][];
+            /**
+             * Empty Area
+             * @description Ambulans çıkınca boşalan alan adı ('triyaj' / 'gözlem'), yoksa boş
+             */
+            empty_area?: string | null;
         };
         /**
          * SlotCoverage
@@ -620,16 +657,6 @@ export interface components {
             assigned: number;
             /** Required */
             required: number;
-            /**
-             * Qualified
-             * @description O vardiyada slotun yetkinliğine SAHİP kişi sayısı (rozetten bağımsız)
-             */
-            qualified?: number | null;
-            /**
-             * Remaining After Ambulance
-             * @description TRIYAJ/GOZLEM: ambulansa çıkmayanların sayısı. Diğer slotlarda boş.
-             */
-            remaining_after_ambulance?: number | null;
         };
         /**
          * SolveAccepted

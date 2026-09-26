@@ -8,7 +8,9 @@ from app.db import cursor
 # Aralık çakışması (&&) kullanılıyor çünkü kullanıcının seçtiği dönem ile taslağın
 # dönemi birebir aynı olmak zorunda değil (hafta seçiliyken aylık taslak da sayılır).
 _TASLAK = """
-SELECT d.id, d.name, d.status, u.name AS unit_name
+SELECT d.id, d.name, d.status, u.name AS unit_name,
+       (SELECT r.params_snapshot ->> 'solver' FROM solver_runs r
+         WHERE r.draft_id = d.id ORDER BY r.started_at DESC LIMIT 1) AS solver_impl
 FROM schedule_drafts d
 JOIN units u ON u.id = d.unit_id
 WHERE d.period && daterange(%(bas)s, %(bitis)s, '[)')

@@ -17,14 +17,13 @@ class SlotCoverage(BaseModel):
     label: str
     assigned: int
     required: int
-    qualified: int | None = Field(
-        default=None,
-        description="O vardiyada slotun yetkinliğine SAHİP kişi sayısı (rozetten bağımsız)",
-    )
-    remaining_after_ambulance: int | None = Field(
-        default=None,
-        description="TRIYAJ/GOZLEM: ambulansa çıkmayanların sayısı. Diğer slotlarda boş.",
-    )
+
+
+class QualificationFlag(BaseModel):
+    """Tooltip'in alt satırı: 'Ekip lideri ✓' gibi. Sayı değil, var/yok."""
+
+    label: str
+    present: bool
 
 
 class ShiftHeader(BaseModel):
@@ -38,7 +37,16 @@ class ShiftHeader(BaseModel):
     label: Literal["G", "N"]
     assigned: int
     required: int
-    slots: list[SlotCoverage] = Field(default_factory=list)
+    slots: list[SlotCoverage] = Field(
+        default_factory=list, description="Yalnız sayılabilir görevler: triyaj, gözlem, ambulans"
+    )
+    flags: list[QualificationFlag] = Field(
+        default_factory=list, description="Var/yok yetkiler: ekip lideri, sayım yetkilisi"
+    )
+    empty_area: str | None = Field(
+        default=None,
+        description="Ambulans çıkınca boşalan alan adı ('triyaj' / 'gözlem'), yoksa boş",
+    )
 
 
 class DayHeader(BaseModel):
@@ -67,9 +75,12 @@ class Row(BaseModel):
     initials: str
     cells: dict[str, Cell] = Field(description="ISO tarih → hücre; çalışılmayan gün anahtarı yok")
     absences: dict[str, str] = Field(default_factory=dict, description="ISO tarih → izin türü")
-    month_hours: float = Field(description="Taslağın ayındaki toplam planlanan saat")
-    month_target: float
-    month_diff: float = Field(description="Hedefe göre fark: pozitif fazla, negatif eksik")
+    period_hours: float = Field(description="Taslağın DÖNEMİNDEKİ toplam planlanan saat")
+    period_target: float = Field(
+        description="Aylık hedefin döneme orantılanmış hali: "
+                    "aylık hedef × dönem gün sayısı / ayın gün sayısı"
+    )
+    period_diff: float = Field(description="Hedefe göre fark: pozitif fazla, negatif eksik")
     shift_count: int
 
 

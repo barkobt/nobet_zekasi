@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.repositories import schedule as repo
 from app.schemas.schedule import (
-    Cell, DayHeader, DraftInfo, Group, Row, Schedule, ShiftHeader, SlotCoverage, Summary,
+    Cell, DayHeader, DraftInfo, Group, QualificationFlag, Row, Schedule, ShiftHeader,
+    SlotCoverage, Summary,
 )
 
 router = APIRouter(prefix="/drafts", tags=["çizelge"])
@@ -17,14 +18,13 @@ AY_ADI = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki"
 # Vardiya kodu → hücre çipi. DESIGN §6: yalnız G ve N, saat aralığı yazılmaz.
 VARDIYA_ETIKET = {"GUNDUZ": "G", "GUNDUZ_CMT": "G", "GECE": "N"}
 
-SLOT_ADI = {
-    "GENEL": "Genel mevcut",
-    "TRIYAJ": "Triyaj",
-    "AMBULANS": "Ambulans",
-    "GOZLEM": "Gözlem",
-    "SAYIM": "Sayım yetkilisi",
-    "SHIFT_YETKILISI": "Ekip lideri",
-}
+# Tooltip iki gruba ayrılıyor (26.09 kararı):
+#   SAYILABILIR → "Triyaj 2/3 · 1 eksik" biçiminde, eksikse kırmızı
+#   VAR_YOK     → "Ekip lideri ✓" biçiminde, sayı gösterilmez
+# Sıra kasıtlı: triyaj → gözlem → ambulans. Alfabetik değil, işleyiş sırası.
+SLOT_SIRA = ["TRIYAJ", "GOZLEM", "AMBULANS"]
+SLOT_ADI = {"TRIYAJ": "Triyaj", "GOZLEM": "Gözlem", "AMBULANS": "Ambulans"}
+YETKI_ADI = {"SHIFT_YETKILISI": "Ekip lideri", "SAYIM": "Sayım yetkilisi"}
 
 # DESIGN §6: rol grubuna göre katlanabilir bölümler.
 GRUPLAR = [
@@ -84,6 +84,15 @@ async def cizelge(
             if not satirlar:
                 continue
             genel = next((s for s in satirlar if s["slot_code"] == "GENEL"), None)
+
+            # Ambulans çıkınca boşalan alan var mı? Tooltip'in tek açıklama satırı.
+            bos_alan = next(
+                (SLOT_ADI[s["slot_code"]].lower()
+                 for s in satirlar
+                 if s["slot_code"] in ("TRIYAJ", "GOZLEM") and s["remaining_after_ambulance"] == 0),
+                None,
+            )
+
             vardiyalar.append(
                 ShiftHeader(
                     code=kod,
@@ -94,15 +103,27 @@ async def cizelge(
                     slots=[
                         SlotCoverage(
                             slot_code=s["slot_code"],
-                            label=SLOT_ADI.get(s["slot_code"], s["slot_code"]),
+                            label=SLOT_ADI[s["slot_code"]],
                             assigned=s["assigned"],
                             required=s["required"],
-                            qualified=s["qualified"],
-                            remaining_after_ambulance=s["remaining_after_ambulance"],
                         )
-                        for s in satirlar
-                        if s["slot_code"] != "GENEL"
+                        for s in sorted(
+                            (x for x in satirlar if x["slot_code"] in SLOT_ADI),
+                            key=lambda x: SLOT_SIRA.index(x["slot_code"]),
+                        )
                     ],
+                    flags=[
+                        QualificationFlag(
+                            label=YETKI_ADI[s["slot_code"]],
+                            present=s["assigned"] >= s["required"],
+                        )
+                        for s in sorted(
+                            (x for x in satirlar if x["slot_code"] in YETKI_ADI),
+                            key=lambda x: x["slot_code"],   # SAYIM, SHIFT_YETKILISI
+                            reverse=True,                   # Ekip lideri önce
+                        )
+                    ],
+                    empty_area=bos_alan,
                 )
             )
         gunler.append(
@@ -137,6 +158,12 @@ async def cizelge(
 
     aylik = {m["staff_id"]: m for m in veri["aylik"]}
 
+    # Aylık hedefi DÖNEME orantıla. Taslak bir hafta da olabiliyor; 200 saatlik
+    # aylık hedefi olduğu gibi göstermek bir haftalık çizelgede anlamsız.
+    #   orantılı hedef = aylık hedef × dönem gün sayısı / aralığın başladığı ayın gün sayısı
+    gun_sayisi = (bitis - bas).days
+    ay_gun_sayisi = (sonraki_ay - date(bas.year, bas.month, 1)).days
+
     # --- Satırlar, rol grubuna göre -----------------------------------------
     gruplar: list[Group] = []
     for anahtar, etiket, roller in GRUPLAR:
@@ -150,7 +177,8 @@ async def cizelge(
 
             m = aylik.get(k["id"])
             planlanan = float(m["planned_hours"]) if m else 0.0
-            hedef = float(m["min_hours"]) if m else 0.0
+            aylik_hedef = float(m["min_hours"]) if m else 0.0
+            hedef = round(aylik_hedef * gun_sayisi / ay_gun_sayisi, 1) if ay_gun_sayisi else 0.0
             satirlar.append(
                 Row(
                     staff_id=k["id"],
@@ -160,9 +188,9 @@ async def cizelge(
                     initials=_bas_harfler(k["full_name"]),
                     cells=hucreler.get(k["id"], {}),
                     absences=izinler.get(k["id"], {}),
-                    month_hours=planlanan,
-                    month_target=hedef,
-                    month_diff=round(planlanan - hedef, 1),
+                    period_hours=planlanan,
+                    period_target=hedef,
+                    period_diff=round(planlanan - hedef, 1),
                     shift_count=int(m["shift_count"]) if m else 0,
                 )
             )
@@ -170,9 +198,9 @@ async def cizelge(
             gruplar.append(Group(key=anahtar, label=etiket, rows=satirlar))
 
     # --- Alt bar ------------------------------------------------------------
-    toplam_saat = round(sum(r.month_hours for g in gruplar for r in g.rows), 1)
+    toplam_saat = round(sum(r.period_hours for g in gruplar for r in g.rows), 1)
     fazla_mesai = round(sum(float(m["overtime_max"]) for m in veri["aylik"]), 1)
-    calisan_saatler = [r.month_hours for g in gruplar for r in g.rows if r.month_hours > 0]
+    calisan_saatler = [r.period_hours for g in gruplar for r in g.rows if r.period_hours > 0]
     adalet = round(max(calisan_saatler) - min(calisan_saatler), 1) if calisan_saatler else 0.0
     eksik = sum(1 for k in veri["kapsama"] if k["assigned"] < k["required"])
 

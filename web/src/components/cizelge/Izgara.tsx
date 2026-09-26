@@ -15,9 +15,9 @@ import { fark, sayi, type Schedule } from "@/lib/cizelge";
  * İlk sütun ve başlık satırı sabit (sticky).
  */
 export function Izgara({ data }: { data: Schedule }) {
-  // DESIGN §2: kırmızı eyleme dönük eksiği bildirir. Aylık hedef (C-004, hard kural)
-  // yalnızca taslak ayın TAMAMINI kapsıyorsa karşılaştırılabilir; kısmi taslakta
-  // eksik görünmesi kuralın ihlali değil, verinin eksikliğidir → nötr kalır.
+  // Hedef artık döneme orantılı (aylık hedef × gün sayısı / ayın gün sayısı), ama
+  // KIRMIZI yalnızca taslak ayın tamamını kapsıyorsa: C-004 aylık bir kuraldır,
+  // bir haftalık çizelgede "hedefin altında" demek kuralın ihlali değildir.
   const ayTam = data.draft.covers_full_month;
   const [kapali, setKapali] = useState<Set<string>>(new Set());
 
@@ -57,7 +57,7 @@ export function Izgara({ data }: { data: Schedule }) {
                 className="block px-3 pb-2 text-right text-muted-foreground"
                 style={{ fontSize: "var(--text-xs)" }}
               >
-                Ay toplamı
+                Dönem toplamı
               </span>
             </th>
           </tr>
@@ -132,16 +132,16 @@ export function Izgara({ data }: { data: Schedule }) {
 
                     <td className="sticky right-0 z-10 border-l bg-card px-3 text-right group-hover:bg-accent">
                       <div className="flex flex-col leading-tight">
-                        <span className="font-medium">{sayi(satir.month_hours)} sa</span>
+                        <span className="font-medium">{sayi(satir.period_hours)} sa</span>
                         <span
                           className={
-                            ayTam && satir.month_diff < 0
+                            ayTam && satir.period_diff < 0
                               ? "text-danger font-medium"
                               : "text-muted-foreground"
                           }
                           style={{ fontSize: "var(--text-xs)" }}
                         >
-                          {fark(satir.month_diff)}
+                          {fark(satir.period_diff)}
                         </span>
                       </div>
                     </td>

@@ -6,6 +6,7 @@ export type ShiftHeader = components["schemas"]["ShiftHeader"];
 export type Row = components["schemas"]["Row"];
 export type Group = components["schemas"]["Group"];
 export type Cell = components["schemas"]["Cell"];
+export type SlotCoverage = components["schemas"]["SlotCoverage"];
 
 /**
  * Görev rozetleri (DESIGN §5): kısaltma rozette, tam adı tooltip'te.

@@ -36,6 +36,7 @@ async def ozet(
     v = await repo.ozet(gun_bas, bitis)
 
     t = v["taslak"]
+    stub = bool(t and t["solver_impl"] == "stub")
     return Overview(
         unit_name=v["birim"],
         period_start=gun_bas,
@@ -44,11 +45,13 @@ async def ozet(
         draft=OverviewDraft(
             id=t["id"], name=t["name"], status=t["status"],
             is_published=t["status"] == "yayinlandi",
+            is_reference_copy=stub,
         ) if t else None,
         assigned_hours=round(v["atanan"], 1),
         required_hours=round(v["gereken"], 1),
         coverage_ratio=round(v["atanan"] / v["gereken"], 3) if v["gereken"] else 0.0,
         violation_count=v["ihlal"],
-        overtime_hours=round(v["fazla_mesai"], 1),
-        fairness_gap=round(v["adalet"], 1),
+        violation_label="Kapsama eksiği" if stub else "Kural ihlali",
+        overtime_hours=None if stub else round(v["fazla_mesai"], 1),
+        fairness_gap=None if stub else round(v["adalet"], 1),
     )
