@@ -22,7 +22,13 @@ DB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$DB_ROOT"
 
 ASSUME_YES=0
-[ "${1:-}" = "--yes" ] && ASSUME_YES=1
+UZAGA_IZIN=0
+for arg in "$@"; do
+  case "$arg" in
+    --yes)                ASSUME_YES=1 ;;
+    --allow-remote-wipe)  UZAGA_IZIN=1 ;;
+  esac
+done
 
 # Bağlantı: DATABASE_URL varsa onu kullan (Neon pooled + sslmode=require dahil),
 # yoksa yerel psql varsayılanlarına düş.
@@ -59,6 +65,22 @@ else
     PSQL=(psql -d "${PGDATABASE:-nobet_zekasi}" -v ON_ERROR_STOP=1 -q)
     HEDEF="YEREL → ${PGDATABASE:-nobet_zekasi}"
 fi
+
+# CANLI VERİ KORUMASI: rebuild ŞEMAYI SİLER. Neon'da elle girilmiş veri var;
+# oraya karşı kazara çalıştırmak geri dönüşü olmayan kayıp demektir.
+# Canlıda doğru araç migrate.sh'tir — o veriyi korur.
+case "$KURULUM_URL" in
+  *neon.tech*|*.rds.amazonaws.com*|*railway.app*|*supabase.co*)
+    if [ "$UZAGA_IZIN" -ne 1 ]; then
+        echo "DURDURULDU: hedef UZAK bir veritabanı ($HEDEF)." >&2
+        echo "  rebuild.sh şemayı siler; canlıda elle girilen veri kaybolur." >&2
+        echo "  Canlıda migration uygulamak için:  ./db/scripts/migrate.sh" >&2
+        echo "  Gerçekten sıfırlamak istiyorsan:   ./db/scripts/rebuild.sh --yes --allow-remote-wipe" >&2
+        exit 1
+    fi
+    echo "UYARI: UZAK veritabanı sıfırlanıyor — elle girilen veri silinecek." >&2
+    ;;
+esac
 
 echo "Hedef veritabanı: $HEDEF"
 if [ "$ASSUME_YES" -eq 0 ]; then

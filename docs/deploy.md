@@ -133,6 +133,79 @@ aşağıdaki kabul kontrolü yapılır.
 
 ---
 
+---
+
+## Canlıda şema güncelleme — `migrate.sh`
+
+**Neon'da `rebuild.sh` KULLANILMAZ.** O şemayı siler; elle girilen personel,
+izin ve çizelge verisi kaybolur. `rebuild.sh` artık uzak bir adres görürse
+kendiliğinden durur ve seni buraya yönlendirir.
+
+Canlıda doğru araç `migrate.sh`: yalnız **uygulanmamış** migration'ları,
+her birini kendi transaction'ında uygular. Uyguladıklarını `schema_migrations`
+tablosunda tutar, ikinci çağrıda atlar. Veriye dokunmaz.
+
+```bash
+# Ne uygulanmış, ne bekliyor?
+DATABASE_URL_DIRECT="postgresql://...@ep-xxx.neon.tech/neondb?sslmode=require" \
+  ./db/scripts/migrate.sh --status
+
+# Bekleyenleri uygula
+DATABASE_URL_DIRECT="postgresql://...@ep-xxx.neon.tech/neondb?sslmode=require" \
+  ./db/scripts/migrate.sh
+```
+
+### Mevcut Neon'u bir kereye mahsus işaretle
+
+Neon'daki şema 001–012 ile kuruldu ama `schema_migrations` defteri yok.
+Bu komut **hiçbir SQL çalıştırmaz**, yalnız "bunlar uygulanmış" diye kaydeder:
+
+```bash
+DATABASE_URL_DIRECT="postgresql://...@ep-xxx.neon.tech/neondb?sslmode=require" \
+  ./db/scripts/migrate.sh --mark-applied
+```
+
+Bundan sonra yeni bir migration eklendiğinde yalnız `migrate.sh` yeter.
+
+> Seed'ler canlıda **yalnız ilk kurulumda** koşar (`--seed`). Her seed dosyası
+> deftere yazılır; ikinci çağrıda atlanır, böylece elle girilen verinin üstüne
+> yazılmaz.
+
+---
+
+## Demo günü güvenliği — Neon branch'i
+
+Neon'da branch, veritabanının o andaki **yazılabilir kopyası**. Sunum sabahı
+çalışan bir kopyayı kenara koy; bir şey bozulursa Railway'i ona çevir.
+
+### Yedek branch'i oluştur (sunumdan önce)
+
+1. https://console.neon.tech → projen → sol menüden **Branches**
+2. **New Branch**
+3. **Name:** `demo-yedek`
+4. **Parent branch:** `production` (ya da ana branch'in adı ne ise)
+5. **Include data up to:** *Current point in time*
+6. **Create branch**
+7. Branch açılınca **Connection Details** → **Pooled connection** dizesini kopyala
+   ve kenara al. Buna yalnız acil durumda ihtiyacın olacak.
+
+### Sunumda sorun çıkarsa — yedeğe geç
+
+1. https://railway.com → **nobet-zekasi-api** → **Variables**
+2. `DATABASE_URL` satırında kalem ikonuna bas
+3. Değeri `demo-yedek` branch'inin **pooled** dizesiyle değiştir
+4. **Save** — Railway kendiliğinden yeniden dağıtır (~40 sn)
+5. `https://nobet-zekasi-api-production.up.railway.app/api/health` → `db: true`
+   ve `sema_guncel: true` gördüğünde hazırsın
+
+### Geri dön (sunumdan sonra)
+
+1. Aynı ekranda `DATABASE_URL`'i **asıl** branch'in pooled dizesiyle değiştir
+2. **Save**, sağlık kontrolünü tekrar yap
+
+> Branch'ler bağımsızdır: `demo-yedek`'te yapılan değişiklik asıl veritabanına
+> geçmez. Sunumda oraya bağlıyken girilen veri, geri dönünce görünmez.
+
 ## Neden bu yapı?
 
 - **API proxy** (`web/src/app/api/[...path]/route.ts`): tarayıcı yalnızca kendi
