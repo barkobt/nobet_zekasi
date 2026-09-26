@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
-import { DURUM_ADI, ayEtiketi, sayi, tarih, type Draft } from "@/lib/taslak";
+import { DURUM_ADI, aralikEtiketi, sayi, tarih, type Draft } from "@/lib/taslak";
 
 export default function TaslaklarSayfasi() {
   const { data, isLoading, error } = useQuery({
@@ -46,7 +46,7 @@ export default function TaslaklarSayfasi() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[220px]">Taslak</TableHead>
-                <TableHead className="w-[92px]">Ay</TableHead>
+                <TableHead className="w-[140px]">Dönem</TableHead>
                 <TableHead className="w-[96px]">Durum</TableHead>
                 <TableHead className="w-[92px] text-right">Atanan saat</TableHead>
                 <TableHead className="w-[92px] text-right">Fazla mesai</TableHead>
@@ -61,7 +61,10 @@ export default function TaslaklarSayfasi() {
                 <TableRow key={t.id} className="h-10">
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {ayEtiketi(t.month_start)}
+                    {aralikEtiketi(t.period_start, t.period_end)}
+                    <span className="ml-1.5 opacity-60" style={{ fontSize: "var(--text-xs)" }}>
+                      {t.day_count} gün
+                    </span>
                   </TableCell>
                   <TableCell>
                     <Badge

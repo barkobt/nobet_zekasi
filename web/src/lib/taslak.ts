@@ -11,11 +11,32 @@ export const AY_ADI = [
 ];
 
 /** DESIGN §7: tarih biçimi "21 Eyl 2026" */
-const KISA_AY = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+export const KISA_AY = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
 
-export const ayEtiketi = (iso: string) => {
-  const d = new Date(iso + "T00:00:00Z");
-  return `${AY_ADI[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+/**
+ * Taslağın aralığını insan diliyle yazar. period_end DIŞLAYICIdır, son gün bir eksik.
+ *   tam ay        → "Ekim 2026"
+ *   tek gün       → "23 Eyl 2026"
+ *   aynı ay içi   → "21–27 Eyl 2026"
+ *   ay aşan       → "28 Eyl – 4 Eki 2026"
+ */
+export const aralikEtiketi = (basIso: string, bitisIso: string) => {
+  const b = new Date(basIso + "T00:00:00Z");
+  const s = new Date(bitisIso + "T00:00:00Z");
+  s.setUTCDate(s.getUTCDate() - 1); // dışlayıcı → kapsayıcı son gün
+
+  const sonrakiAy = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth() + 1, 1));
+  const bitisDis = new Date(bitisIso + "T00:00:00Z");
+  if (b.getUTCDate() === 1 && bitisDis.getTime() === sonrakiAy.getTime())
+    return `${AY_ADI[b.getUTCMonth()]} ${b.getUTCFullYear()}`;
+
+  if (b.getTime() === s.getTime())
+    return `${b.getUTCDate()} ${KISA_AY[b.getUTCMonth()]} ${b.getUTCFullYear()}`;
+
+  if (b.getUTCMonth() === s.getUTCMonth() && b.getUTCFullYear() === s.getUTCFullYear())
+    return `${b.getUTCDate()}–${s.getUTCDate()} ${KISA_AY[s.getUTCMonth()]} ${s.getUTCFullYear()}`;
+
+  return `${b.getUTCDate()} ${KISA_AY[b.getUTCMonth()]} – ${s.getUTCDate()} ${KISA_AY[s.getUTCMonth()]} ${s.getUTCFullYear()}`;
 };
 
 export const tarih = (iso: string) => {

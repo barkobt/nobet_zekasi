@@ -51,20 +51,22 @@ def _kosu(satir: dict) -> SolverRun:
 
 
 def _taslak(satir: dict, son_kosu: dict | None) -> Draft:
-    # Taslak ayın TAMAMINI kapsıyor mu? Aylık hedef karşılaştırması (C-004)
-    # yalnızca bu doğruysa anlamlı; kısmi taslakta eksik görünmesi kuralın
-    # ihlali değil verinin eksikliğidir.
-    ay_bas: date = satir["month_start"]
-    sonraki = date(ay_bas.year + (ay_bas.month == 12), ay_bas.month % 12 + 1, 1)
-    ay_son = sonraki - timedelta(days=1)
+    # C-004 (aylık 200 saat) karşılaştırması: aralık tam bir takvim ayı olmalı
+    # VE atamalar aralığı kapsamalı. Bkz. routers/schedule.py'deki aynı hesap.
+    bas: date = satir["period_start"]
+    bitis: date = satir["period_end"]          # DIŞLAYICI
+    sonraki_ay = date(bas.year + (bas.month == 12), bas.month % 12 + 1, 1)
+    tam_takvim_ayi = bas.day == 1 and bitis == sonraki_ay
     tam_ay = bool(
-        satir["ilk_gun"]
-        and satir["son_gun"]
-        and satir["ilk_gun"] <= ay_bas
-        and satir["son_gun"] >= ay_son
+        tam_takvim_ayi
+        and satir["ilk_gun"] and satir["son_gun"]
+        and satir["ilk_gun"] <= bas
+        and satir["son_gun"] >= bitis - timedelta(days=1)
     )
     return Draft(
-        id=satir["id"], name=satir["name"], month_start=ay_bas, status=satir["status"],
+        id=satir["id"], name=satir["name"],
+        period_start=bas, period_end=bitis, day_count=(bitis - bas).days,
+        status=satir["status"],
         unit_name=satir["unit_name"], created_at=satir["created_at"],
         published_at=satir["published_at"],
         assignment_count=satir["assignment_count"], staff_count=satir["staff_count"],
@@ -85,15 +87,34 @@ async def listele() -> list[Draft]:
 
 @router.post("/drafts", response_model=Draft, status_code=201, summary="Yeni taslak")
 async def olustur(istek: DraftCreate) -> Draft:
+    if istek.period_end < istek.period_start:
+        raise HTTPException(status_code=422, detail="Bitiş tarihi başlangıçtan önce olamaz.")
     try:
-        yeni = await repo.olustur(istek.unit_code, istek.month_start, istek.name)
+        # Kullanıcı KAPSAYICI bitiş seçer; veritabanı DIŞLAYICI tutar.
+        yeni = await repo.olustur(
+            istek.unit_code, istek.period_start, istek.period_end + timedelta(days=1), istek.name
+        )
     except Exception as hata:  # noqa: BLE001 — DB kısıtlarını Türkçeye çevir
         metin = str(hata)
-        if "ck_drafts_month_start" in metin:
-            raise HTTPException(status_code=422, detail="Ay başlangıcı ayın ilk günü olmalı.") from hata
+        if "ck_drafts_period_bounded" in metin:
+            raise HTTPException(status_code=422, detail="Bitiş tarihi başlangıçtan sonra olmalı.") from hata
+        if "ex_drafts_one_published" in metin:
+            raise HTTPException(
+                status_code=409,
+                detail="Bu tarih aralığında zaten yayınlanmış bir çizelge var.",
+            ) from hata
         raise HTTPException(status_code=422, detail="Taslak oluşturulamadı.") from hata
     if yeni is None:
         raise HTTPException(status_code=404, detail="Birim bulunamadı.")
+
+    # Başlangıç verisi: istenirse mevcut bir çizelgeden doldur.
+    if istek.seed_from != "bos":
+        kaynak = await repo.kaynak_taslak_bul(
+            istek.seed_from, istek.period_start, istek.period_end + timedelta(days=1)
+        )
+        if kaynak is not None:
+            await repo.baslangic_verisi_kopyala(yeni["id"], kaynak, istek.lock_seeded)
+
     return await getir(yeni["id"])
 
 

@@ -36,7 +36,9 @@ class SolverRun(BaseModel):
 class Draft(BaseModel):
     id: int
     name: str
-    month_start: date
+    period_start: date
+    period_end: date = Field(description="DIŞLAYICI bitiş: [başlangıç, bitiş)")
+    day_count: int = Field(default=0, description="Aralıktaki gün sayısı")
     status: Literal["taslak", "yayinlandi", "arsiv"]
     unit_name: str
     created_at: datetime | None = None
@@ -53,9 +55,15 @@ class Draft(BaseModel):
 
 
 class DraftCreate(BaseModel):
-    month_start: date = Field(description="Ayın ilk günü, örn. 2026-10-01")
+    period_start: date = Field(description="Başlangıç günü (dahil)")
+    period_end: date = Field(description="Bitiş günü (DAHİL) — API dışlayıcıya çevirir")
     name: str = Field(min_length=1, max_length=100)
     unit_code: str = "ACIL_SERVIS"
+    # Başlangıç verisi: boş / yayınlanmış atamalardan / referans haftadan
+    seed_from: Literal["bos", "yayinlanmis", "referans"] = "bos"
+    lock_seeded: bool = Field(
+        default=False, description="Kopyalanan atamalar kilitlensin (solver dokunmaz)"
+    )
 
 
 class SolveRequest(BaseModel):

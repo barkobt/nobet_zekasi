@@ -280,10 +280,22 @@ export interface components {
             /** Name */
             name: string;
             /**
-             * Month Start
+             * Period Start
              * Format: date
              */
-            month_start: string;
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description DIŞLAYICI bitiş: [başlangıç, bitiş)
+             */
+            period_end: string;
+            /**
+             * Day Count
+             * @description Aralıktaki gün sayısı
+             * @default 0
+             */
+            day_count: number;
             /**
              * Status
              * @enum {string}
@@ -338,11 +350,17 @@ export interface components {
         /** DraftCreate */
         DraftCreate: {
             /**
-             * Month Start
+             * Period Start
              * Format: date
-             * @description Ayın ilk günü, örn. 2026-10-01
+             * @description Başlangıç günü (dahil)
              */
-            month_start: string;
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description Bitiş günü (DAHİL) — API dışlayıcıya çevirir
+             */
+            period_end: string;
             /** Name */
             name: string;
             /**
@@ -350,6 +368,18 @@ export interface components {
              * @default ACIL_SERVIS
              */
             unit_code: string;
+            /**
+             * Seed From
+             * @default bos
+             * @enum {string}
+             */
+            seed_from: "bos" | "yayinlanmis" | "referans";
+            /**
+             * Lock Seeded
+             * @description Kopyalanan atamalar kilitlensin (solver dokunmaz)
+             * @default false
+             */
+            lock_seeded: boolean;
         };
         /** DraftInfo */
         DraftInfo: {
@@ -358,17 +388,23 @@ export interface components {
             /** Name */
             name: string;
             /**
-             * Month Start
+             * Period Start
              * Format: date
              */
-            month_start: string;
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description DIŞLAYICI bitiş: [başlangıç, bitiş)
+             */
+            period_end: string;
             /** Status */
             status: string;
             /** Unit Name */
             unit_name: string;
             /**
              * Covers Full Month
-             * @description Atamalar ayın tamamına yayılıyor mu? Aylık hedef karşılaştırması (C-004) yalnızca bu doğruysa anlamlıdır.
+             * @description Taslağın aralığı tam bir takvim ayı mı VE atamalar o aralığı kapsıyor mu? Aylık hedef (C-004) yalnızca bu doğruysa anlamlıdır.
              */
             covers_full_month: boolean;
         };

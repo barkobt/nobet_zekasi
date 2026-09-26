@@ -38,8 +38,8 @@ SELECT full_name, shift_eligibility FROM staff WHERE full_name = 'Merve Toprak';
 ---------------------------------------------------------------------------
 BEGIN;
 
-INSERT INTO schedule_drafts (unit_id, month_start, name)
-SELECT id, '2026-10-01', 'Deneme' FROM units WHERE code = 'ACIL_SERVIS';
+INSERT INTO schedule_drafts (unit_id, period, name)
+SELECT id, daterange('2026-10-01','2026-11-01','[)'), 'Deneme' FROM units WHERE code = 'ACIL_SERVIS';
 
 -- Ayşe: 1 ve 2 Ekim gece, Merve: 1 Ekim gündüz
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date)
@@ -85,7 +85,7 @@ ROLLBACK;
 
 -- C1) Aynı kişi aynı gün iki vardiya → uq_assignments_draft_staff_date
 BEGIN;
-INSERT INTO schedule_drafts (unit_id, month_start, name) SELECT id, '2026-10-01', 'T' FROM units;
+INSERT INTO schedule_drafts (unit_id, period, name) SELECT id, daterange('2026-10-01','2026-11-01','[)'), 'T' FROM units;
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date)
 SELECT d.id, s.id, st.id, '2026-10-05'
 FROM schedule_drafts d, staff s, shift_types st
@@ -94,19 +94,21 @@ ROLLBACK;
 
 -- C2) Aynı ay için iki yayınlanmış taslak → uq_drafts_one_published
 BEGIN;
-INSERT INTO schedule_drafts (unit_id, month_start, name, status, published_at)
-SELECT id, '2026-10-01', x, 'yayinlandi', now() FROM units, (VALUES ('A'), ('B')) v(x);
+INSERT INTO schedule_drafts (unit_id, period, name, status, published_at)
+SELECT id, daterange('2026-10-01','2026-11-01','[)'), x, 'yayinlandi', now()
+FROM units, (VALUES ('A'), ('B')) v(x);
 ROLLBACK;
 
--- C3) Ayın ilk günü olmayan taslak → ck_drafts_month_start
+-- C3) Boş/ters aralık → ck_drafts_period_bounded
 BEGIN;
-INSERT INTO schedule_drafts (unit_id, month_start, name) SELECT id, '2026-10-15', 'X' FROM units;
+INSERT INTO schedule_drafts (unit_id, period, name)
+SELECT id, daterange('2026-10-15','2026-10-15','[)'), 'X' FROM units;   -- boş aralık
 ROLLBACK;
 
 -- C4) Çıkışı girişten önce gerçekleşen kayıt → ck_actual_end_after_start
 --     (önce geçerli bir atama lazım, o yüzden birkaç satır)
 BEGIN;
-INSERT INTO schedule_drafts (unit_id, month_start, name) SELECT id, '2026-10-01', 'Y' FROM units;
+INSERT INTO schedule_drafts (unit_id, period, name) SELECT id, daterange('2026-10-01','2026-11-01','[)'), 'Y' FROM units;
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date)
 SELECT d.id, s.id, st.id, '2026-10-01' FROM schedule_drafts d, staff s, shift_types st
 WHERE d.name = 'Y' AND s.full_name = 'Merve Toprak' AND st.code = 'GUNDUZ';
@@ -116,7 +118,7 @@ ROLLBACK;
 
 -- C5) Geçmiş ataması olan personeli silmek → fk_assignments_staff (RESTRICT)
 BEGIN;
-INSERT INTO schedule_drafts (unit_id, month_start, name) SELECT id, '2026-10-01', 'Z' FROM units;
+INSERT INTO schedule_drafts (unit_id, period, name) SELECT id, daterange('2026-10-01','2026-11-01','[)'), 'Z' FROM units;
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date)
 SELECT d.id, s.id, st.id, '2026-10-01' FROM schedule_drafts d, staff s, shift_types st
 WHERE d.name = 'Z' AND s.full_name = 'Ceren Bilgin' AND st.code = 'GUNDUZ';

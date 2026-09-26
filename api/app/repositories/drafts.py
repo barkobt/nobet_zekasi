@@ -7,7 +7,8 @@ from app.db import cursor
 # Taslak listesi + metrikler. Alt sorgular LATERAL yerine skaler: satır sayısı az
 # (ayda birkaç taslak), okunabilirlik ağır basıyor.
 _LISTE = """
-SELECT d.id, d.name, d.month_start, d.status, d.created_at, d.published_at,
+SELECT d.id, d.name, d.status, d.created_at, d.published_at,
+       lower(d.period) AS period_start, upper(d.period) AS period_end,
        u.name AS unit_name,
        (SELECT count(*) FROM assignments a WHERE a.draft_id = d.id)               AS assignment_count,
        (SELECT count(DISTINCT a.staff_id) FROM assignments a WHERE a.draft_id = d.id) AS staff_count,
@@ -47,7 +48,7 @@ FROM solver_runs r
 
 async def listele() -> list[dict]:
     async with cursor() as cur:
-        await cur.execute(_LISTE + " ORDER BY d.month_start DESC, d.id DESC")
+        await cur.execute(_LISTE + " ORDER BY lower(d.period) DESC, d.id DESC")
         return await cur.fetchall()
 
 
@@ -57,13 +58,15 @@ async def getir(draft_id: int) -> dict | None:
         return await cur.fetchone()
 
 
-async def olustur(unit_code: str, month_start: date, name: str) -> dict:
+async def olustur(unit_code: str, period_start: date, period_end: date, name: str) -> dict:
+    """period_end DIŞLAYICIdır: [başlangıç, bitiş). Router kullanıcının seçtiği
+    kapsayıcı bitiş gününe 1 ekleyerek çağırır."""
     async with cursor() as cur:
         await cur.execute(
-            """INSERT INTO schedule_drafts (unit_id, month_start, name)
-               SELECT id, %s, %s FROM units WHERE code = %s
+            """INSERT INTO schedule_drafts (unit_id, period, name)
+               SELECT id, daterange(%s, %s, '[)'), %s FROM units WHERE code = %s
                RETURNING id""",
-            (month_start, name, unit_code),
+            (period_start, period_end, name, unit_code),
         )
         return await cur.fetchone()
 
@@ -129,3 +132,84 @@ async def teshisler(run_id: int) -> list[dict]:
     async with cursor() as cur:
         await cur.execute(_TESHIS, (run_id,))
         return await cur.fetchall()
+
+
+# Başlangıç verisi: yeni taslağı boş bırakmak yerine mevcut bir çizelgeden doldur.
+# Kopyalanan satırlar source='manuel' olur — solver onları silmez (yalnız kendi
+# ürettiği 'solver' satırlarını siler). lock_seeded ayrıca is_locked yazar, böylece
+# niyet açıkça kaydedilir ve arayüzde kilit olarak görünür.
+_KOPYALA = """
+WITH hedef AS (
+    SELECT id AS draft_id, period FROM schedule_drafts WHERE id = %(draft_id)s
+),
+kaynak AS (
+    SELECT a.staff_id, a.shift_type_id, a.work_date, a.id AS kaynak_id,
+           EXTRACT(ISODOW FROM a.work_date)::int AS hafta_gunu
+    FROM assignments a
+    JOIN schedule_drafts d ON d.id = a.draft_id
+    WHERE d.id = %(kaynak_id)s
+),
+gunler AS (
+    SELECT h.draft_id, gs::date AS gun
+    FROM hedef h, generate_series(lower(h.period), upper(h.period) - 1, INTERVAL '1 day') gs
+),
+eslesme AS (
+    -- Hafta gününe göre döşe: kaynak 1 hafta, hedef herhangi bir uzunlukta olabilir.
+    SELECT g.draft_id, k.staff_id, k.shift_type_id, g.gun AS work_date, k.kaynak_id
+    FROM gunler g
+    JOIN kaynak k ON k.hafta_gunu = EXTRACT(ISODOW FROM g.gun)::int
+)
+INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date, source, is_locked)
+SELECT draft_id, staff_id, shift_type_id, work_date, 'manuel', %(kilitle)s
+FROM eslesme
+ON CONFLICT (draft_id, staff_id, work_date) DO NOTHING
+RETURNING id, staff_id, work_date
+"""
+
+_ROZET_KOPYALA = """
+INSERT INTO assignment_tasks (assignment_id, competency_id)
+SELECT y.id, t.competency_id
+FROM assignments y
+JOIN assignments k ON k.draft_id = %(kaynak_id)s
+                 AND k.staff_id = y.staff_id
+                 AND EXTRACT(ISODOW FROM k.work_date) = EXTRACT(ISODOW FROM y.work_date)
+JOIN assignment_tasks t ON t.assignment_id = k.id
+WHERE y.draft_id = %(draft_id)s
+  -- Yetkinliği olmayana görev kopyalama: trigger zaten reddederdi.
+  AND EXISTS (SELECT 1 FROM staff_competencies sc
+              WHERE sc.staff_id = y.staff_id AND sc.competency_id = t.competency_id)
+ON CONFLICT DO NOTHING
+"""
+
+
+async def kaynak_taslak_bul(tur: str, period_start: date, period_end: date) -> int | None:
+    """Hangi taslaktan kopyalanacak?
+
+    'referans'    → elle hazırlanan referans hafta
+    'yayinlanmis' → aynı aralıkla çakışan yayınlanmış çizelge (en yenisi)
+    """
+    async with cursor() as cur:
+        if tur == "referans":
+            await cur.execute(
+                "SELECT id FROM schedule_drafts WHERE name LIKE 'Referans:%' ORDER BY id LIMIT 1"
+            )
+        elif tur == "yayinlanmis":
+            await cur.execute(
+                """SELECT id FROM schedule_drafts
+                    WHERE status = 'yayinlandi' AND period && daterange(%s, %s, '[)')
+                    ORDER BY lower(period) DESC LIMIT 1""",
+                (period_start, period_end),
+            )
+        else:
+            return None
+        satir = await cur.fetchone()
+        return satir["id"] if satir else None
+
+
+async def baslangic_verisi_kopyala(draft_id: int, kaynak_id: int, kilitle: bool) -> int:
+    p = {"draft_id": draft_id, "kaynak_id": kaynak_id, "kilitle": kilitle}
+    async with cursor() as cur:
+        await cur.execute(_KOPYALA, p)
+        sayi = cur.rowcount
+        await cur.execute(_ROZET_KOPYALA, {"draft_id": draft_id, "kaynak_id": kaynak_id})
+    return sayi

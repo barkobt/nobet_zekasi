@@ -12,9 +12,12 @@
 
 BEGIN;
 
--- 1) Taslak başlığı: Eylül ayının yayınlanmış çizelgesi (elle hazırlanan)
-INSERT INTO schedule_drafts (unit_id, month_start, name, status, published_at)
-SELECT id, '2026-09-01', 'Referans: elle hazırlanan 21-27 Eylül', 'yayinlandi', '2026-09-20 18:00+03'
+-- 1) Taslak başlığı. Aralık GERÇEK haftadır (migration 012): [21 Eyl, 28 Eyl).
+--    Eskiden tüm Eylül'dü ve kapsama görünümü ayın 23 boş gününü de eksik sayıyordu
+--    (285 eksik slot). Taslak yalnız bu haftayı içeriyor; aralık da onu söylemeli.
+INSERT INTO schedule_drafts (unit_id, period, name, status, published_at)
+SELECT id, daterange('2026-09-21', '2026-09-28', '[)'),
+       'Referans: elle hazırlanan 21-27 Eylül', 'yayinlandi', '2026-09-20 18:00+03'
 FROM units
 WHERE code = 'ACIL_SERVIS'
   AND NOT EXISTS (SELECT 1 FROM schedule_drafts WHERE name = 'Referans: elle hazırlanan 21-27 Eylül');

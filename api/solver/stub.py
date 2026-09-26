@@ -4,9 +4,10 @@ Amacı çizelge üretmek DEĞİL, `model.py` bitmeden uçtan uca akışı çalı
 "Çöz" → solver_runs → assignments → E-09 ızgarası. Böylece API, arayüz ve deploy
 zinciri solver'dan bağımsız olarak bugün doğrulanabilir.
 
-Yöntem: 21-27 Eylül referans haftası HAFTA GÜNÜNE göre hedef aya döşenir
-(hedef ayın her Pazartesisi referans Pazartesinin kadrosunu alır). Bu, gerçek bir
+Yöntem: 21-27 Eylül referans haftası HAFTA GÜNÜNE göre taslağın ARALIĞINA döşenir
+(aralıktaki her Pazartesi referans Pazartesinin kadrosunu alır). Bu, gerçek bir
 optimizasyon değildir ama kural yapısı bozulmamış, gerçekçi bir çizelge üretir.
+Aralık 1 gün de olabilir, 1 ay da: gün listesi taslağın period kolonundan gelir.
 """
 
 from __future__ import annotations
@@ -113,14 +114,13 @@ def _referans_haftayi_yay(cur, draft_id: int) -> int:
     cur.execute(
         """
         WITH hedef AS (
-            SELECT id AS draft_id, month_start FROM schedule_drafts WHERE id = %s
+            SELECT id AS draft_id, period FROM schedule_drafts WHERE id = %s
         ),
         gunler AS (
+            -- Aralık [başlangıç, bitiş): üst sınır dışlayıcı, o yüzden -1
             SELECT h.draft_id, gs::date AS gun
             FROM hedef h,
-                 generate_series(h.month_start,
-                                 (h.month_start + INTERVAL '1 month' - INTERVAL '1 day')::date,
-                                 INTERVAL '1 day') gs
+                 generate_series(lower(h.period), upper(h.period) - 1, INTERVAL '1 day') gs
         ),
         referans AS (
             SELECT a.staff_id, a.shift_type_id, a.work_date,

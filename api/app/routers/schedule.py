@@ -53,12 +53,17 @@ async def cizelge(
     if (t := await repo.taslak(draft_id)) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
 
-    # Ayın son günü: bir sonraki ayın ilkinden bir gün geri.
-    ay_bas = t["month_start"]
-    sonraki = date(ay_bas.year + (ay_bas.month == 12), ay_bas.month % 12 + 1, 1)
-    ay_son = sonraki - timedelta(days=1)
+    # Aylık hedef (C-004) karşılaştırması iki koşul ister:
+    #   1) taslağın aralığı TAM bir takvim ayı olmalı
+    #   2) atamalar o aralığı baştan sona kapsamalı
+    # İkisinden biri yoksa "200 saatin altında" demek anlamsız.
+    bas, bitis = t["period_start"], t["period_end"]   # bitis DIŞLAYICI
+    sonraki_ay = date(bas.year + (bas.month == 12), bas.month % 12 + 1, 1)
+    tam_takvim_ayi = bas.day == 1 and bitis == sonraki_ay
     tam_ay = bool(
-        t["ilk_gun"] and t["son_gun"] and t["ilk_gun"] <= ay_bas and t["son_gun"] >= ay_son
+        tam_takvim_ayi
+        and t["ilk_gun"] and t["son_gun"]
+        and t["ilk_gun"] <= bas and t["son_gun"] >= bitis - timedelta(days=1)
     )
 
     veri = await repo.cizelge_verisi(draft_id, gun_bas, gun_son)
@@ -192,7 +197,8 @@ async def cizelge(
 
     return Schedule(
         draft=DraftInfo(
-            id=t["id"], name=t["name"], month_start=t["month_start"],
+            id=t["id"], name=t["name"],
+            period_start=t["period_start"], period_end=t["period_end"],
             status=t["status"], unit_name=t["unit_name"], covers_full_month=tam_ay,
         ),
         days=gunler,

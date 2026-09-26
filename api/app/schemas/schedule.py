@@ -93,12 +93,13 @@ class Summary(BaseModel):
 class DraftInfo(BaseModel):
     id: int
     name: str
-    month_start: date
+    period_start: date
+    period_end: date = Field(description="DIŞLAYICI bitiş: [başlangıç, bitiş)")
     status: str
     unit_name: str
     covers_full_month: bool = Field(
-        description="Atamalar ayın tamamına yayılıyor mu? Aylık hedef karşılaştırması "
-                    "(C-004) yalnızca bu doğruysa anlamlıdır."
+        description="Taslağın aralığı tam bir takvim ayı mı VE atamalar o aralığı "
+                    "kapsıyor mu? Aylık hedef (C-004) yalnızca bu doğruysa anlamlıdır."
     )
 
 
