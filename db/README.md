@@ -74,4 +74,5 @@ yeter ki tekrar çalıştırılabilir kalsın. Sahadan gelen kararlar tarihli se
 | 008 | 24.09 kararları: ambulans kuralı, sayım zorunluluğu, gündüz mevcudu 5 (sorumlu ve oryantasyon hariç) |
 | 009 | Elle hazırlanan referans çizelge (21–27 Eylül 2026) |
 | 010 | Katalog kodları (C-001…O-002), ihtiyaç satırı ↔ kural bağı |
+| 012 | Demo taslağı: Ekim 2026, referans haftadan döşenmiş, stub ile çözülmüş işaretli |
 | 011 | C-009 tek kurala çevrildi, "her çalışan triyaj veya gözlemde" kuralı, referans haftanın triyaj/gözlem rozetleri kuraldan türetildi |

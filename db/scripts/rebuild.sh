@@ -89,4 +89,4 @@ for f in seeds/*.sql; do gecerli_mi "$f" || continue; echo "• $f"; "${PSQL[@]}
                         (SELECT count(*) FROM staff) AS personel,
                         (SELECT count(*) FROM assignments) AS atama,
                         (SELECT count(*) FROM v_task_eligibility_violations) AS uygunluk_ihlali;"
-echo "Bitti. Beklenen: 22 tablo, 6 view, 20 personel, 91 atama, 1 uygunluk ihlali."
+echo "Bitti. Beklenen: 22 tablo, 6 view, 20 personel, 495 atama (91 referans + 404 demo), 1 uygunluk ihlali."
