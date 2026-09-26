@@ -59,9 +59,18 @@ Vardiya renkleri (tek yerde tanımlı, tüm ekranlarda aynı):
 
 ## 4. Kabuk (tüm ekranlarda sabit)
 
-- **Sol menü (`--brand` zemin, tam yükseklik):** genişken 224px (ikon + etiket), daraltılınca 64px
-  (yalnız ikon, tooltip). En üstte 56px yüksekliğinde **logo bloğu** (§4.1). Aktif öğe: beyaz metin +
-  sol 3px `--accent` çizgi. Menü öğeleri = MVP ekranları (§6).
+- **Sol menü (`--brand` zemin, tam yükseklik):** varsayılan **daraltılmış** (64px,
+  yalnız ikon). Fare üzerine gelince 224px'e açılır ama **içeriği itmez, üstüne biner**;
+  fare çıkınca kapanır. Geçiş 150ms; `prefers-reduced-motion: reduce` → anlık.
+  Altta küçük **sabitleme (pin)** düğmesi: basılınca menü açık kalır ve içeriği iter.
+  Tercih tarayıcıda hatırlanır (`localStorage`), okunamazsa sessizce daraltılmışa düşer.
+  Aktif öğe: beyaz metin + sol 3px `--accent` çizgi.
+  Menü **üç gruba** ayrılır, ince BÜYÜK HARF başlıklarla (kapalıyken başlık yerine ayraç):
+  | Grup | Ekranlar |
+  |---|---|
+  | Planlama | Ana Sayfa · Nöbet Çizelgesi · Taslaklar · Çözüm Teşhisi · İhtiyaç |
+  | Kadro | Personel · Yetkinlik Matrisi |
+  | Ayarlar | Kural Seti · Vardiya Tanımları |
 - **Üst bar (56px, `--surface`, alt çizgi):** sol menünün sağından başlar. Solda sayfa adı / birim seçici
   ("Erişkin Acil Servis"), sağda dönem gezgini (‹ Ekim 2026 ›), bildirim, kullanıcı rolü.
   Logo üst barda **değil**, sol menünün tepesindedir: lacivert sütun kesintisiz yukarı çıkar.
@@ -79,14 +88,13 @@ Bileşen: `web/src/components/shell/BrandLogo.tsx` (tek yerde; başka hiçbir ye
 
 | Durum | Görünüm |
 |---|---|
-| Menü genişken, normal | İşaret (24px) + yanında "Smart Planner" (14px/600, beyaz) |
-| Menü genişken, hover / odak | İşaret ve "Smart Planner" solar, yerine ACIBADEM yazısı (14px yükseklik) belirir |
-| Menü daraltılmışken | Yalnız işaret (24px), ortalı. Hover dönüşümü yok, tooltip: "Acıbadem Smart Planner" |
+| Menü açık (hover ya da sabit) | İşaret (24px) + ACIBADEM yazısı (13px yükseklik) |
+| Menü daraltılmış | Yalnız işaret (24px), tooltip: "Acıbadem Smart Planner" |
 
-- Geçiş: iki katman üst üste (`position: absolute`), yalnız `opacity` + 4px `translateX`,
-  **200ms ease-out**. Genişlik değişmez (layout kayması olmaz). CSS ile yapılır, animasyon kütüphanesi yok.
+- Geçiş: yalnız `opacity`, **150ms ease-out**. İşaret her durumda yerinde kalır, yazı solar.
+  Menünün kendisi hover ile açıldığı için logonun ayrı bir hover davranışı yoktur.
 - `prefers-reduced-motion: reduce` → geçiş anlık (süre 0).
-- Logo bloğu bir link: tıklanınca E-09'a gider. `aria-label="Acıbadem Smart Planner — Nöbet Çizelgesi"`.
+- Logo bloğu bir link: tıklanınca ana sayfaya gider. `aria-label="Acıbadem Smart Planner — Ana Sayfa"`.
 - Logo üzerine rozet, sürüm numarası, gölge veya parıltı eklenmez.
 - **İçerik alanı:** `--bg` zemin, 24px iç boşluk, maksimum genişlik yok (ızgaralar tam genişlik kullanır).
 - **Sayfa başlığı satırı:** solda başlık (20px/600), sağda en fazla 1 birincil + 2 ikincil buton.

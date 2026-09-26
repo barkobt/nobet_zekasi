@@ -32,3 +32,12 @@ export const tarih = (iso: string) => {
 };
 
 export const bugun = () => new Date().toISOString().slice(0, 10);
+
+/** Avatar baş harfleri: "Ahmet Baran Bozkurt" → "AB" (ilk ve son kelime). */
+export const basHarf = (ad: string) => {
+  const p = ad.split(" ").filter(Boolean);
+  if (p.length === 0) return "";
+  const ilk = p[0][0] ?? "";
+  const son = p.length > 1 ? (p[p.length - 1][0] ?? "") : "";
+  return (ilk + son).toLocaleUpperCase("tr");
+};

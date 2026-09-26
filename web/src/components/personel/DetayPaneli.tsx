@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import {
+  CalendarClock, CalendarOff, FileText, IdCard, Plus, Trash2, UserX,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import {
-  CALISMA_TIPI, IZIN_TURU, MUSAITLIK_TURU, bugun, tarih,
+  CALISMA_TIPI, IZIN_TURU, MUSAITLIK_TURU, basHarf, bugun, tarih,
   type PersonDetail, type PersonRow, type Role,
 } from "@/lib/personel";
 
@@ -38,46 +40,76 @@ export function DetayPaneli({
 
   return (
     <Sheet open={staffId !== null} onOpenChange={(a) => !a && onKapat()}>
-      <SheetContent className="w-[460px] sm:max-w-[460px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle style={{ fontSize: "var(--text-base)" }}>
-            {data?.full_name ?? "…"}
-          </SheetTitle>
-          {data && (
-            <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-              {data.role_name}
-              {data.status_label && ` · ${data.status_label}`}
+      <SheetContent className="flex w-[520px] flex-col gap-0 p-0 sm:max-w-[520px]">
+        <SheetHeader className="border-b p-6">
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden
+              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+              style={{ fontSize: "var(--text-base)", fontWeight: 600 }}
+            >
+              {data ? basHarf(data.full_name) : ""}
             </span>
+            <div className="min-w-0">
+              <SheetTitle style={{ fontSize: "var(--text-base)" }}>
+                {data?.full_name ?? "…"}
+              </SheetTitle>
+              <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+                {data?.role_name}
+              </span>
+            </div>
+          </div>
+
+          {data && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
+                     style={{ fontSize: "var(--text-xs)" }}>
+                {data.eligibility_label}
+              </Badge>
+              {data.status_label && (
+                <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
+                       style={{ fontSize: "var(--text-xs)" }}>
+                  {data.status_label}
+                </Badge>
+              )}
+              {data.sicil_no && (
+                <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
+                       style={{ fontSize: "var(--text-xs)" }}>
+                  Sicil {data.sicil_no}
+                </Badge>
+              )}
+            </div>
           )}
         </SheetHeader>
 
         {data && (
-          <Tabs defaultValue="kunye" className="mt-4 px-4 pb-6">
-            <TabsList className="w-full">
-              <TabsTrigger value="kunye">Künye</TabsTrigger>
-              <TabsTrigger value="sozlesme">Sözleşme</TabsTrigger>
-              <TabsTrigger value="musaitlik">Müsaitlik</TabsTrigger>
-              <TabsTrigger value="devamsizlik">Devamsızlık</TabsTrigger>
-              <TabsTrigger value="uyumsuzluk">Uyumsuzluk</TabsTrigger>
+          <Tabs defaultValue="kunye" className="flex min-h-0 flex-1 flex-col">
+            {/* Sekmeler kesilmesin: dar panelde yatay kaydırılır */}
+            <TabsList className="mx-6 mt-4 w-[calc(100%-3rem)] justify-start overflow-x-auto">
+              <TabsTrigger value="kunye"><IdCard size={16} strokeWidth={1.75} />Künye</TabsTrigger>
+              <TabsTrigger value="sozlesme"><FileText size={16} strokeWidth={1.75} />Sözleşme</TabsTrigger>
+              <TabsTrigger value="musaitlik"><CalendarClock size={16} strokeWidth={1.75} />Müsaitlik</TabsTrigger>
+              <TabsTrigger value="devamsizlik"><CalendarOff size={16} strokeWidth={1.75} />Devamsızlık</TabsTrigger>
+              <TabsTrigger value="uyumsuzluk"><UserX size={16} strokeWidth={1.75} />Uyumsuzluk</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="kunye" className="mt-4">
+            <TabsContent value="kunye" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <Kunye kisi={data} roller={roller ?? []} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="sozlesme" className="mt-4">
+            <TabsContent value="sozlesme" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <Sozlesme kisi={data} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="musaitlik" className="mt-4">
+            <TabsContent value="musaitlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <Musaitlik kisi={data} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="devamsizlik" className="mt-4">
+            <TabsContent value="devamsizlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <Devamsizlik kisi={data} onKaydet={tazele} />
             </TabsContent>
 
-            <TabsContent value="uyumsuzluk" className="mt-4">
+            <TabsContent value="uyumsuzluk" className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <Uyumsuzluk kisi={data} herkes={herkes} onKaydet={tazele} />
             </TabsContent>
           </Tabs>
@@ -108,7 +140,8 @@ function Kunye({
   });
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-4">
+      <Bolum baslik="Kimlik">
       <Ikili>
         <Alan etiket="Ad">
           <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
@@ -134,6 +167,9 @@ function Kunye({
           </select>
         </Alan>
       </Ikili>
+      </Bolum>
+
+      <Bolum baslik="Çalışma">
 
       <Alan etiket="Çalışma tipi">
         <select
@@ -145,19 +181,29 @@ function Kunye({
         </select>
       </Alan>
 
-      <Alan etiket="Not">
-        <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-      </Alan>
-
       {kisi.buddy_name && (
         <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
           Eğitmen: {kisi.buddy_name}
         </p>
       )}
+      </Bolum>
 
-      <Button onClick={() => kaydet.mutate()} disabled={kaydet.isPending} className="mt-1">
-        {kaydet.isPending ? "Kaydediliyor…" : "Kaydet"}
-      </Button>
+      <Bolum baslik="Not">
+        <Alan etiket="Serbest not">
+          <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+        </Alan>
+      </Bolum>
+
+      {/* Kaydet panelin altında sabit: içerik kayarken yerinde kalır */}
+      <AltBar
+        kaydediliyor={kaydet.isPending}
+        onKaydet={() => kaydet.mutate()}
+        onVazgec={() => setForm({
+          first_name: kisi.first_name, last_name: kisi.last_name,
+          sicil_no: kisi.sicil_no ?? "", role_code: kisi.role_code,
+          shift_eligibility: kisi.shift_eligibility, note: kisi.note ?? "",
+        })}
+      />
       {kaydet.isError && <Hata>{(kaydet.error as Error).message}</Hata>}
     </div>
   );
@@ -401,6 +447,30 @@ function Uyumsuzluk({
 }
 
 /* ------------------------------------------------------ küçük parçalar */
+function Bolum({ baslik, children }: { baslik: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-2">
+      <h3 className="text-muted-foreground" style={{ fontSize: "var(--text-xs)", letterSpacing: "0.04em" }}>
+        {baslik.toLocaleUpperCase("tr")}
+      </h3>
+      <div className="grid gap-3">{children}</div>
+    </section>
+  );
+}
+
+function AltBar({
+  kaydediliyor, onKaydet, onVazgec,
+}: { kaydediliyor: boolean; onKaydet: () => void; onVazgec: () => void }) {
+  return (
+    <div className="sticky bottom-0 -mx-6 mt-2 flex gap-2 border-t bg-card px-6 py-3">
+      <Button onClick={onKaydet} disabled={kaydediliyor}>
+        {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
+      </Button>
+      <Button variant="outline" onClick={onVazgec}>Vazgeç</Button>
+    </div>
+  );
+}
+
 const Ikili = ({ children }: { children: React.ReactNode }) => (
   <div className="grid grid-cols-2 gap-2">{children}</div>
 );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 
@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import { CALISMA_TIPI, type PersonDetail, type PersonRow, type Role } from "@/lib/personel";
+import { CALISMA_TIPI, basHarf, type PersonDetail, type PersonRow, type Role } from "@/lib/personel";
 
 export default function PersonelSayfasi() {
   const [arama, setArama] = useState("");
@@ -41,6 +41,24 @@ export default function PersonelSayfasi() {
         (!tipFiltre || p.shift_eligibility === tipFiltre),
     );
   }, [data, arama, rolFiltre, tipFiltre]);
+
+  const gruplar = useMemo(() => {
+    // Yetkinlik Matrisi ile AYNI gruplama: iki ekran aynı zihinsel düzeni paylaşsın.
+    const tanim: { ad: string; roller: string[] | null }[] = [
+      { ad: "Sorumlu & Eğitim", roller: ["sorumlu_hemsire", "egitim_hemsire"] },
+      { ad: "Ekip Liderleri", roller: ["shift_yetkilisi"] },
+      { ad: "Hemşireler", roller: null },
+    ];
+    return tanim
+      .map((g, i) => ({
+        ad: g.ad,
+        satirlar: satirlar.filter((p) =>
+          g.roller ? g.roller.includes(p.role_code)
+                   : !tanim.slice(0, i).some((o) => o.roller?.includes(p.role_code)),
+        ),
+      }))
+      .filter((g) => g.satirlar.length > 0);
+  }, [satirlar]);
 
   const roller = useMemo(() => {
     const m = new Map<string, string>();
@@ -109,50 +127,63 @@ export default function PersonelSayfasi() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[90px]">Sicil</TableHead>
-                <TableHead className="w-[140px]">Ad</TableHead>
-                <TableHead className="w-[130px]">Soyad</TableHead>
-                <TableHead className="w-[190px]">Rol</TableHead>
-                <TableHead className="w-[130px]">Çalışma tipi</TableHead>
-                <TableHead className="w-[110px] text-right">Aylık hedef (sa)</TableHead>
-                <TableHead className="w-[170px]">Sözleşme</TableHead>
-                <TableHead className="w-[110px]">Durum</TableHead>
+                <TableHead className="w-[280px]">Ad Soyad</TableHead>
+                <TableHead className="w-[220px]">Rol</TableHead>
+                <TableHead className="w-[160px]">Çalışma tipi</TableHead>
+                <TableHead>Durum</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {satirlar.map((p) => (
-                <TableRow
-                  key={p.id}
-                  className="h-10 cursor-pointer"
-                  onClick={() => setSecili(p.id)}
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && setSecili(p.id)}
-                >
-                  {/* Sicil boşsa boş hücre — uydurma değer yok (DESIGN §7) */}
-                  <TableCell className="text-muted-foreground">{p.sicil_no ?? ""}</TableCell>
-                  <TableCell className="font-medium">{p.first_name}</TableCell>
-                  <TableCell className="font-medium">{p.last_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.role_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.eligibility_label}</TableCell>
-                  <TableCell className="text-right">
-                    {/* Kural varsayılanından geliyorsa soluk: sözleşmede yazmıyor demek */}
-                    <span className={p.target_is_default ? "opacity-50" : ""}>
-                      {p.monthly_target_hours ?? ""}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{p.contract_label ?? ""}</TableCell>
-                  <TableCell>
-                    {p.status_label && (
-                      <Badge
-                        variant="secondary"
-                        className="h-5 rounded-sm px-1.5 font-normal"
-                        style={{ fontSize: "var(--text-xs)" }}
+              {/* Sicil, aylık hedef ve sözleşme tablodan çıktı: herkeste aynı ya da boş.
+                  İkisi de detay panelinde duruyor (26.09 kararı). */}
+              {gruplar.map((grup) => (
+                <Fragment key={grup.ad}>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={4} className="h-9 bg-background py-0">
+                      <span
+                        className="text-muted-foreground"
+                        style={{ fontSize: "var(--text-xs)", letterSpacing: "0.04em" }}
                       >
-                        {p.status_label}
-                      </Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
+                        {grup.ad.toLocaleUpperCase("tr")}
+                        <span className="ml-1.5 normal-case">({grup.satirlar.length})</span>
+                      </span>
+                    </TableCell>
+                  </TableRow>
+
+                  {grup.satirlar.map((p) => (
+                    <TableRow
+                      key={p.id}
+                      className="h-11 cursor-pointer"
+                      onClick={() => setSecili(p.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === "Enter" && setSecili(p.id)}
+                    >
+                      <TableCell>
+                        <span className="flex items-center gap-2.5">
+                          <span
+                            aria-hidden
+                            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+                            style={{ fontSize: "var(--text-xs)" }}
+                          >
+                            {basHarf(p.full_name)}
+                          </span>
+                          <span className="font-medium">{p.full_name}</span>
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.role_name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 rounded-sm px-1.5 font-normal"
+                          style={{ fontSize: "var(--text-xs)" }}
+                        >
+                          {p.eligibility_label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.status_label}</TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
               ))}
             </TableBody>
           </Table>
