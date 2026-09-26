@@ -21,6 +21,9 @@ out/
 web/src/lib/api-types.ts.tmp
 .vercel
 
+# Canlı ekran görüntüleri: gerçek personel adları var, commit edilmez
+docs/screenshots/live/
+
 # macOS
 .DS_Store
 docs/reference/
