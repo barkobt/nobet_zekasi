@@ -72,6 +72,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Taslak listesi */
+        get: operations["listele_api_drafts_get"];
+        put?: never;
+        /** Yeni taslak */
+        post: operations["olustur_api_drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Taslak detayı */
+        get: operations["getir_api_drafts__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/solve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Çöz — arka planda çalıştırır */
+        post: operations["coz_api_drafts__draft_id__solve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Taslağın koşuları */
+        get: operations["kosular_api_drafts__draft_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/solver-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Koşu durumu (yoklama) */
+        get: operations["kosu_api_solver_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/solver-runs/{run_id}/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** E-10 teşhisler, kurala göre gruplu */
+        get: operations["teshisler_api_solver_runs__run_id__diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -122,6 +225,131 @@ export interface components {
             is_weekend: boolean;
             /** Shifts */
             shifts: components["schemas"]["ShiftHeader"][];
+        };
+        /** Diagnostic */
+        Diagnostic: {
+            /** Id */
+            id: number;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "cakisma" | "ihlal" | "uyari";
+            /** Constraint Code */
+            constraint_code?: string | null;
+            /** Catalog Code */
+            catalog_code?: string | null;
+            /** Constraint Name */
+            constraint_name?: string | null;
+            /** Staff Name */
+            staff_name?: string | null;
+            /** Work Date */
+            work_date?: string | null;
+            /** Message */
+            message: string;
+            /** Suggestion */
+            suggestion?: string | null;
+        };
+        /**
+         * DiagnosticGroup
+         * @description E-10: teşhisler kurala göre gruplanır — 44 satır yerine 7 kalem.
+         */
+        DiagnosticGroup: {
+            /** Catalog Code */
+            catalog_code?: string | null;
+            /** Constraint Code */
+            constraint_code?: string | null;
+            /** Constraint Name */
+            constraint_name: string;
+            /** Count */
+            count: number;
+            /** First Date */
+            first_date?: string | null;
+            /** Last Date */
+            last_date?: string | null;
+            /**
+             * Samples
+             * @description İlk birkaç örnek
+             */
+            samples?: components["schemas"]["Diagnostic"][];
+        };
+        /** Draft */
+        Draft: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Month Start
+             * Format: date
+             */
+            month_start: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "taslak" | "yayinlandi" | "arsiv";
+            /** Unit Name */
+            unit_name: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Published At */
+            published_at?: string | null;
+            /**
+             * Assignment Count
+             * @default 0
+             */
+            assignment_count: number;
+            /**
+             * Staff Count
+             * @description Ataması olan kişi sayısı
+             * @default 0
+             */
+            staff_count: number;
+            /**
+             * Shortfall Count
+             * @description Kapsama eksiği olan slot sayısı
+             * @default 0
+             */
+            shortfall_count: number;
+            /**
+             * Total Hours
+             * @default 0
+             */
+            total_hours: number;
+            /**
+             * Overtime Hours
+             * @default 0
+             */
+            overtime_hours: number;
+            /**
+             * Fairness Gap
+             * @description En çok − en az çalışan saat farkı
+             * @default 0
+             */
+            fairness_gap: number;
+            /**
+             * Covers Full Month
+             * @default false
+             */
+            covers_full_month: boolean;
+            last_run?: components["schemas"]["SolverRun"] | null;
+        };
+        /** DraftCreate */
+        DraftCreate: {
+            /**
+             * Month Start
+             * Format: date
+             * @description Ayın ilk günü, örn. 2026-10-01
+             */
+            month_start: string;
+            /** Name */
+            name: string;
+            /**
+             * Unit Code
+             * @default ACIL_SERVIS
+             */
+            unit_code: string;
         };
         /** DraftInfo */
         DraftInfo: {
@@ -176,6 +404,11 @@ export interface components {
             view?: number | null;
             /** Aktif Personel */
             aktif_personel?: number | null;
+            /**
+             * Sema Guncel
+             * @description Veritabanı şeması deploy edilen kodun beklediği migration'ları içeriyor mu
+             */
+            sema_guncel?: boolean | null;
             /** Detay */
             detay?: string | null;
         };
@@ -279,6 +512,85 @@ export interface components {
              * @description TRIYAJ/GOZLEM: ambulansa çıkmayanların sayısı. Diğer slotlarda boş.
              */
             remaining_after_ambulance?: number | null;
+        };
+        /**
+         * SolveAccepted
+         * @description POST /solve yanıtı: koşu kaydı açıldı, arka planda çalışıyor.
+         */
+        SolveAccepted: {
+            /** Run Id */
+            run_id: number;
+            /** Draft Id */
+            draft_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "CALISIYOR" | "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "HATA";
+            /** Poll Url */
+            poll_url: string;
+        };
+        /** SolveRequest */
+        SolveRequest: {
+            /**
+             * Time Limit S
+             * @default 60
+             */
+            time_limit_s: number;
+        };
+        /**
+         * SolverRun
+         * @description Bir çözüm koşusu. E-08 metrik tablosu ve durum yoklaması bunu okur.
+         */
+        SolverRun: {
+            /** Id */
+            id: number;
+            /** Draft Id */
+            draft_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "CALISIYOR" | "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "HATA";
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Time Limit Seconds */
+            time_limit_seconds?: number | null;
+            /** Objective Value */
+            objective_value?: number | null;
+            /**
+             * Assignment Count
+             * @default 0
+             */
+            assignment_count: number;
+            /**
+             * Diagnostic Count
+             * @default 0
+             */
+            diagnostic_count: number;
+            /** Elapsed S */
+            elapsed_s?: number | null;
+            /**
+             * Is Reference Copy
+             * @description Gerçek çözücü değil, referans haftanın kopyası
+             * @default false
+             */
+            is_reference_copy: boolean;
+            /**
+             * Status Label
+             * @description Arayüzde gösterilecek durum metni
+             */
+            status_label: string;
+            /**
+             * Diagnostics Label
+             * @description Teşhis listesinin başlığı
+             */
+            diagnostics_label: string;
         };
         /** Staff */
         Staff: {
@@ -470,6 +782,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listele_api_drafts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"][];
+                };
+            };
+        };
+    };
+    olustur_api_drafts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getir_api_drafts__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coz_api_drafts__draft_id__solve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SolveAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kosular_api_drafts__draft_id__runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SolverRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kosu_api_solver_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SolverRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    teshisler_api_solver_runs__run_id__diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticGroup"][];
                 };
             };
             /** @description Validation Error */

@@ -28,4 +28,8 @@ class HealthCheck(BaseModel):
     tablo: int | None = None
     view: int | None = None
     aktif_personel: int | None = None
+    sema_guncel: bool | None = Field(
+        default=None,
+        description="Veritabanı şeması deploy edilen kodun beklediği migration'ları içeriyor mu",
+    )
     detay: str | None = None

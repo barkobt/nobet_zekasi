@@ -180,14 +180,18 @@ def _teshisleri_yaz(cur, run_id: int, draft_id: int) -> int:
                'ihlal',
                ntr.constraint_id,
                cov.day,
-               -- Not: SQL format() kullanmıyoruz. Onun yer tutucusu psycopg'nin
-               -- parametre yer tutucusuyla aynı yazılır ve psycopg yorum içindekini
-               -- bile sayar. Düz birleştirme hem okunur hem tuzaksız.
-               cov.shift_code || ' ' || cov.slot_code || ': '
-                 || cov.assigned || '/' || cov.required
-                 || ' (' || (cov.required - cov.assigned) || ' eksik)',
-               'İhtiyaç şablonundaki sayıyı gözden geçirin veya yetkin personel ekleyin.'
+               -- Arayüz metni Türkçe (DESIGN §7): ham kod değil okunur ad.
+               -- SQL format() kullanmıyoruz; yer tutucusu psycopg'ninkiyle çakışır.
+               v.vardiya || ' ' || sl.slot || ': ' || cov.assigned || '/' || cov.required,
+               'Gereken ' || cov.required || ' kişi, atanan ' || cov.assigned || '. '
+                 || 'İhtiyaç şablonundaki sayıyı gözden geçirin veya yetkin personel ekleyin.'
         FROM v_daily_coverage cov
+        JOIN (VALUES ('GUNDUZ','Gündüz'), ('GECE','Gece'), ('GUNDUZ_CMT','Gündüz (Cmt)'))
+             AS v (kod, vardiya) ON v.kod = cov.shift_code
+        JOIN (VALUES ('GENEL','genel mevcut'), ('TRIYAJ','triyaj'), ('AMBULANS','ambulans'),
+                     ('GOZLEM','gözlem'), ('SAYIM','sayım yetkilisi'),
+                     ('SHIFT_YETKILISI','ekip lideri'))
+             AS sl (kod, slot) ON sl.kod = cov.slot_code
         JOIN need_periods np        ON np.valid_period @> cov.day
         JOIN need_template_rows ntr ON ntr.need_template_id = np.need_template_id
                                    AND ntr.slot_code = cov.slot_code

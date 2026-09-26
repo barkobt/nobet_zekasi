@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.db import close_pool, open_pool
-from app.routers import health, schedule, staff
+from app.routers import drafts, health, schedule, staff
 from app.settings import get_settings
 
 
@@ -50,3 +50,4 @@ async def demo_token_kontrolu(request: Request, call_next):
 app.include_router(health.router, prefix="/api")
 app.include_router(staff.router, prefix="/api")
 app.include_router(schedule.router, prefix="/api")
+app.include_router(drafts.router, prefix="/api")

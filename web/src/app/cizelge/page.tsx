@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -32,13 +33,24 @@ const araliktaEtiket = (pzt: string) => {
 };
 
 export default function CizelgeSayfasi() {
+  return (
+    <Suspense fallback={null}>
+      <Icerik />
+    </Suspense>
+  );
+}
+
+function Icerik() {
+  // E-08'den "Çizelge" ile gelince o taslak açılır; yoksa referans hafta.
+  const draftParam = useSearchParams().get("draft");
+  const taslakId = draftParam ? Number(draftParam) : TASLAK_ID;
   const [pzt, setPzt] = useState(REFERANS_PZT);
   const son = haftaKaydir(pzt, 1);
   const bitis = isoGun(new Date(new Date(son + "T00:00:00Z").getTime() - 86400000));
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["schedule", TASLAK_ID, pzt],
-    queryFn: () => api<Schedule>(`/drafts/${TASLAK_ID}/schedule?from=${pzt}&to=${bitis}`),
+    queryKey: ["schedule", taslakId, pzt],
+    queryFn: () => api<Schedule>(`/drafts/${taslakId}/schedule?from=${pzt}&to=${bitis}`),
   });
 
   return (
