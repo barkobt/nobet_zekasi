@@ -126,7 +126,7 @@ export default function RaporlarSayfasi() {
           value={seciliId ? String(seciliId) : undefined}
           onValueChange={(v) => setSecim(Number(v))}
         >
-          <SelectTrigger className="w-[320px] yazdirma-gizle">
+          <SelectTrigger className="w-[360px] yazdirma-gizle">
             <SelectValue placeholder="Taslak seçin" />
           </SelectTrigger>
           <SelectContent>
