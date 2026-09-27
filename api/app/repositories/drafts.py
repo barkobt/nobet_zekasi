@@ -135,9 +135,9 @@ async def teshisler(run_id: int) -> list[dict]:
 
 
 # Başlangıç verisi: yeni taslağı boş bırakmak yerine mevcut bir çizelgeden doldur.
-# Kopyalanan satırlar source='manuel' olur — solver onları silmez (yalnız kendi
-# ürettiği 'solver' satırlarını siler). lock_seeded ayrıca is_locked yazar, böylece
-# niyet açıkça kaydedilir ve arayüzde kilit olarak görünür.
+# Kopyalanan satırlar source='referans' olur — solver onları silmez (yalnız kendi
+# ürettiği 'solver' satırlarını siler), ama "elle yapılmış değişiklik" de SAYILMAZ;
+# kullanıcı bunlara dokunmadı (migration 013). lock_seeded ayrıca is_locked yazar.
 _KOPYALA = """
 WITH hedef AS (
     SELECT id AS draft_id, period FROM schedule_drafts WHERE id = %(draft_id)s
@@ -160,7 +160,7 @@ eslesme AS (
     JOIN kaynak k ON k.hafta_gunu = EXTRACT(ISODOW FROM g.gun)::int
 )
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date, source, is_locked)
-SELECT draft_id, staff_id, shift_type_id, work_date, 'manuel', %(kilitle)s
+SELECT draft_id, staff_id, shift_type_id, work_date, 'referans', %(kilitle)s
 FROM eslesme
 ON CONFLICT (draft_id, staff_id, work_date) DO NOTHING
 RETURNING id, staff_id, work_date
@@ -234,6 +234,8 @@ async def sil(draft_id: int) -> dict | None:
 
 _CAKISANLAR = """
 SELECT d.id, d.name, d.period,
+       -- YALNIZCA kullanıcının ızgara hücresinden yaptığı düzenlemeler.
+       -- Kopyalananlar 'referans' olduğu için buraya girmiyor (migration 013).
        (SELECT count(*) FROM assignments a
          WHERE a.draft_id = d.id AND a.source = 'manuel') AS elle_degisiklik,
        -- Eskinin YENİ taslağın dışında kalan kısmı
@@ -285,7 +287,7 @@ async def yayinla(draft_id: int) -> dict | None:
 
 async def kopyala(draft_id: int, yeni_ad: str) -> dict | None:
     """Aynı dönem, aynı atamalar, yeni taslak. Koşu geçmişi kopyalanmaz —
-    kopya henüz çözülmemiştir; atamalar 'manuel' olarak taşınır."""
+    kopya henüz çözülmemiştir; atamalar 'referans' olarak taşınır."""
     async with cursor() as cur:
         await cur.execute(
             """INSERT INTO schedule_drafts (unit_id, period, name)
@@ -299,7 +301,7 @@ async def kopyala(draft_id: int, yeni_ad: str) -> dict | None:
         await cur.execute(
             """INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date,
                                         source, is_locked)
-               SELECT %s, staff_id, shift_type_id, work_date, 'manuel', is_locked
+               SELECT %s, staff_id, shift_type_id, work_date, 'referans', is_locked
                FROM assignments WHERE draft_id = %s""",
             (yeni["id"], draft_id),
         )

@@ -66,7 +66,9 @@ WHERE d.cell <> '';
 
 -- 4) Atamalar. Harf → vardiya kodu çevirisi küçük bir VALUES sözlüğüyle.
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date, source)
-SELECT dr.id, s.id, st.id, c.work_date, 'manuel'
+-- 'referans': kağıttan aktarım. 'manuel' YALNIZCA kullanıcının ızgara
+-- hücresinden yaptığı düzenleme için ayrıldı (migration 013).
+SELECT dr.id, s.id, st.id, c.work_date, 'referans'
 FROM tmp_cells c
 JOIN (VALUES ('D', 'GUNDUZ'), ('N', 'GECE')) AS m (letter, shift_code)
      ON m.letter = c.shift_letter
