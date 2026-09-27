@@ -23,7 +23,11 @@ SELECT
       WHERE table_name='schedule_drafts' AND column_name='period')                AS m012_period,
     -- month_start HÂLÂ varsa 012 uygulanmamış demektir
     (SELECT count(*) FROM information_schema.columns
-      WHERE table_name='schedule_drafts' AND column_name='month_start')           AS m012_eski
+      WHERE table_name='schedule_drafts' AND column_name='month_start')           AS m012_eski,
+    -- 013: assignments.source'ta 'referans' değeri kabul ediliyor mu
+    (SELECT count(*) FROM pg_constraint
+      WHERE conname = 'ck_assignments_source'
+        AND pg_get_constraintdef(oid) LIKE '%%referans%%')                        AS m013_referans
 """
 
 
@@ -41,6 +45,8 @@ async def kontrol() -> dict:
         eksik.append("011 (kapsama kolonları / trigger'lar)")
     if satir["m012_period"] != 1 or satir["m012_eski"] != 0:
         eksik.append("012 (schedule_drafts.period)")
+    if satir["m013_referans"] != 1:
+        eksik.append("013 (assignments.source='referans')")
     sema_guncel = not eksik
     return {
         "tablo": satir["tablo"],
