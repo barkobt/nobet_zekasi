@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { ExcelDugmesi } from "@/components/ExcelDugmesi";
 import { Izgara } from "@/components/cizelge/Izgara";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -88,6 +89,7 @@ function Icerik() {
         </div>
 
         <div className="flex items-center gap-1">
+          {taslakId !== undefined && <ExcelDugmesi draftId={taslakId} />}
           <Button
             variant="outline"
             size="icon"

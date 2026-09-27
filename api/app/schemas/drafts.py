@@ -66,6 +66,23 @@ class DraftCreate(BaseModel):
     )
 
 
+class PublishPreview(BaseModel):
+    """Uygulamadan ÖNCE ne olacağını söyler. Kullanıcı sürprizle karşılaşmasın."""
+
+    can_publish: bool
+    archived_names: list[str] = Field(
+        default_factory=list, description="Arşive alınacak yayınlanmış çizelgeler"
+    )
+    uncovered_label: str | None = Field(
+        default=None,
+        description="Eskinin yeni taslağın dışında kalan günleri, insan diliyle",
+    )
+    manual_change_count: int = Field(
+        default=0, description="Mevcut çizelgede elle yapılmış değişiklik sayısı"
+    )
+    reason: str | None = Field(default=None, description="Uygulanamıyorsa sebebi")
+
+
 class DraftCopy(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 

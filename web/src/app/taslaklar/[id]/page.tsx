@@ -9,6 +9,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { HataKutusu } from "@/components/HataKutusu";
 import { Izgara } from "@/components/cizelge/Izgara";
 import { TaslakPaneli } from "@/components/taslak/TaslakPaneli";
+import { ExcelDugmesi } from "@/components/ExcelDugmesi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -125,6 +126,8 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
               </Button>
             </>
           )}
+
+          <ExcelDugmesi draftId={draftId} />
 
           <Button onClick={() => coz.mutate()} disabled={calisiyor} className="ml-1">
             {calisiyor ? (

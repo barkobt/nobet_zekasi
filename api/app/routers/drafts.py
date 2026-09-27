@@ -3,12 +3,15 @@
 import asyncio
 from datetime import date, timedelta
 
+KISA_AY = ["Oca", "Şub", "Mar", "Nis", "May", "Haz",
+           "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from app.repositories import drafts as repo
 from app.schemas.drafts import (
-    Diagnostic, DiagnosticGroup, Draft, DraftCopy, DraftCreate, SolveAccepted,
-    SolveRequest, SolverRun,
+    Diagnostic, DiagnosticGroup, Draft, DraftCopy, DraftCreate, PublishPreview,
+    SolveAccepted, SolveRequest, SolverRun,
 )
 from app.settings import get_settings
 
@@ -237,17 +240,58 @@ async def taslak_kopyala(draft_id: int, istek: DraftCopy) -> Draft:
     return await getir(yeni["id"])
 
 
-@router.post("/drafts/{draft_id}/publish", response_model=Draft, summary="Taslağı yayınla")
+def _aralik_etiketi(bas: date, bitis_dis: date) -> str:
+    """bitis DIŞLAYICI gelir. '8–31 Eki' / '28 Eyl – 4 Eki' biçiminde yazar."""
+    son = bitis_dis - timedelta(days=1)
+    if bas == son:
+        return f"{bas.day} {KISA_AY[bas.month - 1]}"
+    if bas.month == son.month:
+        return f"{bas.day}–{son.day} {KISA_AY[son.month - 1]}"
+    return f"{bas.day} {KISA_AY[bas.month - 1]} – {son.day} {KISA_AY[son.month - 1]}"
+
+
+@router.get("/drafts/{draft_id}/publish-preview", response_model=PublishPreview,
+            summary="Uygulamadan önce ne olacak?")
+async def yayin_onizleme(draft_id: int) -> PublishPreview:
+    if (d := await repo.getir(draft_id)) is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+    if d["status"] == "yayinlandi":
+        return PublishPreview(can_publish=False, reason="Bu çizelge zaten yayında.")
+
+    cakisanlar = await repo.cakisan_yayinlar(draft_id)
+
+    # Eskinin yeni taslağın dışında kalan günleri: bu kısım yayından kalkacak
+    # ama yerine bir şey gelmeyecek. Kullanıcı bunu bilmeli.
+    disarida: list[str] = []
+    for c in cakisanlar:
+        fark = c["disarida"]
+        if fark is not None and not fark.isempty:
+            disarida.append(_aralik_etiketi(fark.lower, fark.upper))
+
+    return PublishPreview(
+        can_publish=True,
+        archived_names=[c["name"] for c in cakisanlar],
+        uncovered_label=" ve ".join(disarida) if disarida else None,
+        manual_change_count=sum(c["elle_degisiklik"] for c in cakisanlar),
+    )
+
+
+@router.post("/drafts/{draft_id}/publish", response_model=Draft, summary="Taslağı uygula")
 async def taslak_yayinla(draft_id: int) -> Draft:
+    """Çakışan yayınlanmış çizelgeler arşive alınır, bu taslak yayınlanır.
+
+    409 yalnız GERÇEK yarış durumunda kalır: iki kişi aynı anda uygularsa
+    biri kısıta takılır. Normal "üzerine yazma" artık hata değil.
+    """
     try:
         sonuc = await repo.yayinla(draft_id)
     except Exception as hata:  # noqa: BLE001
         if "ex_drafts_one_published" in str(hata):
             raise HTTPException(
                 status_code=409,
-                detail="Bu tarih aralığında zaten yayınlanmış bir çizelge var.",
+                detail="Aynı anda başka bir çizelge yayınlandı. Sayfayı yenileyip tekrar deneyin.",
             ) from hata
-        raise HTTPException(status_code=422, detail="Taslak yayınlanamadı.") from hata
+        raise HTTPException(status_code=422, detail="Taslak uygulanamadı.") from hata
     if sonuc is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
     return await getir(draft_id)

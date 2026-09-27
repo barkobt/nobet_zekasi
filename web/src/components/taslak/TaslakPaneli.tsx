@@ -13,6 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
 import { sayi, tarih, type DiagnosticGroup, type Draft } from "@/lib/taslak";
+import type { components } from "@/lib/api-types";
+
+type PublishPreview = components["schemas"]["PublishPreview"];
 
 /** ☰ paneli: üç büyük kart, başka bir şey yok (DESIGN §1: tek soru, az kart). */
 export function TaslakPaneli({
@@ -36,11 +39,19 @@ export function TaslakPaneli({
     },
   });
 
+  // Uygulamadan ÖNCE ne olacağını sor: kullanıcı sürprizle karşılaşmasın.
+  const { data: onizleme } = useQuery({
+    queryKey: ["publish-preview", taslak.id],
+    queryFn: () => api<PublishPreview>(`/drafts/${taslak.id}/publish-preview`),
+    enabled: yayinla,
+  });
+
   const uygula = useMutation({
     mutationFn: () => api<Draft>(`/drafts/${taslak.id}/publish`, { method: "POST" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["draft", taslak.id] });
       qc.invalidateQueries({ queryKey: ["drafts"] });
+      qc.invalidateQueries({ queryKey: ["publish-preview"] });
       setYayinla(false);
       onKapat();
     },
@@ -75,7 +86,9 @@ export function TaslakPaneli({
                   baslik="Taslağı uygula"
                   aciklama={
                     taslak.status === "yayinlandi"
-                      ? "Bu taslak zaten yayınlandı"
+                      ? "Bu çizelge yayında"
+                      : taslak.status === "arsiv"
+                      ? "Arşivden çıkarıp tekrar yayınlar"
                       : "Yayınlanır ve Nöbet Çizelgesi'nde görünür"
                   }
                   onClick={() => setYayinla(true)}
@@ -101,9 +114,26 @@ export function TaslakPaneli({
             <AlertDialogTitle style={{ fontSize: "var(--text-base)" }}>
               Taslak uygulansın mı?
             </AlertDialogTitle>
-            <AlertDialogDescription style={{ fontSize: "var(--text-xs)" }}>
-              {taslak.name} yayınlanacak ve Nöbet Çizelgesi ekranında görünecek.
-              Aynı dönemde başka bir yayınlanmış çizelge varsa işlem reddedilir.
+            <AlertDialogDescription asChild>
+              <div style={{ fontSize: "var(--text-xs)" }} className="grid gap-1.5">
+                <p>{taslak.name} yayınlanacak ve Nöbet Çizelgesi ekranında görünecek.</p>
+
+                {/* Ne kaybolacağını ÖNCEDEN ve sade söyle */}
+                {(onizleme?.archived_names ?? []).map((ad) => (
+                  <p key={ad}>Mevcut çizelge “{ad}” arşive alınacak.</p>
+                ))}
+                {onizleme?.uncovered_label && (
+                  <p>
+                    Eski çizelgenin {onizleme.uncovered_label} kısmı da yayından kalkacak.
+                  </p>
+                )}
+                {(onizleme?.manual_change_count ?? 0) > 0 && (
+                  <p className="text-danger">
+                    Mevcut çizelgede {onizleme!.manual_change_count} elle yapılmış değişiklik
+                    var; yeni çizelgede olmayacak.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           {uygula.isError && (

@@ -26,6 +26,7 @@ import { aralikEtiketi, type Draft } from "@/lib/taslak";
 /** Durum rozeti: taslağın gerçekte ne olduğunu tek kelimeyle söyler. */
 function durumRozeti(t: Draft): { ad: string; vurgu?: boolean } {
   if (t.status === "yayinlandi") return { ad: "Yayınlandı" };
+  if (t.status === "arsiv") return { ad: "Arşiv" };
   if (t.last_run?.is_reference_copy) return { ad: "Referans kopya" };
   if (t.last_run?.status === "INFEASIBLE") return { ad: "Çözülemedi", vurgu: true };
   if (t.last_run) return { ad: "Çözüldü" };

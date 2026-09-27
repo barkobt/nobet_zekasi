@@ -219,6 +219,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/drafts/{draft_id}/publish-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Uygulamadan önce ne olacak? */
+        get: operations["yayin_onizleme_api_drafts__draft_id__publish_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/drafts/{draft_id}/publish": {
         parameters: {
             query?: never;
@@ -228,7 +245,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Taslağı yayınla */
+        /**
+         * Taslağı uygula
+         * @description Çakışan yayınlanmış çizelgeler arşive alınır, bu taslak yayınlanır.
+         *
+         *     409 yalnız GERÇEK yarış durumunda kalır: iki kişi aynı anda uygularsa
+         *     biri kısıta takılır. Normal "üzerine yazma" artık hata değil.
+         */
         post: operations["taslak_yayinla_api_drafts__draft_id__publish_post"];
         delete?: never;
         options?: never;
@@ -1541,6 +1564,35 @@ export interface components {
             buddy_staff_id?: number | null;
         };
         /**
+         * PublishPreview
+         * @description Uygulamadan ÖNCE ne olacağını söyler. Kullanıcı sürprizle karşılaşmasın.
+         */
+        PublishPreview: {
+            /** Can Publish */
+            can_publish: boolean;
+            /**
+             * Archived Names
+             * @description Arşive alınacak yayınlanmış çizelgeler
+             */
+            archived_names?: string[];
+            /**
+             * Uncovered Label
+             * @description Eskinin yeni taslağın dışında kalan günleri, insan diliyle
+             */
+            uncovered_label?: string | null;
+            /**
+             * Manual Change Count
+             * @description Mevcut çizelgede elle yapılmış değişiklik sayısı
+             * @default 0
+             */
+            manual_change_count: number;
+            /**
+             * Reason
+             * @description Uygulanamıyorsa sebebi
+             */
+            reason?: string | null;
+        };
+        /**
          * QualificationFlag
          * @description Tooltip'in alt satırı: 'Ekip lideri ✓' gibi. Sayı değil, var/yok.
          */
@@ -2320,6 +2372,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    yayin_onizleme_api_drafts__draft_id__publish_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishPreview"];
                 };
             };
             /** @description Validation Error */

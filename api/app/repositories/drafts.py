@@ -232,10 +232,47 @@ async def sil(draft_id: int) -> dict | None:
         return await cur.fetchone()
 
 
-async def yayinla(draft_id: int) -> dict | None:
-    """Zaten yayınlanmışsa published_at KORUNUR: tekrar basmak ilk yayın
-    zamanını siliyordu, oysa o tarih denetim için önemli."""
+_CAKISANLAR = """
+SELECT d.id, d.name, d.period,
+       (SELECT count(*) FROM assignments a
+         WHERE a.draft_id = d.id AND a.source = 'manuel') AS elle_degisiklik,
+       -- Eskinin YENİ taslağın dışında kalan kısmı
+       (SELECT d.period - y.period FROM schedule_drafts y WHERE y.id = %(yeni)s) AS disarida
+FROM schedule_drafts d
+WHERE d.status = 'yayinlandi'
+  AND d.id <> %(yeni)s
+  AND d.unit_id = (SELECT unit_id FROM schedule_drafts WHERE id = %(yeni)s)
+  AND d.period && (SELECT period FROM schedule_drafts WHERE id = %(yeni)s)
+ORDER BY lower(d.period)
+"""
+
+
+async def cakisan_yayinlar(draft_id: int) -> list[dict]:
     async with cursor() as cur:
+        await cur.execute(_CAKISANLAR, {"yeni": draft_id})
+        return await cur.fetchall()
+
+
+async def yayinla(draft_id: int) -> dict | None:
+    """Çakışan yayınlanmış çizelgeleri ARŞİVE alır, sonra bunu yayınlar.
+
+    İkisi TEK transaction: arşivleme yapılıp yayınlama başarısız olursa birim
+    yayınlanmış çizelgesiz kalırdı. EXCLUDE kısıtı (ex_drafts_one_published)
+    yalnız status='yayinlandi' satırlara baktığı için önce arşivleyip sonra
+    yayınlamak kısıtı ihlal etmiyor.
+
+    Silmiyoruz: arşivdeki çizelge açılıp tekrar uygulanabilir — geri dönüş yolu bu.
+    """
+    async with cursor() as cur:
+        await cur.execute(
+            """UPDATE schedule_drafts d
+                  SET status = 'arsiv'
+                WHERE d.status = 'yayinlandi'
+                  AND d.id <> %(yeni)s
+                  AND d.unit_id = (SELECT unit_id FROM schedule_drafts WHERE id = %(yeni)s)
+                  AND d.period && (SELECT period FROM schedule_drafts WHERE id = %(yeni)s)""",
+            {"yeni": draft_id},
+        )
         await cur.execute(
             """UPDATE schedule_drafts
                   SET status = 'yayinlandi',
