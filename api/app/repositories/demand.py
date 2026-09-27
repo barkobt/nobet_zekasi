@@ -71,6 +71,20 @@ async def satir_ekle(template_id: int, shift_code: str, slot_code: str,
         )
         if (yeni := await cur.fetchone()) is None:
             return None
+
+        # Kurala bağla: aynı slotun başka vardiyadaki satırı hangi kurala bağlıysa
+        # bu da ona bağlanır. Docstring bunu vaat ediyordu ama kod yapmıyordu.
+        await cur.execute(
+            """UPDATE need_template_rows ntr
+                  SET constraint_id = (
+                      SELECT o.constraint_id FROM need_template_rows o
+                       WHERE o.slot_code = ntr.slot_code AND o.id <> ntr.id
+                         AND o.constraint_id IS NOT NULL
+                       LIMIT 1)
+                WHERE ntr.id = %s""",
+            (yeni["id"],),
+        )
+
         if competency_codes:
             await cur.execute(
                 """INSERT INTO need_template_row_competencies (need_template_row_id, competency_id)

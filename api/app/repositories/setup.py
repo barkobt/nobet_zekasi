@@ -64,6 +64,18 @@ async def matris() -> list[dict]:
         return await cur.fetchall()
 
 
+async def yetkinlik_var_mi(code: str) -> bool:
+    async with cursor() as cur:
+        await cur.execute("SELECT 1 FROM competencies WHERE code = %s", (code,))
+        return await cur.fetchone() is not None
+
+
+async def personel_var_mi(staff_id: int) -> bool:
+    async with cursor() as cur:
+        await cur.execute("SELECT 1 FROM staff WHERE id = %s", (staff_id,))
+        return await cur.fetchone() is not None
+
+
 async def yetkinlik_degistir(staff_id: int, code: str, ver: bool) -> bool:
     """Kutucuk aç/kapa. Geçmiş atamalar korunur: assignment_tasks'a dokunulmaz,
     yalnızca kişinin yetkinlik kaydı değişir (bkz. migration 010'daki trigger notu)."""
@@ -99,6 +111,18 @@ async def kural_guncelle(constraint_id: int, alanlar: dict) -> dict | None:
         await cur.execute(
             f"UPDATE constraints SET {parcalar} WHERE id = %s RETURNING id",
             [*alanlar.values(), constraint_id],
+        )
+        return await cur.fetchone()
+
+
+async def param_kurali(param_id: int) -> dict | None:
+    """Parametrenin bağlı olduğu kuralın kaynağı — yasal kural kilidi için."""
+    async with cursor() as cur:
+        await cur.execute(
+            """SELECT c.id, c.code, c.name, c.source
+               FROM constraint_params p JOIN constraints c ON c.id = p.constraint_id
+               WHERE p.id = %s""",
+            (param_id,),
         )
         return await cur.fetchone()
 

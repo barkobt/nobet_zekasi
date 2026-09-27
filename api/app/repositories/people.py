@@ -173,9 +173,12 @@ async def izin_ekle(staff_id: int, bas: date, bitis: date,
         return await cur.fetchone()
 
 
-async def izin_sil(absence_id: int) -> dict | None:
+async def izin_sil(staff_id: int, absence_id: int) -> dict | None:
     async with cursor() as cur:
-        await cur.execute("DELETE FROM absences WHERE id = %s RETURNING id", (absence_id,))
+        await cur.execute(
+            "DELETE FROM absences WHERE id = %s AND staff_id = %s RETURNING id",
+            (absence_id, staff_id),
+        )
         return await cur.fetchone()
 
 
@@ -191,10 +194,19 @@ async def musaitlik_ekle(staff_id: int, gun: date, tur: str, note: str | None) -
         return await cur.fetchone()
 
 
-async def musaitlik_sil(rule_id: int) -> dict | None:
+async def musaitlik_sil(staff_id: int, rule_id: int) -> dict | None:
     async with cursor() as cur:
-        await cur.execute("DELETE FROM availability_rules WHERE id = %s RETURNING id", (rule_id,))
+        await cur.execute(
+            "DELETE FROM availability_rules WHERE id = %s AND staff_id = %s RETURNING id",
+            (rule_id, staff_id),
+        )
         return await cur.fetchone()
+
+
+async def personel_var_mi(staff_id: int) -> bool:
+    async with cursor() as cur:
+        await cur.execute("SELECT 1 FROM staff WHERE id = %s", (staff_id,))
+        return await cur.fetchone() is not None
 
 
 async def uyumsuzluk_ekle(a: int, b: int, note: str | None) -> None:
@@ -209,13 +221,16 @@ async def uyumsuzluk_ekle(a: int, b: int, note: str | None) -> None:
         )
 
 
-async def uyumsuzluk_sil(a: int, b: int) -> None:
+async def uyumsuzluk_sil(a: int, b: int) -> bool:
+    """Silinen satır olup olmadığını döndürür: yoksa çağıran 404 verebilsin."""
     dusuk, yuksek = (a, b) if a < b else (b, a)
     async with cursor() as cur:
         await cur.execute(
-            "DELETE FROM staff_conflicts WHERE staff_id_low = %s AND staff_id_high = %s",
+            """DELETE FROM staff_conflicts
+                WHERE staff_id_low = %s AND staff_id_high = %s RETURNING staff_id_low""",
             (dusuk, yuksek),
         )
+        return await cur.fetchone() is not None
 
 
 async def sil(staff_id: int) -> bool:
@@ -229,31 +244,37 @@ async def sil(staff_id: int) -> bool:
         return await cur.fetchone() is not None
 
 
-async def sozlesme_guncelle(contract_id: int, bas, bitis, hedef, note) -> dict | None:
+# ALT KAYIT UÇLARINDA staff_id ŞARTI ZORUNLU.
+# Yoksa /people/21/contracts/17 çağrısı 17 numaralı sözleşme BAŞKASINA ait olsa
+# bile onu değiştiriyordu: yol kişiyi söylüyor ama sorgu dinlemiyordu.
+async def sozlesme_guncelle(staff_id: int, contract_id: int, bas, bitis, hedef, note) -> dict | None:
     async with cursor() as cur:
         await cur.execute(
             """UPDATE contracts
                   SET valid_period = daterange(%s, %s, '[)'),
                       monthly_target_hours = %s, note = %s
-                WHERE id = %s RETURNING id""",
-            (bas, bitis, hedef, note, contract_id),
+                WHERE id = %s AND staff_id = %s RETURNING id""",
+            (bas, bitis, hedef, note, contract_id, staff_id),
         )
         return await cur.fetchone()
 
 
-async def sozlesme_sil(contract_id: int) -> dict | None:
+async def sozlesme_sil(staff_id: int, contract_id: int) -> dict | None:
     async with cursor() as cur:
-        await cur.execute("DELETE FROM contracts WHERE id = %s RETURNING id", (contract_id,))
+        await cur.execute(
+            "DELETE FROM contracts WHERE id = %s AND staff_id = %s RETURNING id",
+            (contract_id, staff_id),
+        )
         return await cur.fetchone()
 
 
-async def izin_guncelle(absence_id: int, bas, bitis, tur: str, note) -> dict | None:
+async def izin_guncelle(staff_id: int, absence_id: int, bas, bitis, tur: str, note) -> dict | None:
     """bitis KAPSAYICI gelir."""
     async with cursor() as cur:
         await cur.execute(
             """UPDATE absences
                   SET period = daterange(%s, %s, '[)'), absence_type = %s, note = %s
-                WHERE id = %s RETURNING id""",
-            (bas, bitis + timedelta(days=1), tur, note, absence_id),
+                WHERE id = %s AND staff_id = %s RETURNING id""",
+            (bas, bitis + timedelta(days=1), tur, note, absence_id, staff_id),
         )
         return await cur.fetchone()

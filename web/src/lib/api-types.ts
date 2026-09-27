@@ -2140,7 +2140,10 @@ export interface operations {
     };
     taslak_sil_api_drafts__draft_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Yayınlanmış çizelgeyi silmek için açıkça istenmeli */
+                force?: boolean;
+            };
             header?: never;
             path: {
                 draft_id: number;

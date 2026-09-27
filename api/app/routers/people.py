@@ -48,17 +48,25 @@ def _satir(s: dict) -> PersonRow:
         bas = _tarih(donem.lower)
         sozlesme = f"{bas} – {_tarih(donem.upper - timedelta(days=1))}" if donem.upper else f"{bas} →"
 
-    durum = "Oryantasyon" if s["is_orientation"] else ("" if s["is_active"] else "Pasif")
+    # İkisi birden olabilir: pasif bir oryantasyon personelinde "Pasif" kaybolmasın.
+    etiketler = []
+    if not s["is_active"]:
+        etiketler.append("Pasif")
+    if s["is_orientation"]:
+        etiketler.append("Oryantasyon")
+    durum = " · ".join(etiketler)
     return PersonRow(
         id=s["id"], sicil_no=s["sicil_no"], first_name=ad, last_name=soyad,
         full_name=s["full_name"], role_code=s["role_code"], role_name=s["role_name"],
         shift_eligibility=s["shift_eligibility"],
         eligibility_label=CALISMA_TIPI.get(s["shift_eligibility"], s["shift_eligibility"]),
+        # "is not None" — falsy kontrolü 0'ı yok sayıyordu; 0 kıdem ya da
+        # 0 hedef saat gerçek bir değer olabilir.
         monthly_target_hours=(
-            float(s["monthly_target_hours"]) if s["monthly_target_hours"]
-            else (float(s["kural_hedefi"]) if s.get("kural_hedefi") else None)
+            float(s["monthly_target_hours"]) if s["monthly_target_hours"] is not None
+            else (float(s["kural_hedefi"]) if s.get("kural_hedefi") is not None else None)
         ),
-        target_is_default=not s["monthly_target_hours"],
+        target_is_default=s["monthly_target_hours"] is None,
         contract_label=sozlesme, is_active=s["is_active"], is_orientation=s["is_orientation"],
         buddy_name=s["buddy_name"], status_label=durum,
     )
@@ -88,13 +96,15 @@ async def detay(staff_id: int) -> PersonDetail:
         buddy_staff_id=s["buddy_staff_id"],
         assignment_count=s["assignment_count"],
         can_delete=s["assignment_count"] == 0,
-        seniority_years=float(s["seniority_years"]) if s["seniority_years"] else None,
+        seniority_years=float(s["seniority_years"]) if s["seniority_years"] is not None else None,
         note=s["note"],
         contracts=[
             Contract(
                 id=c["id"], valid_from=c["valid_from"],
                 valid_to=c["valid_to"] - timedelta(days=1) if c["valid_to"] else None,
-                monthly_target_hours=float(c["monthly_target_hours"]) if c["monthly_target_hours"] else None,
+                monthly_target_hours=(
+                    float(c["monthly_target_hours"]) if c["monthly_target_hours"] is not None else None
+                ),
                 note=c["note"],
             ) for c in d["sozlesmeler"]
         ],
@@ -136,6 +146,10 @@ async def guncelle(staff_id: int, istek: PersonUpdate) -> PersonDetail:
         raise HTTPException(status_code=404, detail="Personel bulunamadı.")
 
     alanlar = istek.model_dump(exclude_unset=True)
+    # Boş sicil NULL olmalı: '' olarak yazılırsa ikinci boş sicil UNIQUE'e takılıp
+    # "bu sicil zaten kayıtlı" diyordu — ikisi de aslında boştu.
+    if alanlar.get("sicil_no") == "":
+        alanlar["sicil_no"] = None
     # Ad/soyad tek alanda saklanıyor: ikisinden biri gelse de tam adı yeniden kur.
     if "first_name" in alanlar or "last_name" in alanlar:
         eski_ad, eski_soyad = _ad_soyad(mevcut["full_name"])
@@ -231,7 +245,7 @@ async def izin_ekle(staff_id: int, istek: AbsenceCreate) -> PersonDetail:
 @router.delete("/{staff_id}/absences/{absence_id}", response_model=PersonDetail,
                summary="Devamsızlık sil")
 async def izin_sil(staff_id: int, absence_id: int) -> PersonDetail:
-    if await repo.izin_sil(absence_id) is None:
+    if await repo.izin_sil(staff_id, absence_id) is None:
         raise HTTPException(status_code=404, detail="Kayıt bulunamadı.")
     return await detay(staff_id)
 
@@ -246,7 +260,7 @@ async def musaitlik_ekle(staff_id: int, istek: AvailabilityCreate) -> PersonDeta
 @router.delete("/{staff_id}/availability/{rule_id}", response_model=PersonDetail,
                summary="Müsaitlik kuralı sil")
 async def musaitlik_sil(staff_id: int, rule_id: int) -> PersonDetail:
-    if await repo.musaitlik_sil(rule_id) is None:
+    if await repo.musaitlik_sil(staff_id, rule_id) is None:
         raise HTTPException(status_code=404, detail="Kayıt bulunamadı.")
     return await detay(staff_id)
 
@@ -256,6 +270,9 @@ async def musaitlik_sil(staff_id: int, rule_id: int) -> PersonDetail:
 async def uyumsuzluk_ekle(staff_id: int, istek: ConflictCreate) -> PersonDetail:
     if istek.other_staff_id == staff_id:
         raise HTTPException(status_code=422, detail="Kişi kendisiyle uyumsuz olamaz.")
+    # Olmayan kişiye referans FK ihlali → ham 500 yerine anlaşılır 404
+    if not await repo.personel_var_mi(istek.other_staff_id):
+        raise HTTPException(status_code=404, detail="Seçilen personel bulunamadı.")
     await repo.uyumsuzluk_ekle(staff_id, istek.other_staff_id, istek.note)
     return await detay(staff_id)
 
@@ -263,7 +280,8 @@ async def uyumsuzluk_ekle(staff_id: int, istek: ConflictCreate) -> PersonDetail:
 @router.delete("/{staff_id}/conflicts/{other_id}", response_model=PersonDetail,
                summary="Uyumsuz kişi sil")
 async def uyumsuzluk_sil(staff_id: int, other_id: int) -> PersonDetail:
-    await repo.uyumsuzluk_sil(staff_id, other_id)
+    if not await repo.uyumsuzluk_sil(staff_id, other_id):
+        raise HTTPException(status_code=404, detail="Uyumsuzluk kaydı bulunamadı.")
     return await detay(staff_id)
 
 
@@ -272,7 +290,7 @@ async def uyumsuzluk_sil(staff_id: int, other_id: int) -> PersonDetail:
 async def sozlesme_guncelle(staff_id: int, contract_id: int, istek: ContractUpsert) -> PersonDetail:
     try:
         sonuc = await repo.sozlesme_guncelle(
-            contract_id, istek.valid_from,
+            staff_id, contract_id, istek.valid_from,
             istek.valid_to + timedelta(days=1) if istek.valid_to else None,
             istek.monthly_target_hours, istek.note,
         )
@@ -288,7 +306,7 @@ async def sozlesme_guncelle(staff_id: int, contract_id: int, istek: ContractUpse
 @router.delete("/{staff_id}/contracts/{contract_id}", response_model=PersonDetail,
                summary="Sözleşme sil")
 async def sozlesme_sil(staff_id: int, contract_id: int) -> PersonDetail:
-    if await repo.sozlesme_sil(contract_id) is None:
+    if await repo.sozlesme_sil(staff_id, contract_id) is None:
         raise HTTPException(status_code=404, detail="Sözleşme bulunamadı.")
     return await detay(staff_id)
 
@@ -300,7 +318,7 @@ async def izin_guncelle(staff_id: int, absence_id: int, istek: AbsenceCreate) ->
         raise HTTPException(status_code=422, detail="Bitiş tarihi başlangıçtan önce olamaz.")
     try:
         sonuc = await repo.izin_guncelle(
-            absence_id, istek.start, istek.end, istek.absence_type, istek.note
+            staff_id, absence_id, istek.start, istek.end, istek.absence_type, istek.note
         )
     except Exception as hata:  # noqa: BLE001
         if "ex_absences_no_overlap" in str(hata):

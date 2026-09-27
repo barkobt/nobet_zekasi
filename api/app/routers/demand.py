@@ -107,6 +107,12 @@ async def satir_guncelle(row_id: int, istek: TemplateRowUpdate) -> TemplateRow:
 @router.post("/need-templates/{template_id}/rows", response_model=list[NeedTemplate],
              status_code=201, summary="Şablona satır ekle")
 async def satir_ekle(template_id: int, istek: TemplateRowCreate) -> list[NeedTemplate]:
+    # Keyfi slot kodu kapsama hesabına hiç girmez, satır sessizce ölü kalır.
+    if istek.slot_code.upper() not in SLOT_ETIKET:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Geçerli slotlar: {', '.join(SLOT_ETIKET)}",
+        )
     try:
         yeni = await repo.satir_ekle(
             template_id, istek.shift_code, istek.slot_code.upper(),

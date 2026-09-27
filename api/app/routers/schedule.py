@@ -254,7 +254,8 @@ async def hucre_yaz(draft_id: int, istek: CellUpdate) -> CellResult:
     if await repo.taslak(draft_id) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
 
-    uyarilar = await repo.hucre_yaz(
+    yazildi, uyarilar = await repo.hucre_yaz(
         draft_id, istek.staff_id, istek.work_date, istek.shift_code, istek.tasks
     )
-    return CellResult(ok=True, warnings=uyarilar)
+    # ok=False → hiçbir şey yazılmadı. Arayüz "kaydedildi" demesin.
+    return CellResult(ok=yazildi, warnings=uyarilar)

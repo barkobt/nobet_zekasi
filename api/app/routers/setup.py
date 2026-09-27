@@ -53,6 +53,11 @@ async def matris() -> CompetencyMatrix:
 @router.put("/people/{staff_id}/competencies/{code}", response_model=CompetencyMatrix,
             summary="Yetkinlik kutucuğunu aç/kapa")
 async def yetkinlik_degistir(staff_id: int, code: str, ver: bool) -> CompetencyMatrix:
+    # Eskiden yazım hatası olan bir kod 200 dönüp hiçbir şey yazmıyordu.
+    if not await repo.personel_var_mi(staff_id):
+        raise HTTPException(status_code=404, detail="Personel bulunamadı.")
+    if not await repo.yetkinlik_var_mi(code):
+        raise HTTPException(status_code=404, detail=f"\"{code}\" diye bir yetkinlik yok.")
     await repo.yetkinlik_degistir(staff_id, code, ver)
     return await matris()
 
@@ -85,12 +90,18 @@ async def kural_guncelle(constraint_id: int, istek: ConstraintUpdate) -> Constra
 
     alanlar = istek.model_dump(exclude_unset=True)
     # Veritabanı kuralı: hard → ağırlık NULL, soft → ağırlık > 0 (migration 003).
-    # İkisini birlikte göndermek zorunda değil; eksik olanı burada tamamlıyoruz.
     hedef_hard = alanlar.get("is_hard", mevcut["is_hard"])
     if hedef_hard:
         alanlar["default_weight"] = None
     elif alanlar.get("default_weight") is None:
-        alanlar["default_weight"] = mevcut["default_weight"] or 50
+        if mevcut["default_weight"] is None:
+            # Zorunlu kuralın ağırlığı yoktur; esneğe çevirirken UYDURMUYORUZ.
+            # Eskiden sessizce 50 yazılıyordu ve iki tıkla ağırlık kayboluyordu.
+            raise HTTPException(
+                status_code=422,
+                detail="Esnek kuralın ağırlığı olmalı. Ağırlığı da gönderin.",
+            )
+        alanlar["default_weight"] = mevcut["default_weight"]
     alanlar["is_hard"] = hedef_hard
 
     try:
@@ -109,6 +120,15 @@ async def kural_guncelle(constraint_id: int, istek: ConstraintUpdate) -> Constra
 @router.patch("/constraint-params/{param_id}", response_model=list[Constraint],
               summary="Kural parametresini düzenle")
 async def param_guncelle(param_id: int, istek: ParamUpdate) -> list[Constraint]:
+    # Kuralın kendisi kilitliyse PARAMETRESİ de kilitli olmalı. Aksi halde
+    # "haftada en az 1 dinlenme" kuralı 99'a çekilerek kilit anlamsızlaşıyordu.
+    if (k := await repo.param_kurali(param_id)) is None:
+        raise HTTPException(status_code=404, detail="Parametre bulunamadı.")
+    if k["source"] == "yasal":
+        raise HTTPException(
+            status_code=403,
+            detail=f"{k['name']} yasal bir kural; parametresi değiştirilemez.",
+        )
     if await repo.param_guncelle(param_id, istek.param_value) is None:
         raise HTTPException(status_code=404, detail="Parametre bulunamadı.")
     return await kurallar()

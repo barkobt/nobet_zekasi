@@ -129,7 +129,15 @@ function Satir({ kural }: { kural: Constraint }) {
               <button
                 key={String(hard)}
                 type="button"
-                onClick={() => guncelle.mutate({ is_hard: hard })}
+                onClick={() =>
+                  // Esneğe çevirirken ağırlık ZORUNLU: sunucu ağırlıksız isteği
+                  // 422 ile reddediyor (eskiden sessizce 50 yazılıyordu).
+                  guncelle.mutate(
+                    hard
+                      ? { is_hard: true }
+                      : { is_hard: false, default_weight: kural.default_weight ?? 50 },
+                  )
+                }
                 aria-pressed={kural.is_hard === hard}
                 disabled={guncelle.isPending}
                 className={
@@ -178,6 +186,9 @@ function Satir({ kural }: { kural: Constraint }) {
               key={p.id}
               etiket={p.description ?? p.param_key}
               deger={p.param_value}
+              // Kural kilitliyse parametresi de kilitli: sunucu 403 döndürüyor,
+              // arayüz de düzenlenebilir göstermemeli.
+              kilitli={kural.locked}
               onKaydet={(d) => paramGuncelle.mutate({ id: p.id, deger: d })}
             />
           ))}
@@ -188,9 +199,23 @@ function Satir({ kural }: { kural: Constraint }) {
 }
 
 function Parametre({
-  etiket, deger, onKaydet,
-}: { etiket: string; deger: number; onKaydet: (d: number) => void }) {
+  etiket, deger, kilitli, onKaydet,
+}: { etiket: string; deger: number; kilitli?: boolean; onKaydet: (d: number) => void }) {
   const [v, setV] = useState(String(deger));
+  if (kilitli) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex h-8 w-16 items-center justify-center rounded-md border bg-background text-muted-foreground">
+            {deger}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[280px]">
+          {etiket} — yasal kural, değiştirilemez
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
   return (
     <Tooltip>
       <TooltipTrigger asChild>

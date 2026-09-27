@@ -215,6 +215,16 @@ async def baslangic_verisi_kopyala(draft_id: int, kaynak_id: int, kilitle: bool)
     return sayi
 
 
+async def durum(draft_id: int) -> dict | None:
+    async with cursor() as cur:
+        await cur.execute(
+            """SELECT status, (SELECT count(*) FROM assignments a WHERE a.draft_id = d.id) AS atama
+               FROM schedule_drafts d WHERE d.id = %s""",
+            (draft_id,),
+        )
+        return await cur.fetchone()
+
+
 async def sil(draft_id: int) -> dict | None:
     """Taslak silinince atamaları, koşuları ve teşhisleri de gider (ON DELETE CASCADE)."""
     async with cursor() as cur:
@@ -223,10 +233,13 @@ async def sil(draft_id: int) -> dict | None:
 
 
 async def yayinla(draft_id: int) -> dict | None:
+    """Zaten yayınlanmışsa published_at KORUNUR: tekrar basmak ilk yayın
+    zamanını siliyordu, oysa o tarih denetim için önemli."""
     async with cursor() as cur:
         await cur.execute(
             """UPDATE schedule_drafts
-                  SET status = 'yayinlandi', published_at = CURRENT_TIMESTAMP
+                  SET status = 'yayinlandi',
+                      published_at = COALESCE(published_at, CURRENT_TIMESTAMP)
                 WHERE id = %s RETURNING id""",
             (draft_id,),
         )

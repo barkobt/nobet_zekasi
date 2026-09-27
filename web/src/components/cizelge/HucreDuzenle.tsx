@@ -43,6 +43,7 @@ export function HucreDuzenle({
   );
   const [gorevler, setGorevler] = useState<string[]>(cell?.tasks ?? []);
   const [uyarilar, setUyarilar] = useState<string[]>([]);
+  const [yazildi, setYazildi] = useState(true);
 
   const kaydet = useMutation({
     mutationFn: () =>
@@ -56,8 +57,10 @@ export function HucreDuzenle({
         }),
       }),
     onSuccess: (r) => {
-      onKaydedildi();
-      if ((r.warnings ?? []).length) setUyarilar(r.warnings ?? []);
+      // ok=false → hiçbir şey yazılmadı; "kaydedildi" demek yanıltıcı olur.
+      setYazildi(r.ok);
+      if (r.ok) onKaydedildi();
+      if ((r.warnings ?? []).length || !r.ok) setUyarilar(r.warnings ?? []);
       else setAcik(false);
     },
   });
@@ -68,6 +71,7 @@ export function HucreDuzenle({
       setVardiya(cell ? cell.shift_code : absence ? "IZIN" : "BOS");
       setGorevler(cell?.tasks ?? []);
       setUyarilar([]);
+      setYazildi(true);
     }
   };
 
@@ -140,7 +144,7 @@ export function HucreDuzenle({
               <p key={u} className="text-danger" style={{ fontSize: "var(--text-xs)" }}>{u}</p>
             ))}
             <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-              Kaydedildi.
+              {yazildi ? "Kaydedildi." : "Kaydedilmedi."}
             </p>
           </div>
         )}

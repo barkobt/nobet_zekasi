@@ -3,7 +3,7 @@
 import asyncio
 from datetime import date, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from app.repositories import drafts as repo
 from app.schemas.drafts import (
@@ -208,8 +208,23 @@ async def teshisler(run_id: int) -> list[DiagnosticGroup]:
 
 
 @router.delete("/drafts/{draft_id}", status_code=204, summary="Taslağı sil")
-async def taslak_sil(draft_id: int) -> None:
+async def taslak_sil(
+    draft_id: int,
+    yayinlanmis_da_sil: bool = Query(
+        default=False, alias="force",
+        description="Yayınlanmış çizelgeyi silmek için açıkça istenmeli",
+    ),
+) -> None:
     """Atamalar, koşular ve teşhisler de gider (şemadaki ON DELETE CASCADE)."""
+    if (d := await repo.durum(draft_id)) is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+    # Yayınlanmış çizelge yürürlükteki nöbettir; tek tıkla gitmemeli.
+    if d["status"] == "yayinlandi" and not yayinlanmis_da_sil:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu çizelge yayınlanmış. Silmek için önce yayından kaldırın "
+                   "ya da silmeyi açıkça onaylayın.",
+        )
     if await repo.sil(draft_id) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
 
