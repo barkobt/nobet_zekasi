@@ -23,10 +23,9 @@ export function Izgara({
   draftId?: number;
   onDegisti?: () => void;
 }) {
-  // Hedef artık döneme orantılı (aylık hedef × gün sayısı / ayın gün sayısı), ama
-  // KIRMIZI yalnızca taslak ayın tamamını kapsıyorsa: C-004 aylık bir kuraldır,
-  // bir haftalık çizelgede "hedefin altında" demek kuralın ihlali değildir.
-  const ayTam = data.draft.covers_full_month;
+  // Hedef saat orantılanmaz (27.09): tam ay → 200 (C-004), tam hafta → 50 (C-003),
+  // başka uzunlukta hedef yok ve fark sütunu "—" gösterir. Kırmızı yalnız hedef
+  // varken ve altında kalınmışken.
   const [kapali, setKapali] = useState<Set<string>>(new Set());
 
   const degistir = (k: string) =>
@@ -166,7 +165,9 @@ export function Izgara({
                         <span className="font-medium">{sayi(satir.period_hours)} sa</span>
                         <span
                           className={
-                            ayTam && satir.period_diff < 0
+                            satir.period_diff !== null &&
+                            satir.period_diff !== undefined &&
+                            satir.period_diff < 0
                               ? "text-danger font-medium"
                               : "text-muted-foreground"
                           }

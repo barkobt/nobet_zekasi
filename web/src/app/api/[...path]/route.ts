@@ -25,10 +25,15 @@ async function proxy(req: NextRequest, path: string[]) {
     cache: "no-store",
   });
 
-  return new Response(res.body, {
-    status: res.status,
-    headers: { "content-type": res.headers.get("content-type") ?? "application/json" },
+  // Dosya indirmelerinde ad content-disposition'da geliyor; aktarılmazsa
+  // tarayıcı "cizelge.xlsx" yedek adına düşer.
+  const cikis = new Headers({
+    "content-type": res.headers.get("content-type") ?? "application/json",
   });
+  const cd = res.headers.get("content-disposition");
+  if (cd) cikis.set("content-disposition", cd);
+
+  return new Response(res.body, { status: res.status, headers: cikis });
 }
 
 type Ctx = { params: Promise<{ path: string[] }> };
@@ -43,5 +48,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   return proxy(req, (await ctx.params).path);
 }
 export async function PUT(req: NextRequest, ctx: Ctx) {
+  return proxy(req, (await ctx.params).path);
+}
+export async function DELETE(req: NextRequest, ctx: Ctx) {
   return proxy(req, (await ctx.params).path);
 }

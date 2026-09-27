@@ -131,7 +131,8 @@ export interface paths {
         delete: operations["taslak_sil_api_drafts__draft_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Taslağı yeniden adlandır */
+        patch: operations["taslak_guncelle_api_drafts__draft_id__patch"];
         trace?: never;
     };
     "/api/drafts/{draft_id}/solve": {
@@ -253,6 +254,74 @@ export interface paths {
          *     biri kısıta takılır. Normal "üzerine yazma" artık hata değil.
          */
         post: operations["taslak_yayinla_api_drafts__draft_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Çizelgeyi Excel'e aktar */
+        get: operations["excel_api_drafts__draft_id__export_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/export-ozet.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kişi özetini Excel'e aktar */
+        get: operations["excel_ozet_api_drafts__draft_id__export_ozet_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/export-eksikler.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eksikleri Excel'e aktar */
+        get: operations["excel_eksikler_api_drafts__draft_id__export_eksikler_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/drafts/{draft_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kişi özeti + eksikler */
+        get: operations["rapor_getir_api_drafts__draft_id__report_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1230,6 +1299,16 @@ export interface components {
              * @description Taslağın aralığı tam bir takvim ayı mı VE atamalar o aralığı kapsıyor mu? Aylık hedef (C-004) yalnızca bu doğruysa anlamlıdır.
              */
             covers_full_month: boolean;
+            /**
+             * Target Label
+             * @description 'Aylık hedef 200 sa' / 'Haftalık hedef 50 sa'. Hedef yoksa null.
+             */
+            target_label?: string | null;
+        };
+        /** DraftRename */
+        DraftRename: {
+            /** Name */
+            name: string;
         };
         /**
          * Group
@@ -1537,6 +1616,28 @@ export interface components {
              */
             status_label: string;
         };
+        /** PersonSummary */
+        PersonSummary: {
+            /** Staff Id */
+            staff_id: number;
+            /** Full Name */
+            full_name: string;
+            /** Role Name */
+            role_name: string;
+            /** Total Hours */
+            total_hours: number;
+            /** Night Count */
+            night_count: number;
+            /** Weekend Count */
+            weekend_count: number;
+            /**
+             * Target Hours
+             * @description Tam ay → 200, tam hafta → 50; başka dönemde null (orantı yapılmaz)
+             */
+            target_hours: number | null;
+            /** Diff Hours */
+            diff_hours: number | null;
+        };
         /** PersonUpdate */
         PersonUpdate: {
             /** First Name */
@@ -1602,6 +1703,36 @@ export interface components {
             /** Present */
             present: boolean;
         };
+        /** Report */
+        Report: {
+            /** Draft Id */
+            draft_id: number;
+            /** Draft Name */
+            draft_name: string;
+            /** Unit Name */
+            unit_name: string;
+            /** Status */
+            status: string;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description DIŞLAYICI bitiş
+             */
+            period_end: string;
+            /** Period Label */
+            period_label: string;
+            /** Target Note */
+            target_note: string | null;
+            /** People */
+            people: components["schemas"]["PersonSummary"][];
+            /** Shortfalls */
+            shortfalls: components["schemas"]["Shortfall"][];
+        };
         /** Role */
         Role: {
             /** Code */
@@ -1642,14 +1773,14 @@ export interface components {
             period_hours: number;
             /**
              * Period Target
-             * @description Aylık hedefin döneme orantılanmış hali: aylık hedef × dönem gün sayısı / ayın gün sayısı
+             * @description Dönem hedefi: tam ay → 200, tam hafta → 50. Başka uzunluktaki dönemde hedef yok (null); orantılı hesap yapılmaz.
              */
-            period_target: number;
+            period_target: number | null;
             /**
              * Period Diff
-             * @description Hedefe göre fark: pozitif fazla, negatif eksik
+             * @description Hedefe göre fark: pozitif fazla, negatif eksik. Hedef yoksa null.
              */
-            period_diff: number;
+            period_diff: number | null;
             /** Shift Count */
             shift_count: number;
         };
@@ -1728,6 +1859,28 @@ export interface components {
             is_active: boolean;
             /** Unit Name */
             unit_name: string;
+        };
+        /** Shortfall */
+        Shortfall: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Shift Code */
+            shift_code: string;
+            /** Shift Name */
+            shift_name: string;
+            /** Slot Code */
+            slot_code: string;
+            /** Slot Name */
+            slot_name: string;
+            /** Assigned */
+            assigned: number;
+            /** Required */
+            required: number;
+            /** Missing */
+            missing: number;
         };
         /**
          * SlotCoverage
@@ -2222,6 +2375,41 @@ export interface operations {
             };
         };
     };
+    taslak_guncelle_api_drafts__draft_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     coz_api_drafts__draft_id__solve_post: {
         parameters: {
             query?: never;
@@ -2434,6 +2622,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    excel_api_drafts__draft_id__export_xlsx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    excel_ozet_api_drafts__draft_id__export_ozet_xlsx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    excel_eksikler_api_drafts__draft_id__export_eksikler_xlsx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rapor_getir_api_drafts__draft_id__report_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
                 };
             };
             /** @description Validation Error */

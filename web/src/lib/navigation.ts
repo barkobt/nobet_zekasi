@@ -1,6 +1,6 @@
 import {
   Home, CalendarDays, Layers, ClipboardList,
-  Users, Grid3x3, Scale, Clock,
+  Users, Grid3x3, Scale, Clock, FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -16,6 +16,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/cizelge",   label: "Nöbet Çizelgesi", kod: "E-09", icon: CalendarDays },
       { href: "/taslaklar", label: "Taslaklar",       kod: "E-08", icon: Layers },
       { href: "/ihtiyac",   label: "İhtiyaç",         kod: "E-06", icon: ClipboardList },
+      { href: "/raporlar",  label: "Raporlar",        kod: "E-11", icon: FileText },
     ],
   },
   {

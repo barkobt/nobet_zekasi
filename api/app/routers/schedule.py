@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.hedef import donem_hedefi, donem_turu, hedef_etiketi
 from app.repositories import schedule as repo
 from app.schemas.schedule import (
     Cell, CellResult, CellUpdate, DayHeader, DraftInfo, Group, QualificationFlag, Row,
@@ -161,11 +162,10 @@ async def cizelge(
 
     aylik = {m["staff_id"]: m for m in veri["aylik"]}
 
-    # Aylık hedefi DÖNEME orantıla. Taslak bir hafta da olabiliyor; 200 saatlik
-    # aylık hedefi olduğu gibi göstermek bir haftalık çizelgede anlamsız.
-    #   orantılı hedef = aylık hedef × dönem gün sayısı / aralığın başladığı ayın gün sayısı
-    gun_sayisi = (bitis - bas).days
-    ay_gun_sayisi = (sonraki_ay - date(bas.year, bas.month, 1)).days
+    # Hedef saat: orantı YOK (bkz. app/hedef.py). Tam ay → 200, tam hafta → 50,
+    # başka uzunlukta hedef gösterilmez.
+    tur = donem_turu(bas, bitis)
+    haftalik_ref = veri["hedefler"].get("weekly_reference_hours")
 
     # --- Satırlar, rol grubuna göre -----------------------------------------
     gruplar: list[Group] = []
@@ -180,8 +180,9 @@ async def cizelge(
 
             m = aylik.get(k["id"])
             planlanan = float(m["planned_hours"]) if m else 0.0
-            aylik_hedef = float(m["min_hours"]) if m else 0.0
-            hedef = round(aylik_hedef * gun_sayisi / ay_gun_sayisi, 1) if ay_gun_sayisi else 0.0
+            hedef = donem_hedefi(
+                tur, float(m["min_hours"]) if m and m["min_hours"] else None, haftalik_ref
+            )
             satirlar.append(
                 Row(
                     staff_id=k["id"],
@@ -193,7 +194,7 @@ async def cizelge(
                     absences=izinler.get(k["id"], {}),
                     period_hours=planlanan,
                     period_target=hedef,
-                    period_diff=round(planlanan - hedef, 1),
+                    period_diff=round(planlanan - hedef, 1) if hedef is not None else None,
                     shift_count=int(m["shift_count"]) if m else 0,
                 )
             )
@@ -231,6 +232,14 @@ async def cizelge(
             id=t["id"], name=t["name"],
             period_start=t["period_start"], period_end=t["period_end"],
             status=t["status"], unit_name=t["unit_name"], covers_full_month=tam_ay,
+            target_label=hedef_etiketi(
+                tur,
+                donem_hedefi(
+                    tur,
+                    next((float(m["min_hours"]) for m in veri["aylik"] if m["min_hours"]), None),
+                    haftalik_ref,
+                ),
+            ),
         ),
         days=gunler,
         groups=gruplar,

@@ -285,6 +285,16 @@ async def yayinla(draft_id: int) -> dict | None:
         return await cur.fetchone()
 
 
+async def ad_degistir(draft_id: int, yeni_ad: str) -> dict | None:
+    """Taslağın adı kullanıcı verisidir; değiştirilebilmesi gerekir."""
+    async with cursor() as cur:
+        await cur.execute(
+            "UPDATE schedule_drafts SET name = %s WHERE id = %s RETURNING id",
+            (yeni_ad, draft_id),
+        )
+        return await cur.fetchone()
+
+
 async def kopyala(draft_id: int, yeni_ad: str) -> dict | None:
     """Aynı dönem, aynı atamalar, yeni taslak. Koşu geçmişi kopyalanmaz —
     kopya henüz çözülmemiştir; atamalar 'referans' olarak taşınır."""

@@ -10,7 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from app.repositories import drafts as repo
 from app.schemas.drafts import (
-    Diagnostic, DiagnosticGroup, Draft, DraftCopy, DraftCreate, PublishPreview,
+    Diagnostic, DiagnosticGroup, Draft, DraftCopy, DraftCreate, DraftRename,
+    PublishPreview,
     SolveAccepted, SolveRequest, SolverRun,
 )
 from app.settings import get_settings
@@ -230,6 +231,13 @@ async def taslak_sil(
         )
     if await repo.sil(draft_id) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+
+
+@router.patch("/drafts/{draft_id}", response_model=Draft, summary="Taslağı yeniden adlandır")
+async def taslak_guncelle(draft_id: int, istek: DraftRename) -> Draft:
+    if await repo.ad_degistir(draft_id, istek.name) is None:
+        raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+    return await getir(draft_id)
 
 
 @router.post("/drafts/{draft_id}/copy", response_model=Draft, status_code=201,

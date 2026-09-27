@@ -46,6 +46,13 @@ FROM v_monthly_hours mh
 WHERE mh.draft_id = %(draft_id)s
 """
 
+# Hedef saatler kodda değil veritabanında (app/hedef.py bunları kullanır).
+_HEDEF_PARAMETRELERI = """
+SELECT p.param_key, p.param_value
+FROM constraint_params p
+WHERE p.param_key IN ('monthly_min_hours', 'weekly_reference_hours')
+"""
+
 _PERSONEL = """
 SELECT s.id, s.full_name, s.is_orientation, r.code AS role_code, r.name AS role_name
 FROM staff s
@@ -104,12 +111,16 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         await cur.execute(_IZINLER, p)
         izinler = await cur.fetchall()
 
+        await cur.execute(_HEDEF_PARAMETRELERI)
+        hedefler = {r["param_key"]: float(r["param_value"]) for r in await cur.fetchall()}
+
     return {
         "personel": personel,
         "atamalar": atamalar,
         "kapsama": kapsama,
         "aylik": aylik,
         "izinler": izinler,
+        "hedefler": hedefler,
     }
 
 

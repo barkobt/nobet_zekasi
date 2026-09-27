@@ -76,11 +76,13 @@ class Row(BaseModel):
     cells: dict[str, Cell] = Field(description="ISO tarih → hücre; çalışılmayan gün anahtarı yok")
     absences: dict[str, str] = Field(default_factory=dict, description="ISO tarih → izin türü")
     period_hours: float = Field(description="Taslağın DÖNEMİNDEKİ toplam planlanan saat")
-    period_target: float = Field(
-        description="Aylık hedefin döneme orantılanmış hali: "
-                    "aylık hedef × dönem gün sayısı / ayın gün sayısı"
+    period_target: float | None = Field(
+        description="Dönem hedefi: tam ay → 200, tam hafta → 50. "
+                    "Başka uzunluktaki dönemde hedef yok (null); orantılı hesap yapılmaz."
     )
-    period_diff: float = Field(description="Hedefe göre fark: pozitif fazla, negatif eksik")
+    period_diff: float | None = Field(
+        description="Hedefe göre fark: pozitif fazla, negatif eksik. Hedef yoksa null."
+    )
     shift_count: int
 
 
@@ -111,6 +113,10 @@ class DraftInfo(BaseModel):
     covers_full_month: bool = Field(
         description="Taslağın aralığı tam bir takvim ayı mı VE atamalar o aralığı "
                     "kapsıyor mu? Aylık hedef (C-004) yalnızca bu doğruysa anlamlıdır."
+    )
+    target_label: str | None = Field(
+        default=None,
+        description="'Aylık hedef 200 sa' / 'Haftalık hedef 50 sa'. Hedef yoksa null.",
     )
 
 

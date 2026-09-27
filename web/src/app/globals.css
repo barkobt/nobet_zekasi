@@ -135,3 +135,36 @@
     }
   }
 }
+
+/* ===========================================================================
+   Yazdırma (Raporlar ekranı → PDF)
+   body[data-yazdir="kisi"|"eksik"] işareti YazdirDugmesi tarafından konur;
+   yalnız o bölüm kâğıda gider — sol menü, üst bar ve düğmeler gizlenir.
+   =========================================================================== */
+@media print {
+  @page { margin: 14mm; }
+
+  body[data-yazdir] nav[aria-label="Ana menü"],
+  body[data-yazdir] header[data-ustbar],
+  body[data-yazdir] .yazdirma-gizle {
+    display: none !important;
+  }
+
+  /* Seçili olmayan bölüm kâğıda girmez */
+  body[data-yazdir="kisi"] section[data-bolum="eksik"],
+  body[data-yazdir="eksik"] section[data-bolum="kisi"] {
+    display: none !important;
+  }
+
+  /* Kabuk kaydırma kutularını açar: tablo tam boyuyla akar */
+  body[data-yazdir] * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  body[data-yazdir] section[data-bolum] {
+    border: 0;
+    box-shadow: none;
+  }
+  body[data-yazdir] thead { display: table-header-group; }   /* başlık her sayfada */
+  body[data-yazdir] tr    { break-inside: avoid; }
+}

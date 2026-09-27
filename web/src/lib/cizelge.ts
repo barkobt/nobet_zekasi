@@ -29,6 +29,9 @@ export const IZIN_ADI: Record<string, string> = {
 export const sayi = (n: number) =>
   new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(n);
 
-/** Satır sonu farkı: +12 / −8 (DESIGN §6). Eksi işareti U+2212, tire değil. */
-export const fark = (n: number) =>
-  n === 0 ? "0" : n > 0 ? `+${sayi(n)}` : `−${sayi(Math.abs(n))}`;
+/** Satır sonu farkı: +12 / −8 (DESIGN §6). Eksi işareti U+2212, tire değil.
+ *  Hedefi olmayan dönemde (ne tam ay ne tam hafta) hedef yok → "—". */
+export const fark = (n: number | null | undefined) =>
+  n === null || n === undefined
+    ? "—"
+    : n === 0 ? "0" : n > 0 ? `+${sayi(n)}` : `−${sayi(Math.abs(n))}`;

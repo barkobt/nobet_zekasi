@@ -83,6 +83,10 @@ class PublishPreview(BaseModel):
     reason: str | None = Field(default=None, description="Uygulanamıyorsa sebebi")
 
 
+class DraftRename(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
 class DraftCopy(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
