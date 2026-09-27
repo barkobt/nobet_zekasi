@@ -134,8 +134,9 @@ def _sayfa_cizelge(ws, t: dict, gunler: list[date], veri: dict) -> None:
     ws["A1"] = (f"Acıbadem Kent ASG · {t['unit_name']} — "
                 f"{_donem_etiketi(gunler[0], gunler[-1])} Nöbet Çizelgesi")
     ws["A1"].font = Font(bold=True, size=14, color=BRAND)
+    # Oluşturulma = taslağın kendi tarihi, dosyanın indirildiği gün değil.
     ws["A2"] = (f"Durum: {DURUM_ADI.get(t['status'], t['status'])} · "
-                f"Oluşturulma: {_tarih(date.today())}")
+                f"Oluşturulma: {_tarih(t['created_at'].date())}")
     ws["A2"].font = Font(color=GRI, size=10)
     ws["A3"] = ACIKLAMA
     ws["A3"].font = Font(color=GRI, size=9)

@@ -75,7 +75,7 @@ WHERE ab.period && daterange(%(gun_bas)s, %(gun_son)s, '[]')
 # ilk_gun / son_gun: atamalar taslağın aralığının TAMAMINI kapsıyor mu? Aylık hedef karşılaştırması
 # (C-004, kişi başı 200 saat) yalnızca tam aylık taslakta anlamlıdır.
 _TASLAK = """
-SELECT d.id, d.name, d.status, u.name AS unit_name,
+SELECT d.id, d.name, d.status, d.created_at, u.name AS unit_name,
        lower(d.period) AS period_start,
        upper(d.period) AS period_end,
        (SELECT min(work_date) FROM assignments WHERE draft_id = d.id) AS ilk_gun,
