@@ -17,6 +17,9 @@ out/
 .turbo/
 *.tsbuildinfo
 
+# Kağıt çizelge fotoğrafları ve dökümü: gerçek personel adları içerir
+docs/kagit-cizelge/
+
 # Araç çıktıları
 web/src/lib/api-types.ts.tmp
 .vercel
