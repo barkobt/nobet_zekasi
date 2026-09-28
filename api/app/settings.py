@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     db_pool_min: int = 1
     db_pool_max: int = 10
 
+    # Neon boştaki hesaplamayı uykuya alır (varsayılan 5 dk) ve havuzdaki eski
+    # bağlantılar sessizce kopar — belirtisi ilk isteğin "SSL connection has been
+    # closed unexpectedly" ile düşmesi. İki ayarla kapatılıyor:
+    #   max_idle     → boşta bekleyen bağlantı bu süreden sonra kapanır
+    #   max_lifetime → bağlantı yaşı ne olursa olsun bu süreden sonra yenilenir
+    #                  (min_size'daki bağlantı max_idle ile kapanmaz, bu onu da yeniler)
+    # İkisi de Neon'un uyku süresinin ALTINDA olmalı.
+    db_pool_max_idle: int = 120
+    db_pool_max_lifetime: int = 240
+
     # Hangi solver çağrılacak. model.py bitene kadar 'stub'.
     solver_impl: Literal["stub", "cpsat"] = "stub"
     # Adım 5 ölçümü: adalet katmanıyla çözüm kalitesi ~30 sn'de platoya oturuyor

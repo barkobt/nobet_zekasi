@@ -25,6 +25,9 @@ class Staff(BaseModel):
 class HealthCheck(BaseModel):
     status: Literal["ok", "hata"]
     db: bool
+    kullanici: str | None = Field(
+        default=None, description="Veritabanına bağlanan rol — canlıda nobet_app olmalı"
+    )
     tablo: int | None = None
     view: int | None = None
     aktif_personel: int | None = None

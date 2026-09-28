@@ -7,6 +7,7 @@ from app.db import cursor
 # gözlemlenebilir bir olguya çeviriyor — aksi halde hata ancak ekran açılınca görülür.
 _BEKLENEN = """
 SELECT
+    current_user                                                                  AS kullanici,
     (SELECT count(*) FROM information_schema.tables
       WHERE table_schema='public' AND table_type='BASE TABLE')                    AS tablo,
     (SELECT count(*) FROM information_schema.views WHERE table_schema='public')   AS view,
@@ -60,6 +61,7 @@ async def kontrol() -> dict:
         eksik.append("015 (istek gücü KESIN/MUMKUNSE)")
     sema_guncel = not eksik
     return {
+        "kullanici": satir["kullanici"],
         "tablo": satir["tablo"],
         "view": satir["view"],
         "aktif_personel": satir["aktif_personel"],

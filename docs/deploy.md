@@ -112,6 +112,7 @@ Aynı değer hem Railway'e hem Vercel'e girilir; ikisi eşleşmezse API 401 dön
 | `ENVIRONMENT` | Railway | `production` (dokümantasyon uçlarını kapatır) | Claude — CLI |
 | `SOLVER_TIME_LIMIT_S` | Railway | `60` | Claude — CLI ✅ |
 | `DB_POOL_MIN` / `DB_POOL_MAX` | Railway | `1` / `10` | Claude — CLI ✅ |
+| `DB_POOL_MAX_IDLE` / `DB_POOL_MAX_LIFETIME` | Railway | `120` / `240` (Neon uykusundan kısa) | varsayılan yeterli |
 | `API_BASE_URL` | Vercel | `https://nobet-zekasi-api-production.up.railway.app` | Claude — CLI ✅ |
 | `DEMO_API_TOKEN` | Vercel | Railway'dekiyle **birebir aynı** | **Baran** — dashboard |
 | `DEMO_PASSWORD` | Vercel | Yöneticilere verilecek demo şifresi | **Baran** — dashboard |

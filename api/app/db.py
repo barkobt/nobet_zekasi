@@ -19,6 +19,12 @@ async def open_pool() -> AsyncConnectionPool:
         conninfo=settings.database_url,
         min_size=settings.db_pool_min,
         max_size=settings.db_pool_max,
+        # Bağlantı havuzdan ÇIKARKEN sınanır: kopmuşsa atılır ve yenisi kurulur.
+        # Neon uykudan dönerken ilk isteğin hata vermesinin çözümü budur —
+        # kullanıcı hatayı görmez, yalnız ilk istek biraz uzun sürer.
+        check=AsyncConnectionPool.check_connection,
+        max_idle=settings.db_pool_max_idle,
+        max_lifetime=settings.db_pool_max_lifetime,
         kwargs={"row_factory": dict_row},
         open=False,
     )
