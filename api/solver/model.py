@@ -222,6 +222,7 @@ class Cozum:
         self.amac: Decimal | None = None
         self.atamalar: list[tuple[int, date, str]] = []
         self.rozetler: list[tuple[int, date, str, str]] = []   # kişi, gün, vardiya, görev
+        self.takviyeler: list[tuple[int, date, str]] = []      # C-022 acil takviye
         self.eksikler: list[Eksik] = []
         self.cozum_suresi: float = 0.0
         self.degisken_sayisi: int = 0
@@ -300,6 +301,9 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
         if len(degiskenler) > 1:
             model.add_at_most_one(degiskenler)
 
+    # ----- C-022: acil takviye değişkenleri (kapsama kısıtından ÖNCE) -----
+    takviye = _acil_takviye_degiskenleri(model, v, x)
+
     # ----- Kısıt 2: genel mevcut (gevşetilebilir) -----
     # Gereken sayı koda YAZILMAZ, ihtiyaç şablonunun GENEL satırlarından gelir.
     sabit_kapsama = _sabit_kapsama_sayimi(v)
@@ -323,8 +327,12 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
             continue
         for g in satir.gunler:
             e = gevset(g, satir.vardiya_kodu, "GENEL", satir.min_sayi, satir.kural_kodu)
+            # Acil takviye (C-022) genel mevcuda SAYILIR — tek amacı bu.
+            takviyeler = [d for (_p, gun, kod), d in takviye.items()
+                          if gun == g and kod == satir.vardiya_kodu]
             model.add(
                 sum(gunun_atamalari.get((g, satir.vardiya_kodu), []))
+                + sum(takviyeler)
                 + sabit_kapsama.get((g, satir.vardiya_kodu), 0) + e >= satir.min_sayi
             )
 
@@ -334,12 +342,12 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     _iki_gece_sonrasi_bos(model, v, kisiler, gece, calisiyor, tum_gunler, donem)  # C-014
     _gece_sonrasi_gunduz_yok(model, kisiler, gece, gunduz, tum_gunler, donem)     # C-021
     _haftalik_bos_gun(model, v, kisiler, calisiyor, tum_gunler, donem)     # C-016
-    _oryantasyon_esi(model, v, x, engelli)                                # C-020
+    _oryantasyon_esi(model, v, x, takviye, engelli)                       # C-020
 
     # ----- Görevler (Adım 4) -----
     t = _gorev_degiskenleri(model, v, x, kapsama_sayilan)
     sonuc.gorev_degiskeni = len(t)
-    _gorev_kisitlari(model, v, x, t, kapsama_sayilan, gevset)
+    _gorev_kisitlari(model, v, x, t, kapsama_sayilan, gevset, takviye)
     _yetkinlik_slotlari(model, v, x, sorumlu_plani, gevset)
 
     # ----- Amaç -----
@@ -356,6 +364,10 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     for (_g, _vd, _slot), (e, kural_kodu, _n) in eksik.items():
         kural = v.kurallar.get(kural_kodu) if kural_kodu else None
         temel.append((int(kural.agirlik) if kural and kural.agirlik else EKSIK_CEZASI_YEDEK, e))
+    takviye_kural = v.kural("C-022")
+    if takviye and takviye_kural and takviye_kural.agirlik:
+        temel.append((int(takviye_kural.agirlik), sum(takviye.values())))
+
     adalet_terimleri, olcumler = _adalet_ve_saat(model, v, x, t, kapsama_sayilan)
     adalet_terimleri += _tercihler(model, v, x, t, kapsama_sayilan, olcumler)
     sonuc.hedefler = olcumler["hedefler"]
@@ -388,6 +400,7 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
         sonuc.atamalar = [anahtar for anahtar, d in x.items() if solver.value(d)]
         sonuc.atamalar += list(sorumlu_plani)
         sonuc.rozetler = [anahtar for anahtar, d in t.items() if solver.value(d)]
+        sonuc.takviyeler = [anahtar for anahtar, d in takviye.items() if solver.value(d)]
         sonuc.saat_eksikleri = {
             p_id: solver.value(e) for p_id, e in olcumler["eksik_saat"].items()
             if solver.value(e) > 0
@@ -533,7 +546,7 @@ def _haftalik_bos_gun(model, v: SolverVerisi, kisiler, calisiyor, tum_gunler, do
             model.add(sum(calisiyor(p.id, g) for g in gunler) <= len(gunler) - en_az)
 
 
-def _oryantasyon_esi(model, v: SolverVerisi, x: dict, engelli: set) -> None:
+def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict, engelli: set) -> None:
     """C-020: oryantasyondaki kişi eşiyle aynı gün aynı vardiyada.
 
     EŞİTLİK: eğitim hemşiresi hangi vardiyada çalışıyorsa oryantasyondaki de
@@ -548,6 +561,11 @@ def _oryantasyon_esi(model, v: SolverVerisi, x: dict, engelli: set) -> None:
     Eşin alabildiği ama oryantasyondakinin alamadığı bir vardiya varsa (örn.
     eş gece çalışabiliyor, oryantasyondaki yalnız gündüz) eşe kısıt konmaz:
     eğitim hemşiresinin başka görevleri olabilir.
+
+    ACİL TAKVİYE (C-022): eşitlik takviye değişkeniyle gevşer.
+        x[oryantasyon] >= x[eş]              eş çalışıyorsa yanındadır (gölgeleme)
+        x[oryantasyon] <= x[eş] + takviye    eşsiz çalışması YALNIZ takviyeyle olur
+    İkisi birlikte, takviye 0 iken eski eşitliğin aynısıdır.
     """
     for o in v.personel:
         if not o.oryantasyonda or o.buddy_id is None:
@@ -559,11 +577,16 @@ def _oryantasyon_esi(model, v: SolverVerisi, x: dict, engelli: set) -> None:
                 oryantasyon = x.get((o.id, g, s.kod))
                 if oryantasyon is None:
                     continue
+                tak = takviye.get((o.id, g, s.kod))
                 es = x.get((o.buddy_id, g, s.kod))
                 if es is None:
-                    model.add(oryantasyon == 0)            # eş o vardiyayı hiç alamıyor
-                else:
+                    # Eş o vardiyayı hiç alamıyor: yalnız acil takviyeyle çalışabilir.
+                    model.add(oryantasyon <= (tak if tak is not None else 0))
+                elif tak is None:
                     model.add(oryantasyon == es)
+                else:
+                    model.add(oryantasyon >= es)
+                    model.add(oryantasyon <= es + tak)
 
 
 def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
@@ -796,6 +819,33 @@ def _beklenen_yukler(v: SolverVerisi) -> dict[str, int]:
     return yuk
 
 
+def _acil_takviye_degiskenleri(model, v: SolverVerisi, x: dict) -> dict:
+    """C-022: oryantasyondaki kişinin genel mevcuda SAYILDIĞI atama kipi.
+
+    Aynı kişi-gün-vardiya için iki kip var: normal (eğitim hemşiresinin yanında,
+    mevcuda sayılmaz) ve TAKVİYE (eşsiz olabilir, mevcuda sayılır). Ayrı bir
+    boole bunu işaretliyor; takviye ancak kişi o vardiyada çalışıyorsa açılabilir.
+
+    Ambulans yasağı ayrı bir kısıt gerektirmiyor: oryantasyondakilere zaten hiç
+    görev değişkeni açılmıyor (_gorev_degiskenleri kapsamaya sayılanlarla sınırlı),
+    dolayısıyla ambulans rozeti de alamıyorlar. Aynı sebeple triyaj/gözlem yetkin
+    sayımına da katılmıyorlar — istenen davranış bu.
+    """
+    if v.kural("C-022") is None:
+        return {}
+    takviye: dict[tuple[int, date, str], cp_model.IntVar] = {}
+    for p in v.personel:
+        if not p.oryantasyonda:
+            continue
+        for (p_id, g, vardiya_kodu), calisiyor in x.items():
+            if p_id != p.id:
+                continue
+            tak = model.new_bool_var(f"takviye_{p_id}_{g}_{vardiya_kodu}")
+            model.add(tak <= calisiyor)
+            takviye[p_id, g, vardiya_kodu] = tak
+    return takviye
+
+
 def _gorev_degiskenleri(model, v: SolverVerisi, x: dict, kapsama_sayilan: set[int]) -> dict:
     """t[kişi, gün, vardiya, görev] — yalnız kind='TASK' yetkinlikler için.
 
@@ -828,7 +878,7 @@ def _gorev_degiskenleri(model, v: SolverVerisi, x: dict, kapsama_sayilan: set[in
 
 
 def _gorev_kisitlari(model, v: SolverVerisi, x: dict, t: dict,
-                     kapsama_sayilan: set[int], gevset) -> None:
+                     kapsama_sayilan: set[int], gevset, takviye: dict) -> None:
     """C-011, C-010, ayrıklık, tam bölme ve C-009."""
     yetkinlik = {p.id: p.yetkinlikler for p in v.personel}
     kalan_kural = v.kural("C-009").kod if v.kural("C-009") else None
@@ -896,6 +946,7 @@ def _gorev_kisitlari(model, v: SolverVerisi, x: dict, t: dict,
     # SESSİZCE hiç kurulmuyordu (13 Kasım gecesi triyaj boş kaldı). Bağlantı
     # değişse bile kural yerinde kalsın diye artık katalog kodundan geliyor.
     kalan_kural = v.kural("C-009")
+    kalanlar: dict[tuple[date, str], list] = {}
     if kalan_kural is not None:
         # Ambulans görevinin hangi gün ve vardiyalarda var olduğu ihtiyaç
         # satırlarından gelir; kısıt o kümede kurulur.
@@ -928,7 +979,19 @@ def _gorev_kisitlari(model, v: SolverVerisi, x: dict, t: dict,
                     continue
                 # Gevşeme değişkeni YOK. Kadro yetmezse ambulans eksik kalır
                 # (o slot gevşetilebilir), alan asla boşalmaz.
-                model.add(sum(alandakiler) - sum(ambulanstakiler) >= asgari)
+                kalan = sum(alandakiler) - sum(ambulanstakiler)
+                model.add(kalan >= asgari)
+                kalanlar.setdefault((g, vardiya_kodu), []).append(kalan)
+
+    # C-022 (c): acil takviyeyle yazılan oryantasyondaki kişi alanda YALNIZ
+    # kalmaz — ambulans çıktıktan sonra en az 1 yetkin kişi durmalı. C-009 her
+    # alan için bunu zaten sağlıyor; burada toplam üzerinden bağlıyoruz ki
+    # kadro çok daraldığında (alanlar boşaldığında) takviye de kapansın.
+    for (g, vardiya_kodu), kalan_ifadeler in kalanlar.items():
+        tak = [d for (_p, gun, kod), d in takviye.items()
+               if gun == g and kod == vardiya_kodu]
+        if tak:
+            model.add(sum(tak) <= sum(kalan_ifadeler))
 
 
 def _yetkinlik_slotlari(model, v: SolverVerisi, x: dict,
@@ -1095,6 +1158,7 @@ def _teshisleri_yaz(cur, run_id: int, v: SolverVerisi, cozum: Cozum) -> int:
         aciklama.eksik_aciklamalari(v, cozum, run_id)
         + aciklama.saat_aciklamalari(v, cozum, run_id)
         + aciklama.istek_aciklamalari(v, cozum, run_id)
+        + aciklama.takviye_aciklamalari(v, cozum, run_id)
     )
     if satirlar:
         cur.executemany(

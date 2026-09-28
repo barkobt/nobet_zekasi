@@ -38,7 +38,7 @@ SORUMLU_ROL = "sorumlu_hemsire"
 KATI_KURALLAR = frozenset({
     "A-1", "A-2", "A-3", "A-4", "A-5",
     "C-002", "C-014", "C-021", "C-016", "C-020",
-    "D-3", "D-8", "D-9",
+    "D-3", "D-8", "D-9", "D-10",
 })
 
 
@@ -217,6 +217,26 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
                                           f"{kod} vardiyasında eşi ({ad[o.buddy_id]}) yok"))
 
     ihlaller += _gorev_kontrolleri(v, atamalar, kisi, ad)
+
+    # D-10 (C-022): oryantasyondaki kişi eşsiz çalışıyorsa acil takviyedir.
+    # C-020 ihlali olarak değil, uyarı olarak raporlanır; ayrıca ambulansa
+    # çıkmadığı ve alanda yalnız kalmadığı denetlenir.
+    gece_kodlari2 = {s.kod for s in v.vardiyalar if s.gece_mi}
+    for a in atamalar:
+        p = kisi[a["staff_id"]]
+        if not p.oryantasyonda or p.buddy_id is None:
+            continue
+        esi_var = any(b["staff_id"] == p.buddy_id and b["work_date"] == a["work_date"]
+                      and b["vardiya_kodu"] == a["vardiya_kodu"] for b in atamalar)
+        if esi_var:
+            continue
+        if "AMBULANS" in set(a["gorevler"]):
+            ihlaller.append(Ihlal("D-10", "C-022 · acil takviye", p.ad, a["work_date"],
+                                  "acil takviyeyken ambulansa çıkmış"))
+        else:
+            ihlaller.append(Ihlal("D-10", "C-022 · acil takviye", p.ad, a["work_date"],
+                                  f"{a['vardiya_kodu']} vardiyasında eşsiz — acil takviye",
+                                  seviye_ustu="uyari"))
     return ihlaller
 
 
@@ -295,7 +315,7 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
 
 KURAL_SIRASI = ["A-1", "A-2", "A-3", "A-4", "A-5",
                 "C-002", "C-014", "C-021", "C-016", "C-020",
-                "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9"]
+                "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9", "D-10"]
 KURAL_ADI = {
     "A-1": "Günde en fazla 1 vardiya",
     "A-2": "Çalışma tipi — sadece gündüz / sadece gece (C-017)",
@@ -316,6 +336,7 @@ KURAL_ADI = {
     "D-7": "Vardiyada en az 1 sayım yetkilisi",
     "D-8": "Rozet verilen kişide yetkinlik var mı",
     "D-9": "C-009 · ambulans sonrası alanda kalan",
+    "D-10": "C-022 · oryantasyon acil takviye",
 }
 
 

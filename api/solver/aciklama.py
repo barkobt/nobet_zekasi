@@ -210,6 +210,22 @@ def saat_aciklamalari(v: SolverVerisi, cozum, run_id: int) -> list[tuple]:
     return satirlar
 
 
+def takviye_aciklamalari(v: SolverVerisi, cozum, run_id: int) -> list[tuple]:
+    """C-022: acil takviye olarak yazılan oryantasyondaki personel."""
+    kural = v.kural("C-022")
+    ad = {p.id: p.ad for p in v.personel}
+    satirlar = []
+    for p_id, g, vardiya_kodu in sorted(getattr(cozum, "takviyeler", []), key=lambda k: (k[1], k[0])):
+        vardiya = VARDIYA_ADI.get(vardiya_kodu, vardiya_kodu)
+        satirlar.append((
+            run_id, "uyari", kural.id if kural else None, g,
+            f"{vardiya}: {ad[p_id]} (oryantasyon) acil takviye olarak yazıldı.",
+            "Genel mevcut başka türlü tamamlanamadı. Oryantasyondaki kişi ambulansa"
+            " çıkmaz ve alanda yalnız bırakılmaz.",
+        ))
+    return satirlar
+
+
 def istek_aciklamalari(v: SolverVerisi, cozum, run_id: int) -> list[tuple]:
     """O-006: karşılanamayan "mümkünse" tercihleri."""
     kural = v.kural("O-006")
