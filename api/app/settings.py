@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # 25 sn'de üç koşudan birinde daha dengesiz bir çizelge çıkıyordu.
     solver_time_limit_s: int = 60
 
+    # Erken durdurma: bu kadar saniye daha iyi çözüm bulunamazsa arama biter.
+    # Adım 5 ölçümü: kalite ~30 sn'de platoya oturuyor ama optimallik
+    # kanıtlanmadığı için solver üst sınıra kadar bekliyordu. 0 = kapalı.
+    solver_no_improvement_s: int = 15
+
     # CP-SAT işçi sayısı. Çekirdekten FAZLA işçi çözümü hızlandırmaz, yavaşlatır:
     # işçiler aynı çekirdek için yarışır. Railway'in verdiği vCPU'ya göre ayarlanır.
     solver_workers: int = 8

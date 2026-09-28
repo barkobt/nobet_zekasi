@@ -38,6 +38,7 @@ Bu adımda BİLEREK YOK: C-013 uyumsuz kişi cezası (veri yok).
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -132,6 +133,10 @@ def run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult:
                     (cozum.durum, cozum.amac, Json(_parametre_fotografi(veri, cozum)), run_id),
                 )
                 conn.commit()
+                # Kontrolcü ancak COMMIT'ten SONRA koşabilir: kendi bağlantısını
+                # açıyor ve yazılmamış satırları göremez.
+                teshis_sayisi += _kontrolcuyu_calistir(cur, run_id, draft_id, veri)
+                conn.commit()
             except Exception as hata:  # noqa: BLE001 — koşu kaydı her hâlükârda kapanmalı
                 conn.rollback()
                 cur.execute(
@@ -169,6 +174,48 @@ class Eksik:
     gereken: int
 
 
+class _IyilesmeIzleyici(cp_model.CpSolverSolutionCallback):
+    """Her yeni çözümde saati sıfırlar. Durdurma kararını gözcü iş parçacığı verir."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.son_iyilesme = time.monotonic()
+        self.cozum_sayisi = 0
+
+    def on_solution_callback(self) -> None:
+        self.son_iyilesme = time.monotonic()
+        self.cozum_sayisi += 1
+
+
+def _durgunlukta_durdur(solver: cp_model.CpSolver, izleyici: _IyilesmeIzleyici,
+                        esik_s: int, bitti: threading.Event) -> dict:
+    """X saniye daha iyi çözüm gelmezse aramayı durdurur.
+
+    NEDEN AYRI İŞ PARÇACIĞI: çözüm geri çağırması yalnız YENİ bir çözüm bulununca
+    çalışır. Solver 5. saniyede iyi bir çözüm bulup sonra hiç iyileşme bulamazsa
+    geri çağırma bir daha hiç tetiklenmez — yani durdurma kararını orada veremeyiz.
+    Bu iş parçacığı yarım saniyede bir saate bakar ve gerekirse stop_search()
+    çağırır; CP-SAT'ın kendi max_time_in_seconds'ı üst sınır olarak kalır.
+    """
+    durum = {"durdurdu": False, "durgunluk_s": 0.0}
+    if not esik_s:
+        return durum
+
+    def gozcu() -> None:
+        while not bitti.wait(0.5):
+            durgun = time.monotonic() - izleyici.son_iyilesme
+            if durgun >= esik_s:
+                durum["durdurdu"] = True
+                durum["durgunluk_s"] = round(durgun, 1)
+                solver.stop_search()
+                return
+
+    iplik = threading.Thread(target=gozcu, name="solver-durgunluk", daemon=True)
+    iplik.start()
+    durum["iplik"] = iplik
+    return durum
+
+
 class Cozum:
     def __init__(self) -> None:
         self.durum: SolverStatus = "HATA"
@@ -183,6 +230,8 @@ class Cozum:
         self.karsilanmayan_istekler: list[tuple[int, date, str]] = []
         self.hedefler: dict[str, int] = {}            # adalet hedefleri (rapor için)
         self.kisit_sayisi: int = 0
+        self.erken_durdu: bool = False
+        self.durgunluk_s: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -303,8 +352,18 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     solver.parameters.random_seed = RASTGELE_TOHUM
 
     model.minimize(sum(agirlik * ifade for agirlik, ifade in temel + adalet_terimleri))
-    solver.parameters.max_time_in_seconds = float(time_limit_s)
-    durum = solver.solve(model)
+    solver.parameters.max_time_in_seconds = float(time_limit_s)      # üst sınır
+    izleyici = _IyilesmeIzleyici()
+    bitti = threading.Event()
+    gozcu = _durgunlukta_durdur(solver, izleyici, get_settings().solver_no_improvement_s, bitti)
+    try:
+        durum = solver.solve(model, izleyici)
+    finally:
+        bitti.set()
+        if (iplik := gozcu.get("iplik")) is not None:
+            iplik.join(timeout=2)
+    sonuc.erken_durdu = gozcu["durdurdu"]
+    sonuc.durgunluk_s = gozcu["durgunluk_s"]
 
     sonuc.durum = _durumu_cevir(durum)
     sonuc.cozum_suresi = solver.wall_time
@@ -788,35 +847,46 @@ def _gorev_kisitlari(model, v: SolverVerisi, x: dict, t: dict,
         e = gevset(g, vardiya_kodu, "ROZETSIZ", len(degiskenler), bolme_kural)
         model.add(e == sum(degiskenler))
 
-    # C-009: ambulanstan sonra alanda kalan
-    for satir, gorev in gorev_satirlari:
-        if gorev != "AMBULANS":
-            continue
-        kural = v.kurallar.get(satir.kural_kodu) if satir.kural_kodu else None
+    # C-009: ambulanstan sonra alanda kalan — KATI, hiçbir koşulda gevşemez.
+    #
+    # KURAL KATALOG KODUYLA OKUNUR, ihtiyaç satırının kuralından DEĞİL. Sebep:
+    # seeds/016 ambulans satırını 'ambulance_crew_size'a bağladı; parametreler ise
+    # C-009'da duruyor. Satırın kuralından okuyunca parametre bulunamıyor ve kısıt
+    # SESSİZCE hiç kurulmuyordu (13 Kasım gecesi triyaj boş kaldı). Bağlantı
+    # değişse bile kural yerinde kalsın diye artık katalog kodundan geliyor.
+    kalan_kural = v.kural("C-009")
+    if kalan_kural is not None:
+        # Ambulans görevinin hangi gün ve vardiyalarda var olduğu ihtiyaç
+        # satırlarından gelir; kısıt o kümede kurulur.
+        ambulans_gunleri: set[tuple[date, str]] = set()
+        for satir, gorev in gorev_satirlari:
+            if gorev == "AMBULANS":
+                ambulans_gunleri.update((g, satir.vardiya_kodu) for g in satir.gunler)
+
         for alan, param in (("TRIYAJ", "min_remaining_triage"),
                             ("GOZLEM", "min_remaining_observation")):
-            if kural is None or param not in kural.parametreler:
+            if param not in kalan_kural.parametreler:
                 continue
-            asgari = int(kural.parametreler[param])
-            for g in satir.gunler:
+            asgari = int(kalan_kural.parametreler[param])
+            for g, vardiya_kodu in sorted(ambulans_gunleri):
                 alandakiler, ambulanstakiler = [], []
                 for p_id in kapsama_sayilan:
-                    rozet = t.get((p_id, g, satir.vardiya_kodu, alan))
+                    rozet = t.get((p_id, g, vardiya_kodu, alan))
                     if rozet is None:
                         continue
                     alandakiler.append(rozet)
-                    amb = t.get((p_id, g, satir.vardiya_kodu, "AMBULANS"))
+                    amb = t.get((p_id, g, vardiya_kodu, "AMBULANS"))
                     if amb is None:
                         continue
                     # "Hem bu alanda hem ambulansta" bir ÇARPIM. Tek eşitsizlikle
-                    # doğrusallaştırıyoruz: ikisi de 1 ise 1'e zorlanır. Üst sınıra
-                    # gerek yok — kısıt bu değişkeni zaten küçük tutmak istiyor.
+                    # doğrusallaştırıyoruz: ikisi de 1 ise 1'e zorlanır.
                     birlikte = model.new_bool_var(f"amb_{alan}_{p_id}_{g}")
                     model.add(birlikte >= rozet + amb - 1)
                     ambulanstakiler.append(birlikte)
-                # C-009 KATI (28.09 kararı): gevşeme değişkeni yok. Triyajdan iki
-                # kişinin birden çıkması yasak değil — 3 triyajcıdan 2'si giderse
-                # 1 kalır, asgari sağlanır.
+                if not alandakiler:
+                    continue
+                # Gevşeme değişkeni YOK. Kadro yetmezse ambulans eksik kalır
+                # (o slot gevşetilebilir), alan asla boşalmaz.
                 model.add(sum(alandakiler) - sum(ambulanstakiler) >= asgari)
 
 
@@ -997,6 +1067,56 @@ def _teshisleri_yaz(cur, run_id: int, v: SolverVerisi, cozum: Cozum) -> int:
     return len(satirlar)
 
 
+def _kontrolcuyu_calistir(cur, run_id: int, draft_id: int, v: SolverVerisi) -> int:
+    """Her çözümden sonra bağımsız kontrolcüyü koşturur.
+
+    NEDEN: C-009'un "alanda kalan" kuralı seeds/016'da bir bağlantı değişince
+    SESSİZCE kurulmaz oldu ve bunu ancak haftalar sonra, ekrana bakarken fark
+    ettik. Kontrolcü zaten vardı ama elle çağrılıyordu. Artık her koşu kendi
+    sonucunu denetliyor; katı bir kural ihlal edilmişse E-10'un en üstünde
+    kırmızı görünür.
+
+    Yalnız KATI kurallar 'hata' sayılır. Gevşetilebilir slot eksikleri (triyaj
+    sayısı, ambulans mevcudu …) kadro yetmediğinde beklenen davranıştır ve solver
+    onları zaten kendi teşhisinde bildirir.
+    """
+    from solver import validate
+
+    try:
+        ihlaller = [i for i in validate.kontrol_et(v, validate.atamalari_oku(draft_id)) if i.kati]
+    except Exception as hata:  # noqa: BLE001 — kontrolcü çökerse çözüm kaybolmasın
+        cur.execute(
+            """INSERT INTO solver_diagnostics (solver_run_id, severity, message, suggestion)
+               VALUES (%s, 'hata', %s, %s)""",
+            (run_id, f"Kontrolcü çalıştırılamadı: {hata}",
+             "Çizelge yazıldı ama denetlenemedi. solver/validate.py'yi elle koşturun."),
+        )
+        return 1
+    if not ihlaller:
+        return 0
+
+    kod_id = {k.katalog_kodu: k.id for k in v.kurallar.values() if k.katalog_kodu}
+    satirlar = [(
+        run_id, "hata", None, None,
+        f"Kontrolcü {len(ihlaller)} katı kural ihlali buldu — çizelge güvenilir değil.",
+        "Bu bir model hatasıdır: solver kurala uymayan bir çizelge üretti."
+        " Aşağıdaki kalemlere bakın.",
+    )]
+    for i in ihlaller[:20]:
+        satirlar.append((
+            run_id, "hata", kod_id.get(i.kod), i.gun,
+            f"{i.kod} {i.kural} — {i.personel}: {i.aciklama}",
+            "Katı kural ihlali.",
+        ))
+    cur.executemany(
+        """INSERT INTO solver_diagnostics
+             (solver_run_id, severity, constraint_id, work_date, message, suggestion)
+           VALUES (%s, %s, %s, %s, %s, %s)""",
+        satirlar,
+    )
+    return len(satirlar)
+
+
 def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
     """'solver': 'cpsat' arayüzdeki "Referans kopya (solver değil)" etiketini kaldırır."""
     return {
@@ -1015,6 +1135,8 @@ def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
         "adalet_hedefleri": cozum.hedefler,
         "cozucu": {"tohum": RASTGELE_TOHUM, "isci": get_settings().solver_workers},
         "sorumlu_cumartesi": SORUMLU_CUMARTESI,
+        "erken_durdu": cozum.erken_durdu,
+        "durgunluk_s": cozum.durgunluk_s,
         "model": {"degisken": cozum.degisken_sayisi,
                   "gorev_degiskeni": cozum.gorev_degiskeni, "kisit": cozum.kisit_sayisi,
                   "cozum_suresi_s": round(cozum.cozum_suresi, 3)},

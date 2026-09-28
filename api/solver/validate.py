@@ -30,6 +30,18 @@ C016_ASGARI_BILINEN_GUN = 4   # bkz. solver/model.py
 SORUMLU_ROL = "sorumlu_hemsire"
 
 
+# KATI kurallar: solver bunları ASLA ihlal etmemeli. Kontrolcü burada bir şey
+# bulursa modelde hata var demektir — koşu sonunda 'hata' teşhisi yazılır.
+# Listede OLMAYANLAR gevşetilebilir slot asgarileridir (D-1, D-2, D-5, D-6, D-7):
+# kadro yetmediğinde eksik kalmaları beklenen davranıştır ve solver zaten
+# kendi teşhisinde bildirir.
+KATI_KURALLAR = frozenset({
+    "A-1", "A-2", "A-3", "A-4", "A-5",
+    "C-002", "C-014", "C-021", "C-016", "C-020",
+    "D-3", "D-8", "D-9",
+})
+
+
 @dataclass(frozen=True)
 class Ihlal:
     kod: str                 # A-1, C-002 …
@@ -37,6 +49,10 @@ class Ihlal:
     personel: str
     gun: date | None
     aciklama: str
+
+    @property
+    def kati(self) -> bool:
+        return self.kod in KATI_KURALLAR
 
 
 def atamalari_oku(draft_id: int) -> list[dict]:
@@ -254,7 +270,7 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
                             if alan in a["gorevler"] and "AMBULANS" not in a["gorevler"])
                 # Alanda hiç kimse yoksa bu satır zaten D-1/D-2'de raporlandı
                 if any(alan in a["gorevler"] for a in satirlar) and kalan < asgari:
-                    ihlaller.append(Ihlal("D-5", "Ambulans sonrası kalan", "—", g,
+                    ihlaller.append(Ihlal("D-9", "C-009 · ambulans sonrası kalan", "—", g,
                                           f"{vardiya_kodu}: {alan.lower()}ta {kalan}/{asgari}"
                                           " kişi kaldı"))
     return ihlaller
@@ -262,7 +278,7 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
 
 KURAL_SIRASI = ["A-1", "A-2", "A-3", "A-4", "A-5",
                 "C-002", "C-014", "C-021", "C-016", "C-020",
-                "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8"]
+                "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9"]
 KURAL_ADI = {
     "A-1": "Günde en fazla 1 vardiya",
     "A-2": "Çalışma tipi — sadece gündüz / sadece gece (C-017)",
@@ -278,10 +294,11 @@ KURAL_ADI = {
     "D-2": "C-010 · gözlemde en az 2 kişi",
     "D-3": "Triyaj ve gözlem aynı kişide olamaz",
     "D-4": "Vardiyadaki herkes ya triyajda ya gözlemde",
-    "D-5": "C-009 · ambulans sayısı ve sonrasında kalan",
+    "D-5": "Ambulans mevcudu (2 kişi)",
     "D-6": "C-007 · vardiyada en az 1 ekip lideri",
     "D-7": "Vardiyada en az 1 sayım yetkilisi",
     "D-8": "Rozet verilen kişide yetkinlik var mı",
+    "D-9": "C-009 · ambulans sonrası alanda kalan",
 }
 
 
@@ -305,9 +322,10 @@ def main(argv: list[str]) -> int:
     print()
     for kod in KURAL_SIRASI:
         grup = gruplu.get(kod, [])
-        isaret = "✓" if not grup else "✗"
+        isaret = "✓" if not grup else ("✗" if kod in KATI_KURALLAR else "!")
+        tip = "katı" if kod in KATI_KURALLAR else "gevşek"
         ek = "" if not grup else f"{len(grup)} ihlal"
-        print(f"  {isaret} {kod:<6} {KURAL_ADI[kod]:<52} {ek}")
+        print(f"  {isaret} {kod:<6} {KURAL_ADI[kod]:<46} {tip:<7} {ek}")
         for i in sorted(grup, key=lambda t: (t.gun or date.min, t.personel))[:12]:
             gun = kisa_tarih(i.gun) if i.gun else "—"
             print(f"        · {i.personel:<16} {gun:<13} {i.aciklama}")
@@ -315,12 +333,19 @@ def main(argv: list[str]) -> int:
             print(f"        … {len(grup) - 12} ihlal daha")
 
     print()
-    if ihlaller:
-        print(f"  SONUÇ: {len(ihlaller)} ihlal, {len(gruplu)} kuralda.")
+    kati = [i for i in ihlaller if i.kati]
+    if kati:
+        print(f"  SONUÇ: {len(kati)} KATI kural ihlali — modelde hata var.")
+        if len(ihlaller) > len(kati):
+            print(f"          Ayrıca {len(ihlaller) - len(kati)} gevşek slot eksiği"
+                  " (kadro yetmedi, beklenen).")
+    elif ihlaller:
+        print(f"  SONUÇ: katı ihlal yok. {len(ihlaller)} gevşek slot eksiği"
+              " — kadro yetmedi, beklenen durum.")
     else:
         print("  SONUÇ: temiz — kontrol edilen kuralların hepsi sağlanıyor.")
     print()
-    return 1 if ihlaller else 0
+    return 1 if kati else 0
 
 
 if __name__ == "__main__":

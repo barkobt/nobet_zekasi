@@ -215,18 +215,30 @@ async def teshisler(run_id: int) -> list[DiagnosticGroup]:
         if g is None:
             gruplar[anahtar] = DiagnosticGroup(
                 catalog_code=s["catalog_code"], constraint_code=s["constraint_code"],
-                constraint_name=s["constraint_name"] or "Bağlanmamış",
+                # Kontrolcü bulgusu bir kurala bağlı olmayabilir (A-1…A-5 gibi
+                # kod kataloğunda karşılığı olmayan kontroller); "Bağlanmamış"
+                # yerine ne olduğunu söyleyen bir ad göster.
+                constraint_name=s["constraint_name"]
+                or ("Kontrolcü bulgusu" if s["severity"] == "hata" else "Bağlanmamış"),
+                severity=s["severity"],
                 count=1, first_date=s["work_date"], last_date=s["work_date"], samples=[d],
             )
         else:
             g.count += 1
+            if s["severity"] == "hata":
+                g.severity = "hata"
             if s["work_date"]:
                 g.first_date = min(g.first_date or s["work_date"], s["work_date"])
                 g.last_date = max(g.last_date or s["work_date"], s["work_date"])
             if len(g.samples) < 3:
                 g.samples.append(d)
 
-    return sorted(gruplar.values(), key=lambda g: (-g.count, g.catalog_code or "zz"))
+    # 'hata' = kontrolcünün bulduğu KATI kural ihlali; her zaman en üstte.
+    # Sessizce kaybolan bir kuralın bir daha fark edilmeden kalmaması için.
+    return sorted(
+        gruplar.values(),
+        key=lambda g: (0 if g.severity == "hata" else 1, -g.count, g.catalog_code or "zz"),
+    )
 
 
 @router.delete("/drafts/{draft_id}", status_code=204, summary="Taslağı sil")

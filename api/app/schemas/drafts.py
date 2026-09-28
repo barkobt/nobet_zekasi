@@ -108,7 +108,7 @@ class SolveAccepted(BaseModel):
 
 class Diagnostic(BaseModel):
     id: int
-    severity: Literal["cakisma", "ihlal", "uyari"]
+    severity: Literal["hata", "cakisma", "ihlal", "uyari"]
     constraint_code: str | None = None
     catalog_code: str | None = None
     constraint_name: str | None = None
@@ -124,6 +124,10 @@ class DiagnosticGroup(BaseModel):
     catalog_code: str | None = None
     constraint_code: str | None = None
     constraint_name: str
+    severity: str = Field(
+        default="ihlal",
+        description="Gruptaki en ağır seviye — 'hata' kontrolcünün bulduğu katı kural ihlalidir",
+    )
     count: int
     first_date: date | None = None
     last_date: date | None = None
