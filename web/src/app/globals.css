@@ -168,3 +168,26 @@
   body[data-yazdir] thead { display: table-header-group; }   /* başlık her sayfada */
   body[data-yazdir] tr    { break-inside: avoid; }
 }
+
+/* Izgaranın yatay kaydırma çubuğu.
+   macOS'ta kaplama (overlay) çubuklar varsayılan olarak gizli: 31 günlük aylık
+   görünümde kullanıcı kaydırılabildiğini hiç fark etmiyordu. Çubuk hep görünür. */
+.izgara-kaydirma {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.izgara-kaydirma::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.izgara-kaydirma::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+.izgara-kaydirma::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid var(--bg);
+}
+.izgara-kaydirma::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

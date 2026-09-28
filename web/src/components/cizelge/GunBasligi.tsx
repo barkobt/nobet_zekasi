@@ -8,19 +8,72 @@ import type { DayHeader, ShiftHeader } from "@/lib/cizelge";
  *
  * Tooltip her vardiya için AYRI açılır: G'nin üstünde gündüz, N'nin üstünde gece.
  */
+/**
+ * Aylık görünümde iki harfli gün adı. Tek harf belirsiz: Pazartesi/Pazar ikisi de
+ * "P", Çarşamba/Cuma/Cumartesi ikisi de "C".
+ */
+const GUN_IKI_HARF: Record<string, string> = {
+  Pzt: "Pt", Sal: "Sa", Çar: "Ça", Per: "Pe", Cum: "Cu", Cmt: "Ct", Paz: "Pz",
+};
+
 export function GunBasligi({ gun, dar }: { gun: DayHeader; dar?: boolean }) {
-  // Aylık görünümde 31 sütun var: gün adı ve tarih tek satıra iner, sayaçlar
-  // alt alta. Tooltip aynı kalır — detay hep orada.
+  // Aylık görünümde 31 sütun yan yana: G 5/5 · N 5/5 sığmıyor, dikey yığılınca
+  // okunmuyordu. Üç satır: gün adı · gün numarası · tek durum hapı.
+  // Kaç kişi eksik olduğu hapta, hangi vardiyada olduğu tooltip'te.
+  if (dar) {
+    const eksik = gun.shifts.reduce(
+      (t, v) => t + Math.max(0, v.required - v.assigned), 0,
+    );
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex cursor-default flex-col items-center gap-0.5 px-0.5 py-2">
+            <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+              {GUN_IKI_HARF[gun.weekday] ?? gun.weekday.slice(0, 2)}
+            </span>
+            <span className="font-medium tabular-nums" style={{ fontSize: "var(--text-xs)" }}>
+              {gun.label.split(" ")[0]}
+            </span>
+            <span
+              className={
+                "rounded-sm px-1 leading-none tabular-nums " +
+                (eksik > 0 ? "text-danger font-semibold" : "text-muted-foreground")
+              }
+              style={{
+                fontSize: "var(--text-xs)",
+                background: eksik > 0 ? "var(--danger-soft)" : "transparent",
+              }}
+            >
+              {eksik > 0 ? `−${eksik}` : "✓"}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="p-0">
+          <div className="py-1">
+            {gun.shifts.map((v) => (
+              <VardiyaOzeti key={v.code} gun={gun} vardiya={v} />
+            ))}
+            {gun.shifts.length === 0 && (
+              <p className="px-3 py-2 text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+                Bu gün için ihtiyaç tanımlı değil.
+              </p>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
   return (
-    <div className={"flex flex-col items-center px-1 py-2 " + (dar ? "gap-0.5" : "gap-1")}>
+    <div className="flex flex-col items-center gap-1 px-1 py-2">
       <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-        {dar ? gun.weekday.slice(0, 1) : gun.weekday}
+        {gun.weekday}
       </span>
       <span className="font-medium tabular-nums" style={{ fontSize: "var(--text-xs)" }}>
-        {dar ? gun.label.split(" ")[0] : gun.label}
+        {gun.label}
       </span>
 
-      <div className={dar ? "flex flex-col items-center" : "flex gap-1.5"}>
+      <div className="flex gap-1.5">
         {gun.shifts.map((v) => (
           <Tooltip key={v.code}>
             <TooltipTrigger asChild>

@@ -147,7 +147,7 @@ function DuzenlePenceresi({
           Düzenle
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[560px]">
+      <DialogContent className="max-h-[85vh] max-w-[560px] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{kisi.full_name}</DialogTitle>
         </DialogHeader>
@@ -155,7 +155,6 @@ function DuzenlePenceresi({
           kisi={kisi}
           herkes={herkes}
           onKaydet={(d) => { onKaydet(d); setAc(false); }}
-          onSilindi={() => setAc(false)}
         />
       </DialogContent>
     </Dialog>

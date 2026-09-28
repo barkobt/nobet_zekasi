@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { CALISMA_TIPI, type PersonDetail, type PersonRow, type Role } from "@/lib/personel";
 import { Alan, Bolum, Hata, Ikili } from "./parcalar";
-import { SilmeBolumu } from "./SilmeBolumu";
 
 type Form = {
   first_name: string; last_name: string; sicil_no: string; role_code: string;
@@ -28,12 +27,11 @@ const formaCevir = (k: PersonDetail): Form => ({
 });
 
 export function Kunye({
-  kisi, herkes, onKaydet, onSilindi,
+  kisi, herkes, onKaydet,
 }: {
   kisi: PersonDetail;
   herkes: PersonRow[];
   onKaydet: (d: PersonDetail) => void;
-  onSilindi: () => void;
 }) {
   const [form, setForm] = useState<Form>(() => formaCevir(kisi));
   const baslangic = JSON.stringify(formaCevir(kisi));
@@ -141,13 +139,10 @@ export function Kunye({
         {kaydet.isError && <Hata>{(kaydet.error as Error).message}</Hata>}
       </div>
 
-      {/* Silme Not'tan ayrı, en altta, ince çizgiyle */}
-      <div className="mt-6">
-        <SilmeBolumu kisi={kisi} onSilindi={onSilindi} />
-      </div>
-
-      {/* Kaydet panelin altında sabit; değişiklik yoksa pasif */}
-      <div className="sticky bottom-0 -mx-6 mt-6 flex gap-2 border-t bg-card px-6 py-3">
+      {/* Kaydet formun altında, akışın içinde. Eskiden yan panele göre
+          "sticky bottom-0 -mx-6" idi; Düzenle penceresinde kaydırma kabı
+          olmadığı için pencerenin ortasında asılı kalıyordu. */}
+      <div className="mt-2 flex gap-2 border-t pt-4">
         <Button onClick={() => kaydet.mutate()} disabled={!degisti || kaydet.isPending}>
           {kaydet.isPending ? "Kaydediliyor…" : "Kaydet"}
         </Button>

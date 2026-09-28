@@ -5,6 +5,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { GunBasligi } from "./GunBasligi";
 import { Hucre } from "./Hucre";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SatirOzeti } from "./SatirOzeti";
 import { useOzetPaneli } from "./DetayDugmesi";
 import { sayi, type Schedule } from "@/lib/cizelge";
@@ -83,7 +84,7 @@ export function Izgara({
     });
 
   return (
-    <div className="overflow-auto rounded-lg border bg-card">
+    <div className="izgara-kaydirma overflow-auto rounded-lg border bg-card">
       <table className="w-full border-collapse" style={{ fontSize: "var(--text-base)" }}>
         <thead>
           <tr>
@@ -92,22 +93,39 @@ export function Izgara({
               className="sticky left-0 top-0 z-30 border-b border-r bg-card p-0 align-bottom"
               style={{ width: ozetGenislik, minWidth: ozetGenislik }}
             >
-              <button
-                type="button"
-                onClick={paneliCevir}
-                aria-expanded={panelAcik}
-                aria-label={panelAcik ? "Özet panelini daralt" : "Özet panelini genişlet"}
-                className="flex h-full w-full items-center justify-center gap-1 px-2 pb-2 pt-2 text-muted-foreground hover:text-foreground"
-              >
-                {panelAcik ? (
-                  <>
-                    <ChevronLeft size={16} strokeWidth={1.75} />
-                    <span style={{ fontSize: "var(--text-xs)" }}>Özet</span>
-                  </>
-                ) : (
-                  <ChevronRight size={16} strokeWidth={1.75} />
-                )}
-              </button>
+              {/* Ok yuvarlak gri bir kutuda: çıplak ikon hem küçük kalıyor hem
+                  tıklanabilir olduğu anlaşılmıyordu. Kapalıyken yalnız kutu,
+                  açıkken yanında "Özet" yazısı. */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={paneliCevir}
+                    aria-expanded={panelAcik}
+                    aria-label={panelAcik ? "Özet panelini daralt" : "Özet panelini genişlet"}
+                    className="flex h-full w-full items-center justify-center gap-1.5 px-2 pb-2 pt-2"
+                  >
+                    <span
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                      style={{ background: "var(--bg)", border: "1px solid var(--border)" }}
+                    >
+                      {panelAcik
+                        ? <ChevronLeft size={14} strokeWidth={2} />
+                        : <ChevronRight size={14} strokeWidth={2} />}
+                    </span>
+                    {panelAcik && (
+                      <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+                        Özet
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {panelAcik
+                    ? "Özet panelini daralt"
+                    : "Özet panelini aç — kişi başına sayaçlar"}
+                </TooltipContent>
+              </Tooltip>
             </th>
 
             <th
@@ -146,13 +164,16 @@ export function Izgara({
               <tr>
                 <th
                   colSpan={data.days.length + 2}
-                  className="sticky left-0 z-10 border-b bg-background p-0 text-left"
+                  className="z-10 border-b bg-background p-0 text-left"
                 >
+                  {/* Etiket hücrenin İÇİNDE sabit: hücre tablo kadar geniş olduğu
+                      için sticky'yi hücreye vermek yetmiyor, yatay kaydırınca
+                      başlık sola kayıp gidiyordu. */}
                   <button
                     type="button"
                     onClick={() => degistir(grup.key)}
                     aria-expanded={acik}
-                    className="flex h-9 w-full items-center gap-1.5 px-3 text-muted-foreground hover:text-foreground"
+                    className="sticky left-0 flex h-9 items-center gap-1.5 px-3 text-muted-foreground hover:text-foreground"
                     style={{ fontSize: "var(--text-xs)", letterSpacing: "0.04em" }}
                   >
                     {acik ? (
@@ -248,7 +269,7 @@ export function Izgara({
                         key={g.day}
                         className={
                           "h-10 border-l p-0 align-middle group-hover:bg-accent " +
-                          (g.is_weekend ? "bg-background/60 " : "") +
+                          (g.is_weekend ? "bg-background " : "") +
                           (g.in_period === false ? "opacity-55 " : "") +
                           (haftaBasi(g.day) ? ayrac + " " : "")
                         }
