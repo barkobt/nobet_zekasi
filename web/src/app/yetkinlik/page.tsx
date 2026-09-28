@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
+import { yetkinlikDegisti } from "@/lib/yetkinlik";
 import type { components } from "@/lib/api-types";
 
 type Matrix = components["schemas"]["CompetencyMatrix"];
@@ -61,7 +62,7 @@ export default function YetkinlikSayfasi() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["competency-matrix"] });
+      yetkinlikDegisti(qc);
       setDuzenle(false);
       setTaslak(new Map());
     },

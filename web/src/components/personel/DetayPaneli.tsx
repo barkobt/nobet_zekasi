@@ -35,8 +35,9 @@ export function DetayPaneli({
   const tazele = (yeni: PersonDetail) => {
     qc.setQueryData(["person", staffId], yeni);
     qc.invalidateQueries({ queryKey: ["people"] });
-    // Yetkinlik, istek ve izin değişikliği çizelgeyi de etkiler.
+    // Yetkinlik, istek ve izin değişikliği çizelgeyi ve matrisi de etkiler.
     qc.invalidateQueries({ queryKey: ["schedule"] });
+    qc.invalidateQueries({ queryKey: ["competency-matrix"] });
   };
 
   if (staffId === null) return null;
