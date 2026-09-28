@@ -49,10 +49,18 @@ class Ihlal:
     personel: str
     gun: date | None
     aciklama: str
+    seviye_ustu: str | None = None    # açıkça verilmişse koddan türetmeyi ezer
+
+    @property
+    def seviye(self) -> str:
+        """kati: model hatası · uyari: elle yapılmış istisna · gevsek: kadro eksiği."""
+        if self.seviye_ustu:
+            return self.seviye_ustu
+        return "kati" if self.kod in KATI_KURALLAR else "gevsek"
 
     @property
     def kati(self) -> bool:
-        return self.kod in KATI_KURALLAR
+        return self.seviye == "kati"
 
 
 def atamalari_oku(draft_id: int) -> list[dict]:
@@ -230,8 +238,17 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
                                   "aynı vardiyada hem triyaj hem gözlem"))
         for gorev in gorevler:
             if gorev not in yetkinlik[p.id]:
-                ihlaller.append(Ihlal("D-8", "Rozet yetkinliği", p.ad, a["work_date"],
-                                      f"{gorev} rozeti var ama yetkinliği yok"))
+                # Solver'ın yazdığı rozette yetkinlik eksikse bu bir MODEL HATASI.
+                # Elle yapılmış bir düzenlemede ise bilinçli bir istisnadır
+                # (örn. oryantasyondaki birinin ambulansa çıkması) — uyarı verilir,
+                # engellenmez. Veritabanı trigger'ı da tam bu ayrımı yapıyor.
+                elle = a["source"] != "solver"
+                ihlaller.append(Ihlal(
+                    "D-8", "Rozet yetkinliği", p.ad, a["work_date"],
+                    f"{gorev} rozeti var ama yetkinliği yok"
+                    + (" (elle yazılmış — bilinçli istisna olabilir)" if elle else ""),
+                    seviye_ustu="uyari" if elle else None,
+                ))
         # Sorumlu ve oryantasyondakiler bölmenin dışında (seeds/011 ile aynı kural)
         if p.kapsamaya_sayilir and not (gorevler & {"TRIYAJ", "GOZLEM"}):
             ihlaller.append(Ihlal("D-4", "Rozetsiz çalışan", p.ad, a["work_date"],
@@ -322,8 +339,11 @@ def main(argv: list[str]) -> int:
     print()
     for kod in KURAL_SIRASI:
         grup = gruplu.get(kod, [])
-        isaret = "✓" if not grup else ("✗" if kod in KATI_KURALLAR else "!")
-        tip = "katı" if kod in KATI_KURALLAR else "gevşek"
+        seviyeler = {i.seviye for i in grup}
+        isaret = "✓" if not grup else ("✗" if "kati" in seviyeler else "!")
+        tip = ("katı" if kod in KATI_KURALLAR else "gevşek") if not grup else \
+              ("katı" if "kati" in seviyeler else
+               "uyarı" if seviyeler == {"uyari"} else "gevşek")
         ek = "" if not grup else f"{len(grup)} ihlal"
         print(f"  {isaret} {kod:<6} {KURAL_ADI[kod]:<46} {tip:<7} {ek}")
         for i in sorted(grup, key=lambda t: (t.gun or date.min, t.personel))[:12]:
@@ -340,8 +360,14 @@ def main(argv: list[str]) -> int:
             print(f"          Ayrıca {len(ihlaller) - len(kati)} gevşek slot eksiği"
                   " (kadro yetmedi, beklenen).")
     elif ihlaller:
-        print(f"  SONUÇ: katı ihlal yok. {len(ihlaller)} gevşek slot eksiği"
-              " — kadro yetmedi, beklenen durum.")
+        uyari = [i for i in ihlaller if i.seviye == "uyari"]
+        gevsek = len(ihlaller) - len(uyari)
+        parca = []
+        if gevsek:
+            parca.append(f"{gevsek} gevşek slot eksiği (kadro yetmedi)")
+        if uyari:
+            parca.append(f"{len(uyari)} uyarı (elle yapılmış istisna)")
+        print(f"  SONUÇ: katı ihlal yok. {' · '.join(parca)}.")
     else:
         print("  SONUÇ: temiz — kontrol edilen kuralların hepsi sağlanıyor.")
     print()

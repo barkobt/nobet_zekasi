@@ -171,6 +171,21 @@ class SabitAtama:
 
 
 @dataclass(frozen=True)
+class MevcutAtama:
+    """Taslakta ŞU AN duran atama — yalnız CP-SAT'a başlangıç ipucu olarak verilir.
+
+    Kısıt değildir: solver istediği gibi değiştirebilir. Amacı "kopyala → çöz"
+    akışında aramanın kaynak çizelgenin yakınından başlaması; böylece sonuç
+    kaynaktan kötüye gitmiyor ve koşular arası dalgalanma azalıyor.
+    """
+
+    personel_id: int
+    gun: date
+    vardiya_kodu: str
+    gorevler: frozenset[str]
+
+
+@dataclass(frozen=True)
 class GecmisAtama:
     """Dönem başlamadan önceki, DEĞİŞTİRİLEMEZ atama."""
 
@@ -194,6 +209,7 @@ class SolverVerisi:
     vardiyalar: tuple[Vardiya, ...]
     yokluklar: tuple[Yokluk, ...]
     sabit_atamalar: tuple[SabitAtama, ...]
+    mevcut_atamalar: tuple[MevcutAtama, ...]   # yalnız ipucu
     kesin_istekler: tuple[Istek, ...]      # KESIN — modele kısıt olarak girer
     tercih_istekler: tuple[Istek, ...]     # MUMKUNSE — cezalı, ihlali raporlanır
     ihtiyaclar: tuple[IhtiyacSatiri, ...]
@@ -237,6 +253,7 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
                 vardiyalar=_vardiyalar(cur, taslak["unit_id"]),
                 yokluklar=_yokluklar(cur, draft_id),
                 sabit_atamalar=_sabit_atamalar(cur, draft_id),
+                mevcut_atamalar=_mevcut_atamalar(cur, draft_id),
                 kesin_istekler=kesin,
                 tercih_istekler=tercih,
                 ihtiyaclar=_ihtiyaclar(cur, draft_id),
@@ -450,6 +467,31 @@ def _sabit_atamalar(cur, draft_id: int) -> tuple[SabitAtama, ...]:
             vardiya_kodu=r["vardiya_kodu"],
             kaynak=r["source"],
             kilitli=r["is_locked"],
+        )
+        for r in cur.fetchall()
+    )
+
+
+def _mevcut_atamalar(cur, draft_id: int) -> tuple[MevcutAtama, ...]:
+    """Taslaktaki tüm dönem içi atamalar ve görev rozetleri (ipucu için)."""
+    cur.execute(
+        """
+        SELECT a.staff_id, a.work_date, st.code AS vardiya_kodu,
+               coalesce(array_agg(c.code) FILTER (WHERE c.code IS NOT NULL), '{}') AS gorevler
+        FROM assignments a
+        JOIN schedule_drafts d ON d.id = a.draft_id
+        JOIN shift_types st    ON st.id = a.shift_type_id
+        LEFT JOIN assignment_tasks t ON t.assignment_id = a.id
+        LEFT JOIN competencies c     ON c.id = t.competency_id
+        WHERE a.draft_id = %s AND d.period @> a.work_date
+        GROUP BY a.staff_id, a.work_date, st.code
+        """,
+        (draft_id,),
+    )
+    return tuple(
+        MevcutAtama(
+            personel_id=r["staff_id"], gun=r["work_date"],
+            vardiya_kodu=r["vardiya_kodu"], gorevler=frozenset(r["gorevler"]),
         )
         for r in cur.fetchall()
     )

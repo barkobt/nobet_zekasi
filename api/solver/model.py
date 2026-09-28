@@ -247,6 +247,16 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     bos = {(i.personel_id, i.gun) for i in v.kesin_istekler if i.tur == "BOS_GUN"}
     yalniz_gunduz = {(i.personel_id, i.gun) for i in v.kesin_istekler if i.tur == "SADECE_GUNDUZ"}
     yalniz_gece = {(i.personel_id, i.gun) for i in v.kesin_istekler if i.tur == "SADECE_GECE"}
+    # Sadece gündüz çalışan biri için O GÜNE ÖZEL gece değişkeni: SADECE_GECE
+    # isteği varsa (gücü ne olursa olsun) o gün gece seçeneği açılır.
+    #   KESIN    → gündüz değişkenleri de kapandığı için gece ZORUNLU olur
+    #   MUMKUNSE → gündüz de açık kalır, karşılanmazsa O-006 cezası yazılır
+    # Kişinin genel çalışma tipi (sadece_gunduz) DEĞİŞMEZ; istisna tek güne aittir.
+    gece_istisnasi = {
+        (i.personel_id, i.gun)
+        for i in v.kesin_istekler + v.tercih_istekler
+        if i.tur == "SADECE_GECE"
+    }
     sabit_gun = {(s.personel_id, s.gun) for s in v.sabit_atamalar}
     engelli = yok | bos | sabit_gun
 
@@ -266,8 +276,11 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
             for s in v.vardiyalar:
                 if not s.secenek_mi(p.rol_kodu, g.isoweekday()):
                     continue                                  # GUNDUZ_CMT yalnız sorumlu+Cmt
-                if s.gece_mi and (p.uygunluk == "sadece_gunduz" or (p.id, g) in yalniz_gunduz):
-                    continue                                  # C-017 + KESIN istek
+                if s.gece_mi and (p.id, g) in yalniz_gunduz:
+                    continue                                  # KESIN "sadece gündüz" isteği
+                if (s.gece_mi and p.uygunluk == "sadece_gunduz"
+                        and (p.id, g) not in gece_istisnasi):
+                    continue                                  # C-017, istisnası yoksa
                 if not s.gece_mi and (p.uygunluk == "sadece_gece" or (p.id, g) in yalniz_gece):
                     continue
                 x[p.id, g, s.kod] = model.new_bool_var(f"x_{p.id}_{g}_{s.kod}")
@@ -353,6 +366,8 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
 
     model.minimize(sum(agirlik * ifade for agirlik, ifade in temel + adalet_terimleri))
     solver.parameters.max_time_in_seconds = float(time_limit_s)      # üst sınır
+    _baslangic_ipucu(model, v, x, t)
+
     izleyici = _IyilesmeIzleyici()
     bitti = threading.Event()
     gozcu = _durgunlukta_durdur(solver, izleyici, get_settings().solver_no_improvement_s, bitti)
@@ -385,6 +400,32 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
             if (adet := solver.value(e)) > 0:
                 sonuc.eksikler.append(Eksik(g, vardiya_kodu, slot, kural_kodu, adet, gereken))
     return sonuc
+
+
+def _baslangic_ipucu(model, v: SolverVerisi, x: dict, t: dict) -> None:
+    """Taslakta duran atamaları CP-SAT'a başlangıç ipucu olarak verir.
+
+    Kısıt değil ipucu: solver istediği gibi değiştirebilir, ipucu kurallara
+    uymuyorsa onarır. Amacı "kopyala → çöz" akışında aramanın kaynak çizelgenin
+    yakınından başlaması — böylece sonuç kaynaktan kötüye gitmiyor.
+
+    Adım 5'te denenen ve işe yaramayan iki fazlı ipucudan farkı: orada ipucu
+    solver'ın KENDİ ilk fazından geliyordu ve aramayı kendi bulduğu yere
+    kilitliyordu. Buradaki ipucu dışarıdan, insan eliyle ya da önceki bir
+    koşudan gelen gerçek bir çizelge.
+    """
+    verilen = 0
+    for a in v.mevcut_atamalar:
+        degisken = x.get((a.personel_id, a.gun, a.vardiya_kodu))
+        if degisken is None:
+            continue
+        model.add_hint(degisken, 1)
+        verilen += 1
+        for gorev in a.gorevler:
+            rozet = t.get((a.personel_id, a.gun, a.vardiya_kodu, gorev))
+            if rozet is not None:
+                model.add_hint(rozet, 1)
+    return verilen
 
 
 def _zaman_cizgisi(v: SolverVerisi, x: dict, sorumlu_plani: list[tuple[int, date, str]]):
@@ -1083,7 +1124,9 @@ def _kontrolcuyu_calistir(cur, run_id: int, draft_id: int, v: SolverVerisi) -> i
     from solver import validate
 
     try:
-        ihlaller = [i for i in validate.kontrol_et(v, validate.atamalari_oku(draft_id)) if i.kati]
+        bulgular = validate.kontrol_et(v, validate.atamalari_oku(draft_id))
+        ihlaller = [i for i in bulgular if i.kati]
+        uyarilar = [i for i in bulgular if i.seviye == "uyari"]
     except Exception as hata:  # noqa: BLE001 — kontrolcü çökerse çözüm kaybolmasın
         cur.execute(
             """INSERT INTO solver_diagnostics (solver_run_id, severity, message, suggestion)
@@ -1092,8 +1135,19 @@ def _kontrolcuyu_calistir(cur, run_id: int, draft_id: int, v: SolverVerisi) -> i
              "Çizelge yazıldı ama denetlenemedi. solver/validate.py'yi elle koşturun."),
         )
         return 1
+    kod_id_u = {k.katalog_kodu: k.id for k in v.kurallar.values() if k.katalog_kodu}
+    if uyarilar:
+        cur.executemany(
+            """INSERT INTO solver_diagnostics
+                 (solver_run_id, severity, constraint_id, work_date, message, suggestion)
+               VALUES (%s, 'uyari', %s, %s, %s, %s)""",
+            [(run_id, kod_id_u.get(i.kod), i.gun,
+              f"{i.personel}: {i.aciklama}",
+              "Elle yapılmış istisna. Kasıtlıysa bir şey yapmanıza gerek yok.")
+             for i in uyarilar[:20]],
+        )
     if not ihlaller:
-        return 0
+        return len(uyarilar[:20])
 
     kod_id = {k.katalog_kodu: k.id for k in v.kurallar.values() if k.katalog_kodu}
     satirlar = [(
@@ -1114,7 +1168,7 @@ def _kontrolcuyu_calistir(cur, run_id: int, draft_id: int, v: SolverVerisi) -> i
            VALUES (%s, %s, %s, %s, %s, %s)""",
         satirlar,
     )
-    return len(satirlar)
+    return len(satirlar) + len(uyarilar[:20])
 
 
 def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
