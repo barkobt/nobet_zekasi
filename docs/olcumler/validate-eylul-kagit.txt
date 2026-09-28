@@ -28,14 +28,14 @@ KONTROL — Eylül 2026 (kağıt) (#10)
         · Birol Karaca     26 Eyl Cmt    25.09 gecesinden sonra gündüz
         · Derya Torun      28 Eyl Pzt    27.09 gecesinden sonra gündüz
   ✓ C-016  Haftada en az 1 boş gün                        katı    
-  ✗ C-020  Oryantasyon eşiyle aynı gün aynı vardiyada     katı    1 ihlal
-        · Çağla Sarıtaş    31 Ağu Pzt    GUNDUZ vardiyasında eşi (Şükran Ünlü) yok
+  ✓ C-020  Oryantasyon eşiyle aynı gün aynı vardiyada     katı    
   ! D-1    C-011 · triyajda en az 3 kişi                  gevşek  4 ihlal
         · —                13 Eyl Paz    GECE: 2/3
         · —                22 Eyl Sal    GECE: 2/3
         · —                25 Eyl Cum    GUNDUZ: 2/3
         · —                28 Eyl Pzt    GECE: 2/3
-  ! D-2    C-010 · gözlemde en az 2 kişi                  gevşek  20 ihlal
+  ! D-2    C-010 · gözlemde en az 2 kişi                  gevşek  21 ihlal
+        · —                31 Ağu Pzt    GUNDUZ: 1/2
         · —                 1 Eyl Sal    GUNDUZ: 1/2
         · —                 2 Eyl Çar    GUNDUZ: 1/2
         · —                 2 Eyl Çar    GECE: 1/2
@@ -47,11 +47,11 @@ KONTROL — Eylül 2026 (kağıt) (#10)
         · —                11 Eyl Cum    GUNDUZ: 1/2
         · —                11 Eyl Cum    GECE: 1/2
         · —                12 Eyl Cmt    GUNDUZ: 1/2
-        · —                12 Eyl Cmt    GECE: 1/2
-        … 8 ihlal daha
+        … 9 ihlal daha
   ✓ D-3    Triyaj ve gözlem aynı kişide olamaz            katı    
   ✓ D-4    Vardiyadaki herkes ya triyajda ya gözlemde     gevşek  
-  ! D-5    Ambulans mevcudu (2 kişi)                      gevşek  17 ihlal
+  ! D-5    Ambulans mevcudu (2 kişi)                      gevşek  18 ihlal
+        · —                31 Ağu Pzt    GUNDUZ: 1/2
         · —                 1 Eyl Sal    GUNDUZ: 1/2
         · —                 7 Eyl Pzt    GECE: 1/2
         · —                10 Eyl Per    GUNDUZ: 0/2
@@ -63,8 +63,7 @@ KONTROL — Eylül 2026 (kağıt) (#10)
         · —                13 Eyl Paz    GECE: 0/2
         · —                14 Eyl Pzt    GUNDUZ: 1/2
         · —                18 Eyl Cum    GUNDUZ: 1/2
-        · —                19 Eyl Cmt    GECE: 1/2
-        … 5 ihlal daha
+        … 6 ihlal daha
   ✓ D-6    C-007 · vardiyada en az 1 ekip lideri          gevşek  
   ✓ D-7    Vardiyada en az 1 sayım yetkilisi              gevşek  
   ! D-8    Rozet verilen kişide yetkinlik var mı          uyarı   20 ihlal
@@ -83,7 +82,8 @@ KONTROL — Eylül 2026 (kağıt) (#10)
         … 8 ihlal daha
   ✗ D-9    C-009 · ambulans sonrası alanda kalan          katı    1 ihlal
         · —                21 Eyl Pzt    GECE: gozlemta 0/1 kişi kaldı
-  ✗ D-11   C-022 · oryantasyon acil takviye               katı    6 ihlal
+  ✗ D-11   C-022 · oryantasyon acil takviye               katı    7 ihlal
+        · Çağla Sarıtaş    31 Ağu Pzt    GUNDUZ: (c) ekip zaten yeterli (5/5) · (c) takviyeyle gereken aşılıyor (5+1 > 5)
         · Çağla Sarıtaş     4 Eyl Cum    GUNDUZ: (c) ekip zaten yeterli (6/5) · (c) takviyeyle gereken aşılıyor (6+1 > 5)
         · Çağla Sarıtaş     5 Eyl Cmt    GUNDUZ: (c) ekip zaten yeterli (5/5) · (c) takviyeyle gereken aşılıyor (5+1 > 5)
         · Güven Göl        26 Eyl Cmt    GUNDUZ: (c) ekip zaten yeterli (6/5) · (c) takviyeyle gereken aşılıyor (6+1 > 5) · (d) takviyedeyken ambulansa çıkmış
@@ -92,5 +92,5 @@ KONTROL — Eylül 2026 (kağıt) (#10)
         · Ayşe Kartal      29 Eyl Sal    GECE: (c) ekip zaten yeterli (5/5) · (c) takviyeyle gereken aşılıyor (5+1 > 5)
 
   SONUÇ: 22 katı kural ihlali — çizelge elle hazırlanmış, ölçüm sonucudur.
-          Ayrıca 63 gevşek slot eksiği (kadro yetmedi, beklenen).
+          Ayrıca 65 gevşek slot eksiği (kadro yetmedi, beklenen).
 

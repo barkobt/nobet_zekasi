@@ -1,0 +1,28 @@
+
+KONTROL — Eylül 2026 — sistem (#11)
+───────────────────────────────────
+  Dönem: 31 Ağu 2026 – 29 Eyl 2026  ·  358 atama  ·  geçmişten 0 atama
+
+  ✓ A-1    Günde en fazla 1 vardiya                       katı    
+  ✓ A-2    Çalışma tipi — sadece gündüz / sadece gece (C-017) katı    
+  ✓ A-3    İzin / rapor günü boş                          katı    
+  ✓ A-4    Kesin istek (BOS_GUN / SADECE_GUNDUZ / SADECE_GECE) katı    
+  ✓ A-5    Kısa Cumartesi vardiyası yalnız sorumluya      katı    
+  ✓ C-002  En fazla 2 gece arka arkaya                    katı    
+  ✓ C-014  2 gece sonrası ertesi gün hiç çalışmaz         katı    
+  ✓ C-021  Gece sonrası gündüz yasağı                     katı    
+  ✓ C-016  Haftada en az 1 boş gün                        katı    
+  ✓ C-020  Oryantasyon eşiyle aynı gün aynı vardiyada     katı    
+  ✓ D-1    C-011 · triyajda en az 3 kişi                  gevşek  
+  ✓ D-2    C-010 · gözlemde en az 2 kişi                  gevşek  
+  ✓ D-3    Triyaj ve gözlem aynı kişide olamaz            katı    
+  ✓ D-4    Vardiyadaki herkes ya triyajda ya gözlemde     gevşek  
+  ✓ D-5    Ambulans mevcudu (2 kişi)                      gevşek  
+  ✓ D-6    C-007 · vardiyada en az 1 ekip lideri          gevşek  
+  ✓ D-7    Vardiyada en az 1 sayım yetkilisi              gevşek  
+  ✓ D-8    Rozet verilen kişide yetkinlik var mı          katı    
+  ✓ D-9    C-009 · ambulans sonrası alanda kalan          katı    
+  ✓ D-11   C-022 · oryantasyon acil takviye               katı    
+
+  SONUÇ: temiz — kontrol edilen kuralların hepsi sağlanıyor.
+
