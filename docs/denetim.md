@@ -106,6 +106,7 @@ Demo için kabul edilebilir; gerçek kullanıcı hesaplarına geçilirse yeniden
 | **Farklı taslakları aynı anda çözmek** | Koruma **yok**. Her çözüm `asyncio.to_thread` ile CP-SAT'ı `num_workers=8` ile 60 sn çalıştırır | **Açık risk.** 3 taslak = 24 çözücü iş parçacığı. Railway'in çekirdek sayısı bunun çok altında; API yanıt veremez hale gelir |
 | Silme uçları | 7 adet DELETE (`taslak`, `personel`, `izin`, `istek`, `uyumsuzluk`, `sözleşme`, `ihtiyaç satırı`). Hepsi token arkasında, onay gerektirmiyor | Orta — token'ı olan her istek kalıcı veri silebilir. `assignments` FK'si `RESTRICT` olduğu için ataması olan personel silinemiyor (pasife alınıyor), bu iyi |
 | Hata mesajları | Ham veritabanı hatası dışarı verilmiyor; `setup.py:130` dışında `detail=str(hata)` kalıbı yok. Solver hataları `solver_diagnostics`'e yazılıyor, HTTP yanıtına değil | **Temiz** |
+| **Yarıda kalan koşu** | `repositories/drafts.py:89` süren koşuyu `status='CALISIYOR'` ile arar, **zaman aşımı yok** | **Açık risk.** Railway süreci yeniden başlarsa (deploy, çökme, uyku) arka plan görevi ölür ama satır `CALISIYOR` kalır. Çift tıklama koruması bu ölü satırı bulup döndürür → **o taslak bir daha hiç çözülemez.** Elle `UPDATE solver_runs SET status='HATA'` gerekir |
 | Hız sınırı (rate limit) | **Yok** | Demo için kabul edilebilir, token korumasıyla birlikte |
 
 ### A7. Kişisel veri
@@ -267,6 +268,7 @@ Bunların **1 ve 2**'si sunumda karşılaşılması muhtemel; 3-7 daha uzak ihti
 | 3 | **`/health`'in migration kontrolünü 015'e kadar genişlet** | Bugün yalnız 013'ü yokluyor; 014/015 eksikse canlı sessizce yanlış çalışır |
 | 4 | **Eşzamanlı çözüm sınırı** | Birden çok taslak aynı anda çözülürse Railway boğulur |
 | 5 | **`ISCI_SAYISI`'nı ortam ayarına taşı** | Railway'in çekirdek sayısına göre ayarlanmalı |
+| 6 | **Yarıda kalan koşuya zaman aşımı** | Deploy sırasında çözüm koşuyorsa o taslak kalıcı olarak kilitlenir (bkz. A6) |
 
 ### Sunumdan önce iyi olur
 
