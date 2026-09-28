@@ -330,11 +330,22 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
             # Acil takviye (C-022) genel mevcuda SAYILIR — tek amacı bu.
             takviyeler = [d for (_p, gun, kod), d in takviye.items()
                           if gun == g and kod == satir.vardiya_kodu]
-            model.add(
-                sum(gunun_atamalari.get((g, satir.vardiya_kodu), []))
-                + sum(takviyeler)
-                + sabit_kapsama.get((g, satir.vardiya_kodu), 0) + e >= satir.min_sayi
-            )
+            ekip = (sum(gunun_atamalari.get((g, satir.vardiya_kodu), []))
+                    + sabit_kapsama.get((g, satir.vardiya_kodu), 0))
+            model.add(ekip + sum(takviyeler) + e >= satir.min_sayi)
+            if takviyeler:
+                # C-022 KATI SINIR: takviye yalnız AÇIĞI kapatacak kadar
+                # kullanılabilir; 5/5 dolu bir vardiyaya oryantasyondaki hiçbir
+                # koşulda eklenemez.
+                #
+                # Sınır YALNIZ takviye kullanıldığında devreye girer. Koşulsuz
+                # yazılsaydı (ekip + takviye <= gereken) normal ekibi de gerekene
+                # kilitlerdi: "fazlası sorun değil" (C-005) serbestliği kalkar ve
+                # ölçtük — Ekim'de saat farkı 3,0'dan 9,5'e çıkıyor. Oysa kural
+                # ekibin fazlasını değil, oryantasyonun fazlasını yasaklıyor.
+                tak_var = model.new_bool_var(f"takviye_var_{g}_{satir.vardiya_kodu}")
+                model.add(sum(takviyeler) == 0).only_enforce_if(tak_var.Not())
+                model.add(ekip + sum(takviyeler) <= satir.min_sayi).only_enforce_if(tak_var)
 
     # ----- Kısıt 3–6: zaman kuralları (geçmiş dahil) -----
     kisiler = atanabilirler + [p for p in v.personel if p.rol_kodu == SORUMLU_ROL]

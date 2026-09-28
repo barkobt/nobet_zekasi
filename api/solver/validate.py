@@ -38,7 +38,7 @@ SORUMLU_ROL = "sorumlu_hemsire"
 KATI_KURALLAR = frozenset({
     "A-1", "A-2", "A-3", "A-4", "A-5",
     "C-002", "C-014", "C-021", "C-016", "C-020",
-    "D-3", "D-8", "D-9", "D-10",
+    "D-3", "D-8", "D-9", "D-11",
 })
 
 
@@ -207,10 +207,20 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
                                       f"{gunler[0]:%d.%m}–{gunler[-1]:%d.%m} haftası:"
                                       f" {len(gunler)} günün {dolu}'inde vardiya var"))
 
+    # C-022 acil takviye, C-020'nin bilinçli istisnasıdır. Oryantasyondaki kişinin
+    # eşsiz çalıştığı her vakayı _takviye_kontrolu sahipleniyor (meşruysa uyarı,
+    # değilse hata). C-020'yi ayrıca yazmak aynı olayı iki kez, üstelik yanlış
+    # seviyede raporlardı.
+    takviye_bulgulari = _takviye_kontrolu(v, atamalar, kisi, ad)
+    takviye_gunleri = {(i.personel, i.gun) for i in takviye_bulgulari}
+    ihlaller += takviye_bulgulari
+
     for o in v.personel:
         if not o.oryantasyonda or o.buddy_id is None:
             continue
         for g in v.gunler:
+            if (o.ad, g) in takviye_gunleri:
+                continue
             for kod in donem_plan.get((o.id, g), []):
                 if kod not in donem_plan.get((o.buddy_id, g), []):
                     ihlaller.append(Ihlal("C-020", "Oryantasyon eşleştirmesi", o.ad, g,
@@ -218,25 +228,71 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
 
     ihlaller += _gorev_kontrolleri(v, atamalar, kisi, ad)
 
-    # D-10 (C-022): oryantasyondaki kişi eşsiz çalışıyorsa acil takviyedir.
-    # C-020 ihlali olarak değil, uyarı olarak raporlanır; ayrıca ambulansa
-    # çıkmadığı ve alanda yalnız kalmadığı denetlenir.
-    gece_kodlari2 = {s.kod for s in v.vardiyalar if s.gece_mi}
+    return ihlaller
+
+
+def _takviye_kontrolu(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: dict) -> list[Ihlal]:
+    """C-022: oryantasyondaki biri EŞİ OLMADAN çalışıyorsa bu acil takviyedir.
+
+    Veritabanında takviyenin ayrı bir izi yok; çizelgeden çıkarıyoruz. Dört
+    koşulun HEPSİ doğruysa meşru takviyedir (uyarı); biri bile yanlışsa hatadır
+    ve mesaj hangi koşulun tutmadığını söyler.
+
+      a) kişi oryantasyonda
+      b) eşi o gün o vardiyada yok
+      c) kapsamaya sayılan ekip gerekenin ALTINDA ve oryantasyondakiler
+         eklenince gerekeni AŞMIYOR
+      d) oryantasyondakinde ambulans rozeti yok VE ambulans çıktıktan sonra
+         alanda en az 1 yetkin kişi kalıyor
+    """
+    kural = v.kural("C-009")
+    asgari = int(kural.parametreler.get("min_remaining_triage", 1)) if kural else 1
+    gereken = {(s.vardiya_kodu, g): s.min_sayi for s in v.ihtiyaclar
+               if s.slot_kodu == "GENEL" for g in s.gunler}
+
+    vardiya: dict[tuple[date, str], list[dict]] = defaultdict(list)
     for a in atamalar:
-        p = kisi[a["staff_id"]]
-        if not p.oryantasyonda or p.buddy_id is None:
+        vardiya[a["work_date"], a["vardiya_kodu"]].append(a)
+
+    ihlaller: list[Ihlal] = []
+    for (g, vardiya_kodu), satirlar in sorted(vardiya.items()):
+        n = gereken.get((vardiya_kodu, g))
+        if n is None:
             continue
-        esi_var = any(b["staff_id"] == p.buddy_id and b["work_date"] == a["work_date"]
-                      and b["vardiya_kodu"] == a["vardiya_kodu"] for b in atamalar)
-        if esi_var:
-            continue
-        if "AMBULANS" in set(a["gorevler"]):
-            ihlaller.append(Ihlal("D-10", "C-022 · acil takviye", p.ad, a["work_date"],
-                                  "acil takviyeyken ambulansa çıkmış"))
-        else:
-            ihlaller.append(Ihlal("D-10", "C-022 · acil takviye", p.ad, a["work_date"],
-                                  f"{a['vardiya_kodu']} vardiyasında eşsiz — acil takviye",
-                                  seviye_ustu="uyari"))
+        ekip = sum(1 for a in satirlar if kisi[a["staff_id"]].kapsamaya_sayilir)
+        # Ambulanstan sonra alanda kalan yetkin kişi (her iki alan toplamı)
+        kalan = sum(
+            1 for a in satirlar
+            if kisi[a["staff_id"]].kapsamaya_sayilir
+            and {"TRIYAJ", "GOZLEM"} & set(a["gorevler"])
+            and "AMBULANS" not in set(a["gorevler"])
+        )
+        takviyeciler = [
+            a for a in satirlar
+            if kisi[a["staff_id"]].oryantasyonda
+            and not any(b["staff_id"] == kisi[a["staff_id"]].buddy_id for b in satirlar)
+        ]
+        for a in takviyeciler:
+            p = kisi[a["staff_id"]]
+            eksikler = []
+            if ekip >= n:
+                eksikler.append(f"(c) ekip zaten yeterli ({ekip}/{n})")
+            if ekip + len(takviyeciler) > n:
+                eksikler.append(
+                    f"(c) takviyeyle gereken aşılıyor ({ekip}+{len(takviyeciler)} > {n})")
+            if "AMBULANS" in set(a["gorevler"]):
+                eksikler.append("(d) takviyedeyken ambulansa çıkmış")
+            if kalan < asgari:
+                eksikler.append(f"(d) alanda yetkin kalmıyor ({kalan}/{asgari})")
+            if eksikler:
+                ihlaller.append(Ihlal(
+                    "D-11", "C-022 · geçersiz takviye", p.ad, g,
+                    f"{vardiya_kodu}: " + " · ".join(eksikler)))
+            else:
+                ihlaller.append(Ihlal(
+                    "D-11", "C-022 · acil takviye", p.ad, g,
+                    f"{vardiya_kodu}: eşi yok, ekip {ekip}/{n} — meşru takviye",
+                    seviye_ustu="uyari"))
     return ihlaller
 
 
@@ -315,7 +371,7 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
 
 KURAL_SIRASI = ["A-1", "A-2", "A-3", "A-4", "A-5",
                 "C-002", "C-014", "C-021", "C-016", "C-020",
-                "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9", "D-10"]
+                "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9", "D-11"]
 KURAL_ADI = {
     "A-1": "Günde en fazla 1 vardiya",
     "A-2": "Çalışma tipi — sadece gündüz / sadece gece (C-017)",
@@ -336,7 +392,7 @@ KURAL_ADI = {
     "D-7": "Vardiyada en az 1 sayım yetkilisi",
     "D-8": "Rozet verilen kişide yetkinlik var mı",
     "D-9": "C-009 · ambulans sonrası alanda kalan",
-    "D-10": "C-022 · oryantasyon acil takviye",
+    "D-11": "C-022 · oryantasyon acil takviye",
 }
 
 
@@ -387,7 +443,7 @@ def main(argv: list[str]) -> int:
         if gevsek:
             parca.append(f"{gevsek} gevşek slot eksiği (kadro yetmedi)")
         if uyari:
-            parca.append(f"{len(uyari)} uyarı (elle yapılmış istisna)")
+            parca.append(f"{len(uyari)} uyarı (bilinçli istisna)")
         print(f"  SONUÇ: katı ihlal yok. {' · '.join(parca)}.")
     else:
         print("  SONUÇ: temiz — kontrol edilen kuralların hepsi sağlanıyor.")
