@@ -1,13 +1,14 @@
 """E-04 Personel — liste + sekmeli detay."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 ShiftEligibility = Literal["gunduz_gece", "sadece_gunduz", "sadece_gece"]
 AbsenceType = Literal["yillik_izin", "rapor", "ucretsiz_izin", "diger"]
-RuleType = Literal["off_talebi", "acilis_tercihi", "kapanis_tercihi"]
+RuleType = Literal["BOS_GUN", "SADECE_GUNDUZ", "SADECE_GECE"]
+RuleStrength = Literal["KESIN", "MUMKUNSE"]
 
 
 class Contract(BaseModel):
@@ -30,11 +31,31 @@ class Absence(BaseModel):
 
 
 class AvailabilityRule(BaseModel):
+    """Bir gün için istek. KESIN katı kuraldır, MUMKUNSE cezalandırılan tercihtir."""
+
     id: int
     target_date: date
     rule_type: RuleType
     type_label: str
+    strength: RuleStrength
+    strength_label: str
+    summary: str = Field(description="Listede görünen özet: '17 Eki 2026 » Boş gün'")
+    created_at: datetime | None = None
     note: str | None = None
+
+
+class StaffCompetency(BaseModel):
+    """Yetkinlik kataloğunun bir satırı + bu kişide var mı.
+
+    TASK = ızgarada rozet olan görevler (triyaj, gözlem, ambulans),
+    QUALIFICATION = rozetsiz yetkiler (ekip lideri, sayım, IV, İM, hasta iletişimi).
+    """
+
+    code: str
+    name: str
+    kind: Literal["TASK", "QUALIFICATION"]
+    group_label: str = Field(description="'Görevler' / 'Yetkiler'")
+    has: bool
 
 
 class Conflict(BaseModel):
@@ -53,6 +74,8 @@ class PersonRow(BaseModel):
     full_name: str
     role_code: str
     role_name: str
+    display_group: str = Field(description="Listede ve ızgarada toplandığı grup (roles tablosundan)")
+    group_order: int = Field(description="Grup içi sıra")
     shift_eligibility: ShiftEligibility
     eligibility_label: str
     monthly_target_hours: float | None = Field(
@@ -76,6 +99,9 @@ class PersonDetail(PersonRow):
     can_delete: bool = Field(default=True, description="Ataması yoksa gerçekten silinebilir")
     seniority_years: float | None = None
     note: str | None = None
+    competencies: list[StaffCompetency] = Field(
+        default_factory=list, description="Katalogun TAMAMI; has=true olanlar kişide var"
+    )
     contracts: list[Contract] = Field(default_factory=list)
     absences: list[Absence] = Field(default_factory=list)
     availability: list[AvailabilityRule] = Field(default_factory=list)
@@ -122,9 +148,25 @@ class AbsenceCreate(BaseModel):
 
 
 class AvailabilityCreate(BaseModel):
+    """Tek gün ya da aralık. `end` verilirse aralıktaki her güne bir istek yazılır."""
+
     target_date: date
+    end_date: date | None = Field(default=None, description="Verilirse aralık (DAHİL)")
     rule_type: RuleType
+    strength: RuleStrength = "MUMKUNSE"
     note: str | None = None
+
+
+class AvailabilityUpdate(BaseModel):
+    rule_type: RuleType | None = None
+    strength: RuleStrength | None = None
+    note: str | None = None
+
+
+class CompetencyAssignment(BaseModel):
+    """Kişinin yetkinlik listesi — tümü birden yazılır (eksikler silinir)."""
+
+    codes: list[str]
 
 
 class ConflictCreate(BaseModel):

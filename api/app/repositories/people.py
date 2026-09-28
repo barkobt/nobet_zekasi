@@ -22,7 +22,9 @@ SELECT s.id, s.sicil_no, s.full_name, s.shift_eligibility, s.is_active,
        -- target_is_default ile bildiriliyor.
        (SELECT p.param_value FROM constraint_params p
          JOIN constraints k ON k.id = p.constraint_id
-        WHERE k.code = 'monthly_min_hours' AND p.param_key = 'monthly_min_hours') AS kural_hedefi
+        WHERE k.code = 'monthly_min_hours' AND p.param_key = 'monthly_min_hours') AS kural_hedefi,
+       r.display_group,
+       r.sort_order AS group_order
 FROM staff s
 JOIN roles r      ON r.id = s.role_id
 LEFT JOIN staff b ON b.id = s.buddy_staff_id
@@ -36,13 +38,10 @@ LEFT JOIN LATERAL (
 ) c ON TRUE
 """
 
+# Sıra artık roles.sort_order'dan (migration 019): yeni bir rol eklendiğinde
+# listede ve ızgarada nereye düşeceği veritabanında yazılı, kodda değil.
 _SIRA = """
-ORDER BY CASE r.code
-           WHEN 'sorumlu_hemsire' THEN 1
-           WHEN 'egitim_hemsire'  THEN 2
-           WHEN 'shift_yetkilisi' THEN 3
-           ELSE 4
-         END, s.full_name
+ORDER BY COALESCE(r.sort_order, 999), s.full_name
 """
 
 
@@ -98,11 +97,22 @@ async def detay(staff_id: int) -> dict:
         izinler = await cur.fetchall()
 
         await cur.execute(
-            """SELECT id, target_date, rule_type, note
+            """SELECT id, target_date, rule_type, status, note, created_at
                FROM availability_rules WHERE staff_id = %s ORDER BY target_date DESC""",
             (staff_id,),
         )
         musaitlik = await cur.fetchall()
+
+        await cur.execute(
+            """SELECT c.code, c.name, c.kind,
+                      (sc.staff_id IS NOT NULL) AS has
+               FROM competencies c
+               LEFT JOIN staff_competencies sc
+                      ON sc.competency_id = c.id AND sc.staff_id = %s
+               ORDER BY c.kind DESC, c.name""",
+            (staff_id,),
+        )
+        yetkinlikler = await cur.fetchall()
 
         await cur.execute(
             """SELECT v.other_staff_id, s.full_name AS other_name, v.note
@@ -113,7 +123,7 @@ async def detay(staff_id: int) -> dict:
         )
         uyumsuzluk = await cur.fetchall()
 
-    return {"sozlesmeler": sozlesmeler, "izinler": izinler,
+    return {"sozlesmeler": sozlesmeler, "izinler": izinler, "yetkinlikler": yetkinlikler,
             "musaitlik": musaitlik, "uyumsuzluk": uyumsuzluk}
 
 
@@ -182,16 +192,74 @@ async def izin_sil(staff_id: int, absence_id: int) -> dict | None:
         return await cur.fetchone()
 
 
-async def musaitlik_ekle(staff_id: int, gun: date, tur: str, note: str | None) -> dict | None:
+async def musaitlik_ekle(staff_id: int, bas: date, bit: date, tur: str,
+                         guc: str, note: str | None) -> int:
+    """Tek gün ya da aralık. Aynı kişiye aynı güne TEK istek: mevcut olan güncellenir.
+
+    Tablodaki tekillik (staff_id, target_date, rule_type) üzerine; farklı TÜRDE ikinci
+    bir istek eklenmesin diye o günün başka türdeki isteği önce siliniyor.
+    """
+    gunler = [bas + timedelta(days=i) for i in range((bit - bas).days + 1)]
     async with cursor() as cur:
         await cur.execute(
-            """INSERT INTO availability_rules (staff_id, target_date, rule_type, note)
-               VALUES (%s, %s, %s, %s)
-               ON CONFLICT (staff_id, target_date, rule_type) DO UPDATE SET note = EXCLUDED.note
-               RETURNING id""",
-            (staff_id, gun, tur, note),
+            """DELETE FROM availability_rules
+                WHERE staff_id = %s AND target_date = ANY(%s) AND rule_type <> %s""",
+            (staff_id, gunler, tur),
+        )
+        await cur.executemany(
+            """INSERT INTO availability_rules (staff_id, target_date, rule_type, status, note)
+               VALUES (%s, %s, %s, %s, %s)
+               ON CONFLICT (staff_id, target_date, rule_type)
+               DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note""",
+            [(staff_id, g, tur, guc, note) for g in gunler],
+        )
+        return len(gunler)
+
+
+async def musaitlik_guncelle(staff_id: int, rule_id: int, tur: str | None,
+                             guc: str | None, note: str | None) -> dict | None:
+    alanlar, degerler = [], []
+    if tur is not None:
+        alanlar.append("rule_type = %s"); degerler.append(tur)
+    if guc is not None:
+        alanlar.append("status = %s"); degerler.append(guc)
+    if note is not None:
+        alanlar.append("note = %s"); degerler.append(note)
+    if not alanlar:
+        return {"id": rule_id}
+    async with cursor() as cur:
+        await cur.execute(
+            f"UPDATE availability_rules SET {', '.join(alanlar)} "
+            "WHERE id = %s AND staff_id = %s RETURNING id",
+            (*degerler, rule_id, staff_id),
         )
         return await cur.fetchone()
+
+
+async def yetkinlikleri_yaz(staff_id: int, kodlar: list[str]) -> list[str]:
+    """Kişinin yetkinliklerini VERİLEN LİSTEYE eşitler: eksikler silinir, yeniler eklenir.
+
+    Tek tek ekle/sil yerine tam liste yazmak, arayüzdeki onay kutularının durumunu
+    birebir yansıtır ve yarı uygulanmış bir değişiklik bırakmaz.
+    """
+    async with cursor() as cur:
+        await cur.execute("SELECT id, code FROM competencies")
+        kod_id = {r["code"]: r["id"] for r in await cur.fetchall()}
+        bilinmeyen = [k for k in kodlar if k not in kod_id]
+        if bilinmeyen:
+            return bilinmeyen
+        idler = [kod_id[k] for k in kodlar]
+        await cur.execute(
+            "DELETE FROM staff_competencies WHERE staff_id = %s AND competency_id <> ALL(%s)",
+            (staff_id, idler),
+        )
+        if idler:
+            await cur.executemany(
+                """INSERT INTO staff_competencies (staff_id, competency_id)
+                   VALUES (%s, %s) ON CONFLICT DO NOTHING""",
+                [(staff_id, i) for i in idler],
+            )
+        return []
 
 
 async def musaitlik_sil(staff_id: int, rule_id: int) -> dict | None:

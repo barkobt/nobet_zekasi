@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
@@ -39,8 +39,8 @@ export function Kunye({
   const baslangic = JSON.stringify(formaCevir(kisi));
   const degisti = JSON.stringify(form) !== baslangic;
 
-  // Başka bir kişiye geçilince form sıfırlansın
-  useEffect(() => setForm(formaCevir(kisi)), [kisi.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Form sıfırlaması için effect YOK: bileşen artık Düzenle penceresinin içinde,
+  // pencere her açılışta yeniden kuruluyor ve form o kişiyle başlıyor.
 
   const { data: roller } = useQuery({
     queryKey: ["roles"], queryFn: () => api<Role[]>("/people/roles"),

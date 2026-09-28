@@ -552,7 +552,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Müsaitlik kuralı ekle */
+        /** İstek ekle (tek gün ya da aralık) */
         post: operations["musaitlik_ekle_api_people__staff_id__availability_post"];
         delete?: never;
         options?: never;
@@ -572,6 +572,24 @@ export interface paths {
         post?: never;
         /** Müsaitlik kuralı sil */
         delete: operations["musaitlik_sil_api_people__staff_id__availability__rule_id__delete"];
+        options?: never;
+        head?: never;
+        /** İstek düzenle */
+        patch: operations["musaitlik_duzenle_api_people__staff_id__availability__rule_id__patch"];
+        trace?: never;
+    };
+    "/api/people/{staff_id}/competencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Yetkinlikleri yaz */
+        put: operations["yetkinlikler_api_people__staff_id__competencies_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -834,7 +852,10 @@ export interface components {
             /** Note */
             note?: string | null;
         };
-        /** AvailabilityCreate */
+        /**
+         * AvailabilityCreate
+         * @description Tek gün ya da aralık. `end` verilirse aralıktaki her güne bir istek yazılır.
+         */
         AvailabilityCreate: {
             /**
              * Target Date
@@ -842,14 +863,28 @@ export interface components {
              */
             target_date: string;
             /**
+             * End Date
+             * @description Verilirse aralık (DAHİL)
+             */
+            end_date?: string | null;
+            /**
              * Rule Type
              * @enum {string}
              */
-            rule_type: "off_talebi" | "acilis_tercihi" | "kapanis_tercihi";
+            rule_type: "BOS_GUN" | "SADECE_GUNDUZ" | "SADECE_GECE";
+            /**
+             * Strength
+             * @default MUMKUNSE
+             * @enum {string}
+             */
+            strength: "KESIN" | "MUMKUNSE";
             /** Note */
             note?: string | null;
         };
-        /** AvailabilityRule */
+        /**
+         * AvailabilityRule
+         * @description Bir gün için istek. KESIN katı kuraldır, MUMKUNSE cezalandırılan tercihtir.
+         */
         AvailabilityRule: {
             /** Id */
             id: number;
@@ -862,9 +897,32 @@ export interface components {
              * Rule Type
              * @enum {string}
              */
-            rule_type: "off_talebi" | "acilis_tercihi" | "kapanis_tercihi";
+            rule_type: "BOS_GUN" | "SADECE_GUNDUZ" | "SADECE_GECE";
             /** Type Label */
             type_label: string;
+            /**
+             * Strength
+             * @enum {string}
+             */
+            strength: "KESIN" | "MUMKUNSE";
+            /** Strength Label */
+            strength_label: string;
+            /**
+             * Summary
+             * @description Listede görünen özet: '17 Eki 2026 » Boş gün'
+             */
+            summary: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** AvailabilityUpdate */
+        AvailabilityUpdate: {
+            /** Rule Type */
+            rule_type?: ("BOS_GUN" | "SADECE_GUNDUZ" | "SADECE_GECE") | null;
+            /** Strength */
+            strength?: ("KESIN" | "MUMKUNSE") | null;
             /** Note */
             note?: string | null;
         };
@@ -996,6 +1054,14 @@ export interface components {
              * @default 0
              */
             staff_count: number;
+        };
+        /**
+         * CompetencyAssignment
+         * @description Kişinin yetkinlik listesi — tümü birden yazılır (eksikler silinir).
+         */
+        CompetencyAssignment: {
+            /** Codes */
+            codes: string[];
         };
         /** CompetencyMatrix */
         CompetencyMatrix: {
@@ -1656,6 +1722,16 @@ export interface components {
             /** Role Name */
             role_name: string;
             /**
+             * Display Group
+             * @description Listede ve ızgarada toplandığı grup (roles tablosundan)
+             */
+            display_group: string;
+            /**
+             * Group Order
+             * @description Grup içi sıra
+             */
+            group_order: number;
+            /**
              * Shift Eligibility
              * @enum {string}
              */
@@ -1707,6 +1783,11 @@ export interface components {
             seniority_years?: number | null;
             /** Note */
             note?: string | null;
+            /**
+             * Competencies
+             * @description Katalogun TAMAMI; has=true olanlar kişide var
+             */
+            competencies?: components["schemas"]["StaffCompetency"][];
             /** Contracts */
             contracts?: components["schemas"]["Contract"][];
             /** Absences */
@@ -1738,6 +1819,16 @@ export interface components {
             role_code: string;
             /** Role Name */
             role_name: string;
+            /**
+             * Display Group
+             * @description Listede ve ızgarada toplandığı grup (roles tablosundan)
+             */
+            display_group: string;
+            /**
+             * Group Order
+             * @description Grup içi sıra
+             */
+            group_order: number;
             /**
              * Shift Eligibility
              * @enum {string}
@@ -2215,6 +2306,31 @@ export interface components {
              * @description Yalnızca görev (kind=TASK) olabilecekler
              */
             task_codes?: string[];
+        };
+        /**
+         * StaffCompetency
+         * @description Yetkinlik kataloğunun bir satırı + bu kişide var mı.
+         *
+         *     TASK = ızgarada rozet olan görevler (triyaj, gözlem, ambulans),
+         *     QUALIFICATION = rozetsiz yetkiler (ekip lideri, sayım, IV, İM, hasta iletişimi).
+         */
+        StaffCompetency: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "TASK" | "QUALIFICATION";
+            /**
+             * Group Label
+             * @description 'Görevler' / 'Yetkiler'
+             */
+            group_label: string;
+            /** Has */
+            has: boolean;
         };
         /**
          * Summary
@@ -3547,6 +3663,77 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    musaitlik_duzenle_api_people__staff_id__availability__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvailabilityUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    yetkinlikler_api_people__staff_id__competencies_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompetencyAssignment"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

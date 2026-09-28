@@ -3,6 +3,8 @@ import type { components } from "@/lib/api-types";
 export type PersonRow = components["schemas"]["PersonRow"];
 export type PersonDetail = components["schemas"]["PersonDetail"];
 export type Role = components["schemas"]["Role"];
+export type StaffCompetency = components["schemas"]["StaffCompetency"];
+export type AvailabilityRule = components["schemas"]["AvailabilityRule"];
 
 export const CALISMA_TIPI: { deger: PersonRow["shift_eligibility"]; ad: string }[] = [
   { deger: "gunduz_gece", ad: "Gündüz + Gece" },
@@ -17,10 +19,17 @@ export const IZIN_TURU = [
   { deger: "diger", ad: "Diğer" },
 ] as const;
 
-export const MUSAITLIK_TURU = [
-  { deger: "off_talebi", ad: "İzin talebi" },
-  { deger: "acilis_tercihi", ad: "Açılış tercihi" },
-  { deger: "kapanis_tercihi", ad: "Kapanış tercihi" },
+/** İstek türleri. Eski adlar (off_talebi vb.) migration 020 ile kalktı. */
+export const ISTEK_TURU = [
+  { deger: "BOS_GUN", ad: "Boş gün" },
+  { deger: "SADECE_GUNDUZ", ad: "Sadece gündüz" },
+  { deger: "SADECE_GECE", ad: "Sadece gece" },
+] as const;
+
+/** İsteğin gücü: Kesin katı kuraldır, Mümkünse cezalandırılan tercihtir. */
+export const ISTEK_GUCU = [
+  { deger: "MUMKUNSE", ad: "Mümkünse" },
+  { deger: "KESIN", ad: "Kesin" },
 ] as const;
 
 const KISA_AY = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];

@@ -118,11 +118,27 @@ WHERE ar.status = 'MUMKUNSE'
   AND ar.target_date BETWEEN %(gun_bas)s AND %(gun_son)s
 """
 
+# Kişi başına TASLAĞIN DÖNEMİNDEKİ izin günü sayısı. Aylık hedef bu kadar
+# 'absence_daily_reduction_hours' düşürülür — solver de aynısını yapıyor.
+_IZIN_GUNLERI = """
+SELECT ab.staff_id, count(*) AS gun
+FROM absences ab
+JOIN schedule_drafts d ON d.id = %(draft_id)s
+CROSS JOIN LATERAL generate_series(
+    GREATEST(lower(ab.period), lower(d.period)),
+    LEAST(upper(ab.period), upper(d.period)) - 1,
+    INTERVAL '1 day'
+) g
+WHERE ab.period && d.period
+GROUP BY ab.staff_id
+"""
+
 # Hedef saatler kodda değil veritabanında (app/hedef.py bunları kullanır).
 _HEDEF_PARAMETRELERI = """
 SELECT p.param_key, p.param_value
 FROM constraint_params p
-WHERE p.param_key IN ('monthly_min_hours', 'weekly_reference_hours')
+WHERE p.param_key IN ('monthly_min_hours', 'weekly_reference_hours',
+                      'absence_daily_reduction_hours')
 """
 
 # Ayrılan personel: aktif değil ama bu taslakta ÇALIŞMIŞSA satırı görünmeli — kağıt
@@ -224,6 +240,9 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         await cur.execute("SELECT period FROM schedule_drafts WHERE id = %(draft_id)s", p)
         donem = (await cur.fetchone())["period"]
 
+        await cur.execute(_IZIN_GUNLERI, {"draft_id": draft_id})
+        izin_gunleri = {r["staff_id"]: int(r["gun"]) for r in await cur.fetchall()}
+
     return {
         "personel": personel,
         "atamalar": atamalar,
@@ -238,6 +257,7 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         "dis_kapsama": dis_kapsama,
         "hucre_istekleri": hucre_istekleri,
         "donem": donem,
+        "izin_gunleri": izin_gunleri,
     }
 
 

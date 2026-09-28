@@ -34,6 +34,18 @@ def donem_hedefi(tur: str, aylik_min: float | None, haftalik_ref: float | None) 
     return None
 
 
+def izin_dusumu(hedef: float | None, izin_gunu: int, gunluk_dusum: float | None) -> float | None:
+    """Aylık hedeften izin/rapor günlerini düşer (C-004 parametresi).
+
+    Solver aynı hesabı yapıyor (solver/model.py, absence_daily_reduction_hours):
+    ekranın 200 deyip çözücünün 125 istemesi, izinli birini eksik çalışmış gibi
+    gösterirdi. Haftalık referansta (C-003) düşüm YOK — o kural izni tanımıyor.
+    """
+    if hedef is None or not gunluk_dusum or izin_gunu <= 0:
+        return hedef
+    return max(0.0, round(hedef - izin_gunu * float(gunluk_dusum), 1))
+
+
 def hedef_etiketi(tur: str, hedef: float | None) -> str | None:
     """Ekranda ve Excel'de hedefin ne olduğunu söyleyen tek cümlelik etiket."""
     if hedef is None:

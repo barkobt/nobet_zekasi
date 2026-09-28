@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Search } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { DetayPaneli } from "@/components/personel/DetayPaneli";
@@ -20,13 +20,55 @@ import {
 import { api } from "@/lib/api";
 import { CALISMA_TIPI, basHarf, type PersonDetail, type PersonRow, type Role } from "@/lib/personel";
 
+/** Sıralanabilir sütunlar. */
+type Alan = "sicil" | "ad" | "soyad" | "rol" | "grup" | "tip" | "hedef";
+
+function Baslik({
+  alan, genislik, sag, sirala, onSirala, children,
+}: {
+  alan: Alan;
+  genislik?: string;
+  sag?: boolean;
+  sirala: { alan: Alan; yon: "artan" | "azalan" } | null;
+  onSirala: (a: Alan) => void;
+  children: React.ReactNode;
+}) {
+  const etkin = sirala?.alan === alan;
+  return (
+    <TableHead style={genislik ? { width: genislik } : undefined} className={sag ? "text-right" : ""}>
+      <button
+        type="button"
+        onClick={() => onSirala(alan)}
+        className="inline-flex items-center gap-1 hover:text-foreground"
+        aria-label={`${String(children)} sütununa göre sırala`}
+      >
+        {children}
+        {etkin &&
+          (sirala.yon === "artan"
+            ? <ArrowUp size={12} strokeWidth={2} aria-hidden />
+            : <ArrowDown size={12} strokeWidth={2} aria-hidden />)}
+      </button>
+    </TableHead>
+  );
+}
+
 export default function PersonelSayfasi() {
   const [arama, setArama] = useState("");
   const [rolFiltre, setRolFiltre] = useState("");
   const [tipFiltre, setTipFiltre] = useState("");
   const [secili, setSecili] = useState<number | null>(null);
+  // Bir satır seçilince ekran ikiye bölünür: solda daralmış liste, sağda detay.
+  const bolunmus = secili !== null;
 
   const [durum, setDurum] = useState<"aktif" | "pasif" | "hepsi">("aktif");
+  const [sirala, setSirala] = useState<{ alan: Alan; yon: "artan" | "azalan" } | null>(null);
+
+  const sirayaAl = (alan: Alan) =>
+    setSirala((e) =>
+      e?.alan === alan
+        ? { alan, yon: e.yon === "artan" ? "azalan" : "artan" }
+        : { alan, yon: "artan" },
+    );
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["people", durum],
@@ -45,23 +87,41 @@ export default function PersonelSayfasi() {
     );
   }, [data, arama, rolFiltre, tipFiltre]);
 
+  // Sütun sıralaması: aynı sütuna ikinci tıklayış yönü çevirir.
+  const siralilar = useMemo(() => {
+    if (!sirala) return satirlar;
+    const { alan, yon } = sirala;
+    const anahtar = (p: PersonRow): string | number =>
+      alan === "sicil" ? (p.sicil_no ?? "")
+      : alan === "ad" ? p.first_name
+      : alan === "soyad" ? p.last_name
+      : alan === "rol" ? p.role_name
+      : alan === "grup" ? p.display_group
+      : alan === "tip" ? p.eligibility_label
+      : (p.monthly_target_hours ?? 0);
+    return [...satirlar].sort((a, b) => {
+      const x = anahtar(a), y = anahtar(b);
+      const k = typeof x === "number" && typeof y === "number"
+        ? x - y
+        : String(x).localeCompare(String(y), "tr");
+      return yon === "artan" ? k : -k;
+    });
+  }, [satirlar, sirala]);
+
+  // Gruplar ARTIK VERİTABANINDAN (roles.display_group / sort_order). Sabit dizi
+  // kalkınca yeni bir rol eklendiğinde listede kaybolmuyor.
   const gruplar = useMemo(() => {
-    // Yetkinlik Matrisi ile AYNI gruplama: iki ekran aynı zihinsel düzeni paylaşsın.
-    const tanim: { ad: string; roller: string[] | null }[] = [
-      { ad: "Sorumlu & Eğitim", roller: ["sorumlu_hemsire", "egitim_hemsire"] },
-      { ad: "Ekip Liderleri", roller: ["shift_yetkilisi"] },
-      { ad: "Hemşireler", roller: null },
-    ];
-    return tanim
-      .map((g, i) => ({
-        ad: g.ad,
-        satirlar: satirlar.filter((p) =>
-          g.roller ? g.roller.includes(p.role_code)
-                   : !tanim.slice(0, i).some((o) => o.roller?.includes(p.role_code)),
-        ),
-      }))
-      .filter((g) => g.satirlar.length > 0);
-  }, [satirlar]);
+    const m = new Map<string, { ad: string; sira: number; satirlar: PersonRow[] }>();
+    for (const p of siralilar) {
+      const g = m.get(p.display_group) ?? {
+        ad: p.display_group, sira: p.group_order, satirlar: [],
+      };
+      g.sira = Math.min(g.sira, p.group_order);
+      g.satirlar.push(p);
+      m.set(p.display_group, g);
+    }
+    return [...m.values()].sort((a, b) => a.sira - b.sira);
+  }, [siralilar]);
 
   const roller = useMemo(() => {
     const m = new Map<string, string>();
@@ -132,7 +192,13 @@ export default function PersonelSayfasi() {
         )}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className={bolunmus ? "flex min-h-0 flex-1 gap-4" : ""}>
+      <div
+        className={
+          "overflow-auto rounded-lg border bg-card " +
+          (bolunmus ? "w-[340px] shrink-0" : "")
+        }
+      >
         {error ? (
           <HataKutusu hata={error} onTekrar={() => refetch()} kisa />
         ) : isLoading ? (
@@ -143,10 +209,18 @@ export default function PersonelSayfasi() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[280px]">Ad Soyad</TableHead>
-                <TableHead className="w-[220px]">Rol</TableHead>
-                <TableHead className="w-[160px]">Çalışma tipi</TableHead>
-                <TableHead>Durum</TableHead>
+                <Baslik alan="sicil" genislik="90px" sirala={sirala} onSirala={sirayaAl}>Sicil</Baslik>
+                <Baslik alan="ad" genislik="200px" sirala={sirala} onSirala={sirayaAl}>Ad</Baslik>
+                {!bolunmus && (
+                  <>
+                    <Baslik alan="soyad" genislik="170px" sirala={sirala} onSirala={sirayaAl}>Soyad</Baslik>
+                    <Baslik alan="rol" genislik="210px" sirala={sirala} onSirala={sirayaAl}>Rol</Baslik>
+                    <Baslik alan="grup" genislik="160px" sirala={sirala} onSirala={sirayaAl}>Grup</Baslik>
+                    <Baslik alan="tip" genislik="150px" sirala={sirala} onSirala={sirayaAl}>Çalışma tipi</Baslik>
+                    <Baslik alan="hedef" genislik="120px" sag sirala={sirala} onSirala={sirayaAl}>Aylık hedef</Baslik>
+                    <TableHead>Durum</TableHead>
+                  </>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -155,7 +229,7 @@ export default function PersonelSayfasi() {
               {gruplar.map((grup) => (
                 <Fragment key={grup.ad}>
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={4} className="h-9 bg-background py-0">
+                    <TableCell colSpan={bolunmus ? 2 : 8} className="h-9 bg-background py-0">
                       <span
                         className="text-muted-foreground"
                         style={{ fontSize: "var(--text-xs)", letterSpacing: "0.04em" }}
@@ -169,11 +243,18 @@ export default function PersonelSayfasi() {
                   {grup.satirlar.map((p) => (
                     <TableRow
                       key={p.id}
-                      className={"h-11 cursor-pointer " + (p.is_active ? "" : "opacity-55")}
+                      className={
+                        "h-11 cursor-pointer " +
+                        (p.is_active ? "" : "opacity-55 ") +
+                        (p.id === secili ? "bg-brand-soft " : "")
+                      }
                       onClick={() => setSecili(p.id)}
                       tabIndex={0}
                       onKeyDown={(e) => e.key === "Enter" && setSecili(p.id)}
                     >
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {p.sicil_no ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <span className="flex items-center gap-2.5">
                           <span
@@ -183,20 +264,37 @@ export default function PersonelSayfasi() {
                           >
                             {basHarf(p.full_name)}
                           </span>
-                          <span className="font-medium">{p.full_name}</span>
+                          <span className="font-medium">
+                            {bolunmus ? p.full_name : p.first_name}
+                          </span>
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{p.role_name}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className="h-5 rounded-sm px-1.5 font-normal"
-                          style={{ fontSize: "var(--text-xs)" }}
-                        >
-                          {p.eligibility_label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{p.status_label}</TableCell>
+                      {!bolunmus && (
+                        <>
+                          <TableCell className="font-medium">{p.last_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{p.role_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{p.display_group}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className="h-5 rounded-sm px-1.5 font-normal"
+                              style={{ fontSize: "var(--text-xs)" }}
+                            >
+                              {p.eligibility_label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {p.monthly_target_hours == null ? "—" : `${p.monthly_target_hours} sa`}
+                            {p.target_is_default && (
+                              <span className="ml-1 text-muted-foreground"
+                                    style={{ fontSize: "var(--text-xs)" }} title="Kural varsayılanı">
+                                ·
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{p.status_label}</TableCell>
+                        </>
+                      )}
                     </TableRow>
                   ))}
                 </Fragment>
@@ -207,6 +305,7 @@ export default function PersonelSayfasi() {
       </div>
 
       <DetayPaneli staffId={secili} herkes={data ?? []} onKapat={() => setSecili(null)} />
+      </div>
     </AppShell>
   );
 }

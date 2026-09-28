@@ -1,0 +1,1 @@
+ALTER TABLE roles DROP COLUMN IF EXISTS display_group, DROP COLUMN IF EXISTS sort_order;

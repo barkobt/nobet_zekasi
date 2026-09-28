@@ -7,9 +7,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.repositories import people as repo
 from app.schemas.people import (
-    Absence, AbsenceCreate, AvailabilityCreate, AvailabilityRule, Conflict, ConflictCreate,
-    Contract, ContractUpsert, DeleteResult, PersonCreate, PersonDetail, PersonRow,
-    PersonUpdate, Role,
+    Absence, AbsenceCreate, AvailabilityCreate, AvailabilityRule, AvailabilityUpdate,
+    CompetencyAssignment, StaffCompetency, Conflict, ConflictCreate, Contract, ContractUpsert,
+    DeleteResult, PersonCreate, PersonDetail, PersonRow, PersonUpdate, Role,
 )
 
 router = APIRouter(prefix="/people", tags=["personel"])
@@ -24,9 +24,10 @@ IZIN_ADI = {
     "ucretsiz_izin": "Ücretsiz izin", "diger": "Diğer",
 }
 MUSAITLIK_ADI = {
-    "off_talebi": "İzin talebi", "acilis_tercihi": "Açılış tercihi",
-    "kapanis_tercihi": "Kapanış tercihi",
+    "BOS_GUN": "Boş gün", "SADECE_GUNDUZ": "Sadece gündüz", "SADECE_GECE": "Sadece gece",
 }
+GUC_ADI = {"KESIN": "Kesin", "MUMKUNSE": "Mümkünse"}
+YETKINLIK_GRUBU = {"TASK": "Görevler", "QUALIFICATION": "Yetkiler"}
 KISA_AY = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
 
 
@@ -58,6 +59,8 @@ def _satir(s: dict) -> PersonRow:
     return PersonRow(
         id=s["id"], sicil_no=s["sicil_no"], first_name=ad, last_name=soyad,
         full_name=s["full_name"], role_code=s["role_code"], role_name=s["role_name"],
+        display_group=s.get("display_group") or "Diğer",
+        group_order=s.get("group_order") or 999,
         shift_eligibility=s["shift_eligibility"],
         eligibility_label=CALISMA_TIPI.get(s["shift_eligibility"], s["shift_eligibility"]),
         # "is not None" — falsy kontrolü 0'ı yok sayıyordu; 0 kıdem ya da
@@ -118,8 +121,20 @@ async def detay(staff_id: int) -> PersonDetail:
         availability=[
             AvailabilityRule(
                 id=m["id"], target_date=m["target_date"], rule_type=m["rule_type"],
-                type_label=MUSAITLIK_ADI.get(m["rule_type"], m["rule_type"]), note=m["note"],
+                type_label=MUSAITLIK_ADI.get(m["rule_type"], m["rule_type"]),
+                strength=m["status"],
+                strength_label=GUC_ADI.get(m["status"], m["status"]),
+                # Listede tek satırda okunsun: "17 Eki 2026 » Boş gün"
+                summary=f"{_tarih(m["target_date"])} » "
+                        f"{MUSAITLIK_ADI.get(m['rule_type'], m['rule_type'])}",
+                created_at=m["created_at"], note=m["note"],
             ) for m in d["musaitlik"]
+        ],
+        competencies=[
+            StaffCompetency(
+                code=y["code"], name=y["name"], kind=y["kind"],
+                group_label=YETKINLIK_GRUBU.get(y["kind"], y["kind"]), has=y["has"],
+            ) for y in d["yetkinlikler"]
         ],
         conflicts=[Conflict(**u) for u in d["uyumsuzluk"]],
     )
@@ -251,9 +266,39 @@ async def izin_sil(staff_id: int, absence_id: int) -> PersonDetail:
 
 
 @router.post("/{staff_id}/availability", response_model=PersonDetail, status_code=201,
-             summary="Müsaitlik kuralı ekle")
+             summary="İstek ekle (tek gün ya da aralık)")
 async def musaitlik_ekle(staff_id: int, istek: AvailabilityCreate) -> PersonDetail:
-    await repo.musaitlik_ekle(staff_id, istek.target_date, istek.rule_type, istek.note)
+    son = istek.end_date or istek.target_date
+    if son < istek.target_date:
+        raise HTTPException(status_code=422, detail="Bitiş tarihi başlangıçtan önce olamaz.")
+    if (son - istek.target_date).days > 92:
+        raise HTTPException(status_code=422, detail="Aralık en fazla 3 ay olabilir.")
+    await repo.musaitlik_ekle(
+        staff_id, istek.target_date, son, istek.rule_type, istek.strength, istek.note
+    )
+    return await detay(staff_id)
+
+
+@router.patch("/{staff_id}/availability/{rule_id}", response_model=PersonDetail,
+              summary="İstek düzenle")
+async def musaitlik_duzenle(staff_id: int, rule_id: int,
+                            istek: AvailabilityUpdate) -> PersonDetail:
+    if await repo.musaitlik_guncelle(
+        staff_id, rule_id, istek.rule_type, istek.strength, istek.note
+    ) is None:
+        raise HTTPException(status_code=404, detail="Kayıt bulunamadı.")
+    return await detay(staff_id)
+
+
+@router.put("/{staff_id}/competencies", response_model=PersonDetail,
+            summary="Yetkinlikleri yaz")
+async def yetkinlikler(staff_id: int, istek: CompetencyAssignment) -> PersonDetail:
+    if await repo.getir(staff_id) is None:
+        raise HTTPException(status_code=404, detail="Personel bulunamadı.")
+    bilinmeyen = await repo.yetkinlikleri_yaz(staff_id, istek.codes)
+    if bilinmeyen:
+        raise HTTPException(status_code=422,
+                            detail=f"Bilinmeyen yetkinlik: {', '.join(bilinmeyen)}")
     return await detay(staff_id)
 
 

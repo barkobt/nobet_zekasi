@@ -7,6 +7,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { PersonDetail } from "@/lib/personel";
@@ -21,8 +23,8 @@ type DeleteResult = components["schemas"]["DeleteResult"];
  * ne olacağını baştan söylüyor.
  */
 export function SilmeBolumu({
-  kisi, onSilindi,
-}: { kisi: PersonDetail; onSilindi: () => void }) {
+  kisi, onSilindi, kompakt,
+}: { kisi: PersonDetail; onSilindi: () => void; kompakt?: boolean }) {
   const qc = useQueryClient();
   const silinebilir = kisi.can_delete;
 
@@ -34,17 +36,13 @@ export function SilmeBolumu({
     },
   });
 
-  return (
-    <section className="border-t pt-4">
-      <p className="mb-2 text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-        {silinebilir
-          ? "Bu kişinin hiç ataması yok, kaydı tamamen silinebilir."
-          : "Personel yeni taslaklarda yer almaz, geçmiş korunur."}
-      </p>
+  // kompakt: başlık satırında yalnız düğme durur; ne olacağını onay penceresi anlatır.
+  const govde = (
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="ghost" size="sm" className="text-danger hover:text-danger">
-            {silinebilir ? "Personeli sil" : "Pasife al"}
+          <Button variant="outline" size="sm" className="text-danger hover:text-danger">
+            <Trash2 size={14} strokeWidth={1.75} />
+            {silinebilir ? "Sil" : "Pasife al"}
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
@@ -67,6 +65,17 @@ export function SilmeBolumu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+  );
+
+  if (kompakt) return govde;
+  return (
+    <section className="border-t pt-4">
+      <p className="mb-2 text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+        {silinebilir
+          ? "Bu kişinin hiç ataması yok, kaydı tamamen silinebilir."
+          : "Personel yeni taslaklarda yer almaz, geçmiş korunur."}
+      </p>
+      {govde}
     </section>
   );
 }

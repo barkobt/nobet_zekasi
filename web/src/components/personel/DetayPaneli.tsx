@@ -2,22 +2,26 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
+import { Pencil, Trash2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  IZIN_TURU, MUSAITLIK_TURU, basHarf, bugun, tarih,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { api, sunucuAciklamasi } from "@/lib/api";
+import {
+  ISTEK_GUCU, ISTEK_TURU, IZIN_TURU, basHarf, bugun, tarih,
   type PersonDetail, type PersonRow,
 } from "@/lib/personel";
 import { Kunye } from "./Kunye";
-import { Alan, Bolum, Bos, EkleDugmesi, Hata, Ikili, SatirKart } from "./parcalar";
+import { SilmeBolumu } from "./SilmeBolumu";
+import { Alan, Bos, EkleDugmesi, Hata, Ikili, SatirKart } from "./parcalar";
 
-/** E-04 sağ panel: Künye · Sözleşme · Müsaitlik · Devamsızlık · Uyumsuzluk. */
+/** E-04 detay paneli: Yetkinlikler · Sözleşme · Devamsızlık · İstekler · Uyumsuzluk. */
 export function DetayPaneli({
   staffId, herkes, onKapat,
 }: { staffId: number | null; herkes: PersonRow[]; onKapat: () => void }) {
@@ -31,94 +35,199 @@ export function DetayPaneli({
   const tazele = (yeni: PersonDetail) => {
     qc.setQueryData(["person", staffId], yeni);
     qc.invalidateQueries({ queryKey: ["people"] });
+    // Yetkinlik, istek ve izin değişikliği çizelgeyi de etkiler.
+    qc.invalidateQueries({ queryKey: ["schedule"] });
   };
 
+  if (staffId === null) return null;
+
   return (
-    <Sheet open={staffId !== null} onOpenChange={(a) => !a && onKapat()}>
-      <SheetContent className="flex w-[600px] flex-col gap-0 p-0 sm:max-w-[600px]">
-        <SheetHeader className="px-6 pb-3 pt-6">
-          <div className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
-              style={{ fontSize: "var(--text-base)", fontWeight: 600 }}
-            >
-              {data ? basHarf(data.full_name) : ""}
-            </span>
-            <div className="min-w-0">
-              <SheetTitle style={{ fontSize: "var(--text-base)" }}>
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card">
+      {/* Başlık: sicil · AD SOYAD · Düzenle · Sil */}
+      <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+            style={{ fontSize: "var(--text-base)", fontWeight: 600 }}
+          >
+            {data ? basHarf(data.full_name) : ""}
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              {data?.sicil_no && (
+                <span className="text-muted-foreground tabular-nums"
+                      style={{ fontSize: "var(--text-xs)" }}>
+                  {data.sicil_no}
+                </span>
+              )}
+              <h2 className="truncate" style={{ fontSize: "var(--text-base)", fontWeight: 600 }}>
                 {data?.full_name ?? "…"}
-              </SheetTitle>
+              </h2>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
                 {data?.role_name}
               </span>
-            </div>
-          </div>
-
-          {data && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
-                     style={{ fontSize: "var(--text-xs)" }}>
-                {data.eligibility_label}
-              </Badge>
-              {data.status_label && (
+              {data && (
+                <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
+                       style={{ fontSize: "var(--text-xs)" }}>
+                  {data.eligibility_label}
+                </Badge>
+              )}
+              {data?.status_label && (
                 <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
                        style={{ fontSize: "var(--text-xs)" }}>
                   {data.status_label}
                 </Badge>
               )}
-              {data.sicil_no && (
-                <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-normal"
-                       style={{ fontSize: "var(--text-xs)" }}>
-                  Sicil {data.sicil_no}
-                </Badge>
-              )}
             </div>
-          )}
-        </SheetHeader>
+          </div>
+        </div>
 
-        {data && (
-          <Tabs defaultValue="kunye" className="flex min-h-0 flex-1 flex-col">
-            {/* Sekmeler kesilmesin: dar panelde yatay kaydırılır */}
-            {/* Sade metin sekmeler, hepsi tek satırda. Yatay kaydırma YOK. */}
-            <TabsList className="mx-6 h-auto w-[calc(100%-3rem)] justify-between gap-0 rounded-none border-b bg-transparent p-0">
-              {[
-                ["kunye", "Künye"], ["sozlesme", "Sözleşme"], ["musaitlik", "Müsaitlik"],
-                ["devamsizlik", "İzinler"], ["uyumsuzluk", "Uyumsuzluk"],
-              ].map(([deger, ad]) => (
-                <TabsTrigger
-                  key={deger}
-                  value={deger}
-                  className="flex-1 whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-2 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                >
-                  {ad}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+        <div className="flex shrink-0 items-center gap-1">
+          {data && <DuzenlePenceresi kisi={data} herkes={herkes} onKaydet={tazele} />}
+          {data && <SilmeBolumu kisi={data} onSilindi={onKapat} kompakt />}
+          <Button variant="ghost" size="icon" onClick={onKapat} aria-label="Detayı kapat">
+            <X size={16} strokeWidth={1.75} />
+          </Button>
+        </div>
+      </div>
 
-            <TabsContent value="kunye" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-              <Kunye kisi={data} herkes={herkes} onKaydet={tazele} onSilindi={onKapat} />
-            </TabsContent>
+      {data && (
+        <Tabs defaultValue="yetkinlik" className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="mx-5 h-auto w-[calc(100%-2.5rem)] justify-start gap-4 rounded-none border-b bg-transparent p-0">
+            {[
+              ["yetkinlik", "Yetkinlikler"], ["sozlesme", "Sözleşme"],
+              ["devamsizlik", "Devamsızlık"], ["istekler", "İstekler"],
+              ["uyumsuzluk", "Uyumsuzluk"],
+            ].map(([deger, ad]) => (
+              <TabsTrigger
+                key={deger}
+                value={deger}
+                className="whitespace-nowrap rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-2 data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              >
+                {ad}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-            <TabsContent value="sozlesme" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-              <Sozlesme kisi={data} onKaydet={tazele} />
-            </TabsContent>
+          <TabsContent value="yetkinlik" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <Yetkinlikler kisi={data} onKaydet={tazele} />
+          </TabsContent>
+          <TabsContent value="sozlesme" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <Sozlesme kisi={data} onKaydet={tazele} />
+          </TabsContent>
+          <TabsContent value="devamsizlik" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <Devamsizlik kisi={data} onKaydet={tazele} />
+          </TabsContent>
+          <TabsContent value="istekler" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <Istekler kisi={data} onKaydet={tazele} />
+          </TabsContent>
+          <TabsContent value="uyumsuzluk" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <Uyumsuzluk kisi={data} herkes={herkes} onKaydet={tazele} />
+          </TabsContent>
+        </Tabs>
+      )}
+    </div>
+  );
+}
 
-            <TabsContent value="musaitlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-              <Musaitlik kisi={data} onKaydet={tazele} />
-            </TabsContent>
+/* ------------------------------------------------------- Düzenle penceresi */
+function DuzenlePenceresi({
+  kisi, herkes, onKaydet,
+}: { kisi: PersonDetail; herkes: PersonRow[]; onKaydet: (d: PersonDetail) => void }) {
+  const [ac, setAc] = useState(false);
+  return (
+    <Dialog open={ac} onOpenChange={setAc}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Pencil size={14} strokeWidth={1.75} />
+          Düzenle
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle>{kisi.full_name}</DialogTitle>
+        </DialogHeader>
+        <Kunye
+          kisi={kisi}
+          herkes={herkes}
+          onKaydet={(d) => { onKaydet(d); setAc(false); }}
+          onSilindi={() => setAc(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-            <TabsContent value="devamsizlik" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-              <Devamsizlik kisi={data} onKaydet={tazele} />
-            </TabsContent>
+/* ---------------------------------------------------------- Yetkinlikler */
+function Yetkinlikler({
+  kisi, onKaydet,
+}: { kisi: PersonDetail; onKaydet: (d: PersonDetail) => void }) {
+  // Seçim yerel: kullanıcı birkaç kutu işaretleyip bir kez kaydeder.
+  const mevcut = (kisi.competencies ?? []).filter((c) => c.has).map((c) => c.code);
+  const [secim, setSecim] = useState<string[] | null>(null);
+  const liste = secim ?? mevcut;
 
-            <TabsContent value="uyumsuzluk" className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-              <Uyumsuzluk kisi={data} herkes={herkes} onKaydet={tazele} />
-            </TabsContent>
-          </Tabs>
+  const kaydet = useMutation({
+    mutationFn: () =>
+      api<PersonDetail>(`/people/${kisi.id}/competencies`, {
+        method: "PUT", body: JSON.stringify({ codes: liste }),
+      }),
+    onSuccess: (d) => { onKaydet(d); setSecim(null); },
+  });
+
+  const degisti =
+    secim !== null &&
+    (secim.length !== mevcut.length || secim.some((k) => !mevcut.includes(k)));
+
+  const gruplar = ["Görevler", "Yetkiler"];
+
+  return (
+    <div className="grid gap-4">
+      {gruplar.map((g) => {
+        const uyeler = (kisi.competencies ?? []).filter((c) => c.group_label === g);
+        if (uyeler.length === 0) return null;
+        return (
+          <div key={g} className="grid gap-2">
+            <span className="text-muted-foreground"
+                  style={{ fontSize: "var(--text-xs)", letterSpacing: "0.04em" }}>
+              {g.toLocaleUpperCase("tr")}
+            </span>
+            {uyeler.map((c) => (
+              <label key={c.code} className="flex items-center gap-2.5">
+                <Checkbox
+                  checked={liste.includes(c.code)}
+                  onCheckedChange={(v) =>
+                    setSecim(
+                      v ? [...liste, c.code] : liste.filter((k) => k !== c.code),
+                    )
+                  }
+                />
+                <span>{c.name}</span>
+                <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+                  {c.code}
+                </span>
+              </label>
+            ))}
+          </div>
+        );
+      })}
+
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => kaydet.mutate()} disabled={!degisti || kaydet.isPending}>
+          {kaydet.isPending ? "Kaydediliyor…" : "Kaydet"}
+        </Button>
+        {degisti && (
+          <Button size="sm" variant="outline" onClick={() => setSecim(null)}>Vazgeç</Button>
         )}
-      </SheetContent>
-    </Sheet>
+      </div>
+      <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+        Yetkinlik kaldırılınca solver o kişiye o görevi bir daha vermez; geçmiş
+        çizelgelerdeki rozetler durur.
+      </p>
+    </div>
   );
 }
 
@@ -211,54 +320,150 @@ function Sozlesme({ kisi, onKaydet }: { kisi: PersonDetail; onKaydet: (d: Person
 }
 
 /* ----------------------------------------------------------- Müsaitlik */
-function Musaitlik({ kisi, onKaydet }: { kisi: PersonDetail; onKaydet: (d: PersonDetail) => void }) {
+function Istekler({
+  kisi, onKaydet,
+}: { kisi: PersonDetail; onKaydet: (d: PersonDetail) => void }) {
   const [ac, setAc] = useState(false);
-  const [form, setForm] = useState({ target_date: bugun(), rule_type: "off_talebi" });
+  const [duzenlenen, setDuzenlenen] = useState<number | null>(null);
+  const [form, setForm] = useState({
+    target_date: bugun(), end_date: "", rule_type: "BOS_GUN",
+    strength: "MUMKUNSE", note: "",
+  });
 
   const ekle = useMutation({
     mutationFn: () =>
       api<PersonDetail>(`/people/${kisi.id}/availability`, {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify(form),
+        method: "POST",
+        body: JSON.stringify({
+          target_date: form.target_date,
+          // Boş bırakılırsa tek gün: sunucu end_date yoksa target_date kullanıyor.
+          end_date: form.end_date || null,
+          rule_type: form.rule_type,
+          strength: form.strength,
+          note: form.note || null,
+        }),
       }),
     onSuccess: (d) => { onKaydet(d); setAc(false); },
   });
+
+  const guncelle = useMutation({
+    mutationFn: (v: { id: number; alan: Record<string, string> }) =>
+      api<PersonDetail>(`/people/${kisi.id}/availability/${v.id}`, {
+        method: "PATCH", body: JSON.stringify(v.alan),
+      }),
+    onSuccess: (d) => { onKaydet(d); setDuzenlenen(null); },
+  });
+
   const sil = useMutation({
     mutationFn: (id: number) =>
       api<PersonDetail>(`/people/${kisi.id}/availability/${id}`, { method: "DELETE" }),
     onSuccess: onKaydet,
   });
 
+  const istekler = kisi.availability ?? [];
+
   return (
     <div className="grid gap-2">
       <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-        Çalışma tipi (gündüz / gece) Künye sekmesinde. Burada gün bazlı istekler durur.
+        <strong className="font-medium">Kesin</strong> istek katı kuraldır, çözüm onu bozamaz.
+        <strong className="font-medium"> Mümkünse</strong> tercihtir: karşılanamazsa
+        çözüm teşhisinde &quot;karşılanamayan tercih&quot; olarak görünür.
       </p>
-      {(kisi.availability ?? []).length === 0 && <Bos>Gün bazlı istek yok.</Bos>}
-      {(kisi.availability ?? []).map((m) => (
-        <SatirKart key={m.id} onSil={() => sil.mutate(m.id)}>
-          {tarih(m.target_date)} · {m.type_label}
-        </SatirKart>
+
+      {istekler.length === 0 && <Bos>Kayıtlı istek yok.</Bos>}
+
+      {istekler.map((m) => (
+        <div key={m.id} className="rounded-md border px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="font-medium">{m.summary}</span>
+              <Badge variant="secondary" className="ml-2 h-5 rounded-sm px-1.5 font-normal"
+                     style={{ fontSize: "var(--text-xs)" }}>
+                {m.strength_label}
+              </Badge>
+              {m.note && (
+                <p className="truncate text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+                  {m.note}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 gap-1">
+              <Button variant="ghost" size="icon"
+                      onClick={() => setDuzenlenen(duzenlenen === m.id ? null : m.id)}
+                      aria-label="İsteği düzenle">
+                <Pencil size={14} strokeWidth={1.75} />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => sil.mutate(m.id)}
+                      aria-label="İsteği sil">
+                <Trash2 size={14} strokeWidth={1.75} />
+              </Button>
+            </div>
+          </div>
+
+          {duzenlenen === m.id && (
+            <div className="mt-2 grid gap-2 border-t pt-2">
+              <Ikili>
+                <Alan etiket="Tür">
+                  <select className="h-9 w-full rounded-md border bg-card px-2"
+                          defaultValue={m.rule_type}
+                          onChange={(e) =>
+                            guncelle.mutate({ id: m.id, alan: { rule_type: e.target.value } })}>
+                    {ISTEK_TURU.map((t) => <option key={t.deger} value={t.deger}>{t.ad}</option>)}
+                  </select>
+                </Alan>
+                <Alan etiket="Güç">
+                  <select className="h-9 w-full rounded-md border bg-card px-2"
+                          defaultValue={m.strength}
+                          onChange={(e) =>
+                            guncelle.mutate({ id: m.id, alan: { strength: e.target.value } })}>
+                    {ISTEK_GUCU.map((t) => <option key={t.deger} value={t.deger}>{t.ad}</option>)}
+                  </select>
+                </Alan>
+              </Ikili>
+            </div>
+          )}
+        </div>
       ))}
 
       {ac ? (
         <div className="grid gap-2 rounded-md border p-3">
           <Ikili>
-            <Alan etiket="Gün">
+            <Alan etiket="Başlangıç">
               <Input type="date" value={form.target_date}
                      onChange={(e) => setForm({ ...form, target_date: e.target.value })} />
             </Alan>
+            <Alan etiket="Bitiş (boşsa tek gün)">
+              <Input type="date" value={form.end_date}
+                     onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+            </Alan>
+          </Ikili>
+          <Ikili>
             <Alan etiket="Tür">
               <select className="h-9 w-full rounded-md border bg-card px-2" value={form.rule_type}
                       onChange={(e) => setForm({ ...form, rule_type: e.target.value })}>
-                {MUSAITLIK_TURU.map((t) => <option key={t.deger} value={t.deger}>{t.ad}</option>)}
+                {ISTEK_TURU.map((t) => <option key={t.deger} value={t.deger}>{t.ad}</option>)}
+              </select>
+            </Alan>
+            <Alan etiket="Güç">
+              <select className="h-9 w-full rounded-md border bg-card px-2" value={form.strength}
+                      onChange={(e) => setForm({ ...form, strength: e.target.value })}>
+                {ISTEK_GUCU.map((t) => <option key={t.deger} value={t.deger}>{t.ad}</option>)}
               </select>
             </Alan>
           </Ikili>
+          <Alan etiket="Not">
+            <Input value={form.note} placeholder="isteğe bağlı"
+                   onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          </Alan>
           <div className="flex gap-2">
             <Button size="sm" onClick={() => ekle.mutate()} disabled={ekle.isPending}>Ekle</Button>
             <Button size="sm" variant="outline" onClick={() => setAc(false)}>İptal</Button>
           </div>
+          {ekle.isError && (
+            <p className="text-danger" style={{ fontSize: "var(--text-xs)" }} role="alert">
+              {sunucuAciklamasi(ekle.error) ?? "İstek eklenemedi."}
+            </p>
+          )}
         </div>
       ) : (
         <EkleDugmesi onClick={() => setAc(true)}>İstek ekle</EkleDugmesi>

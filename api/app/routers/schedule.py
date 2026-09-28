@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.hedef import donem_hedefi, donem_turu, hedef_etiketi
+from app.hedef import donem_hedefi, donem_turu, hedef_etiketi, izin_dusumu
 from app.repositories import schedule as repo
 from app.schemas.schedule import (
     Cell, CellRequest, CellResult, CellUpdate, CounterView, DayHeader, DraftInfo,
@@ -220,6 +220,8 @@ async def cizelge(
     # başka uzunlukta hedef gösterilmez.
     tur = donem_turu(bas, bitis)
     haftalik_ref = veri["hedefler"].get("weekly_reference_hours")
+    gunluk_dusum = veri["hedefler"].get("absence_daily_reduction_hours")
+    izin_gunleri = veri["izin_gunleri"]
 
     # --- Satırlar, rol grubuna göre -----------------------------------------
     gruplar: list[Group] = []
@@ -234,15 +236,25 @@ async def cizelge(
 
             m = aylik.get(k["id"])
             planlanan = float(m["planned_hours"]) if m else 0.0
-            hedef = donem_hedefi(
-                tur, float(m["min_hours"]) if m and m["min_hours"] else None, haftalik_ref
+            # Aylık hedeften izin günleri düşülür — solver de aynısını yapıyor.
+            hedef = izin_dusumu(
+                donem_hedefi(
+                    tur, float(m["min_hours"]) if m and m["min_hours"] else None, haftalik_ref
+                ),
+                izin_gunleri.get(k["id"], 0) if tur == "ay" else 0,
+                gunluk_dusum,
             )
             # Sayaçlar GÖRÜNEN ARALIĞI ölçer (satır sonundaki period_hours ise taslağın
             # tamamını). Haftalık görünümde "S" o haftanın saati, aylıkta ayın saati.
-            gorunen_hedef = donem_hedefi(
-                donem_turu(gun_bas, gun_son + timedelta(days=1)),
-                float(m["min_hours"]) if m and m["min_hours"] else None,
-                haftalik_ref,
+            gorunen_tur = donem_turu(gun_bas, gun_son + timedelta(days=1))
+            gorunen_hedef = izin_dusumu(
+                donem_hedefi(
+                    gorunen_tur,
+                    float(m["min_hours"]) if m and m["min_hours"] else None,
+                    haftalik_ref,
+                ),
+                izin_gunleri.get(k["id"], 0) if gorunen_tur == "ay" else 0,
+                gunluk_dusum,
             )
             sayaclar = repo.sayac_degerleri(
                 staff_id=k["id"],
