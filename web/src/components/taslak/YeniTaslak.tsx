@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { AY_ADI, aralikEtiketi, type Draft } from "@/lib/taslak";
+import { AralikSecici, gunMetni } from "./AralikSecici";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -28,6 +29,22 @@ const gunEkle = (d: Date, n: number) => {
 const ayBasi = (temel: Date, kaydir = 0) =>
   new Date(Date.UTC(temel.getUTCFullYear(), temel.getUTCMonth() + kaydir, 1));
 
+/** ISO 8601 hafta numarası — önerilen ad için. */
+function haftaNo(d: Date): number {
+  const p = gunEkle(haftaBasi(d), 3);
+  const ilk = gunEkle(haftaBasi(new Date(Date.UTC(p.getUTCFullYear(), 0, 4))), 3);
+  return 1 + Math.round((p.getTime() - ilk.getTime()) / (7 * 86400000));
+}
+
+/** "5–11 Eki 2026" ya da ay değişiyorsa "28 Eyl – 4 Eki 2026". */
+function gunAraligi(bas: string, bitis: string): string {
+  const b = new Date(bas + "T00:00:00Z");
+  const s = new Date(bitis + "T00:00:00Z");
+  return b.getUTCMonth() === s.getUTCMonth()
+    ? `${b.getUTCDate()}–${gunMetni(bitis)}`
+    : `${gunMetni(bas)} – ${gunMetni(bitis)}`;
+}
+
 /** Hızlı seçenekler: her biri [başlangıç, KAPSAYICI bitiş] döndürür. */
 const HIZLI: { ad: string; hesapla: () => [Date, Date] }[] = [
   { ad: "Bu hafta",     hesapla: () => { const b = haftaBasi(new Date(), 0); return [b, gunEkle(b, 6)]; } },
@@ -36,10 +53,13 @@ const HIZLI: { ad: string; hesapla: () => [Date, Date] }[] = [
   { ad: "Gelecek ay",   hesapla: () => { const b = ayBasi(new Date(), 1); return [b, gunEkle(ayBasi(new Date(), 2), -1)]; } },
 ];
 
+// "Referans haftadan kopyala" kalktı: o taslak arşivde, kopyalamak eski bir
+// haftayı yeni döneme yaymaktan başka bir şey yapmıyordu.
 const BASLANGIC_VERISI = [
-  { deger: "bos",         ad: "Boş başla",                    not: "Solver sıfırdan üretir" },
-  { deger: "yayinlanmis", ad: "Yayınlanmış atamalardan yükle", not: "Aynı aralıktaki yayınlanmış çizelge" },
-  { deger: "referans",    ad: "Referans haftadan kopyala",     not: "21–27 Eylül, hafta gününe göre" },
+  { deger: "bos",         ad: "Boş başla",
+    not: "Solver sıfırdan üretir" },
+  { deger: "yayinlanmis", ad: "Yayınlanmış atamalardan yükle",
+    not: "Aynı aralıktaki yayınlanmış çizelgeden doldurur; çözerken başlangıç ipucu olarak kullanılır, sonuç kaynaktan kötüye gitmez" },
 ] as const;
 
 export function YeniTaslak() {
@@ -52,9 +72,20 @@ export function YeniTaslak() {
   const [kilitle, setKilitle] = useState(false);
   const qc = useQueryClient();
 
+  // Önerilen ad seçilen döneme göre: tam takvim ayı → "Ekim 2026",
+  // Pazartesi başlayan 7 gün → "Hafta 41 · 5–11 Eki 2026", başka → tarih aralığı.
   const onerilenAd = () => {
-    const d = new Date(bas + "T00:00:00Z");
-    return `${AY_ADI[d.getUTCMonth()]} ${d.getUTCFullYear()} çizelgesi`;
+    const b = new Date(bas + "T00:00:00Z");
+    const s2 = new Date(bitis + "T00:00:00Z");
+    const gun = Math.round((+s2 - +b) / 86400000) + 1;
+    const ayinSonu = gunEkle(ayBasi(b, 1), -1);
+    if (b.getUTCDate() === 1 && iso(s2) === iso(ayinSonu)) {
+      return `${AY_ADI[b.getUTCMonth()]} ${b.getUTCFullYear()}`;
+    }
+    if (gun === 7 && b.getUTCDay() === 1) {
+      return `Hafta ${haftaNo(b)} · ${gunAraligi(bas, bitis)}`;
+    }
+    return gunAraligi(bas, bitis);
   };
 
   const olustur = useMutation({
@@ -115,11 +146,11 @@ export function YeniTaslak() {
                 </Button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <Input type="date" value={bas} onChange={(e) => setBas(e.target.value)} aria-label="Başlangıç" />
-              <span className="text-muted-foreground">–</span>
-              <Input type="date" value={bitis} onChange={(e) => setBitis(e.target.value)} aria-label="Bitiş" />
-            </div>
+            <AralikSecici
+              bas={bas}
+              bitis={bitis}
+              onSec={(b2, s2) => { setBas(b2); setBitis(s2); }}
+            />
             <p className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
               {gecerli ? `${aralikEtiketi(bas, iso(new Date(+new Date(bitis + "T00:00:00Z") + 86400000)))} · ${gunSayisi} gün`
                        : "Bitiş tarihi başlangıçtan önce olamaz."}
