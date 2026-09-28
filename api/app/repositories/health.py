@@ -27,7 +27,14 @@ SELECT
     -- 013: assignments.source'ta 'referans' değeri kabul ediliyor mu
     (SELECT count(*) FROM pg_constraint
       WHERE conname = 'ck_assignments_source'
-        AND pg_get_constraintdef(oid) LIKE '%%referans%%')                        AS m013_referans
+        AND pg_get_constraintdef(oid) LIKE '%%referans%%')                        AS m013_referans,
+    -- 014: availability_rules.status kolonu (isteğin gücü)
+    (SELECT count(*) FROM information_schema.columns
+      WHERE table_name='availability_rules' AND column_name='status')             AS m014_status,
+    -- 015: güç sözlüğü KESIN / MUMKUNSE
+    (SELECT count(*) FROM pg_constraint
+      WHERE conname = 'ck_availability_rules_status'
+        AND pg_get_constraintdef(oid) LIKE '%%MUMKUNSE%%')                        AS m015_guc
 """
 
 
@@ -47,6 +54,10 @@ async def kontrol() -> dict:
         eksik.append("012 (schedule_drafts.period)")
     if satir["m013_referans"] != 1:
         eksik.append("013 (assignments.source='referans')")
+    if satir["m014_status"] != 1:
+        eksik.append("014 (availability_rules.status)")
+    if satir["m015_guc"] != 1:
+        eksik.append("015 (istek gücü KESIN/MUMKUNSE)")
     sema_guncel = not eksik
     return {
         "tablo": satir["tablo"],

@@ -23,6 +23,23 @@ class Settings(BaseSettings):
     # 25 sn'de üç koşudan birinde daha dengesiz bir çizelge çıkıyordu.
     solver_time_limit_s: int = 60
 
+    # CP-SAT işçi sayısı. Çekirdekten FAZLA işçi çözümü hızlandırmaz, yavaşlatır:
+    # işçiler aynı çekirdek için yarışır. Railway'in verdiği vCPU'ya göre ayarlanır.
+    solver_workers: int = 8
+
+    # Aynı anda kaç taslak çözülebilir. Her çözüm solver_workers kadar iş parçacığı
+    # tutar; sınırsız bırakılırsa birkaç eşzamanlı istek API'yi yanıt veremez hale
+    # getirir. 1 = kuyruk yok, ikinci istek "meşgul" yanıtı alır.
+    solver_max_concurrent: int = 1
+
+    # Ortam adı. 'production' iken /docs, /redoc ve /openapi.json kapatılır:
+    # API yüzeyinin tamamını internete açık bırakmanın gereği yok.
+    environment: str = "development"
+
+    @property
+    def uretim_mi(self) -> bool:
+        return self.environment.lower() in ("production", "prod")
+
     # Web'in sunucu tarafı proxy'si bu token'ı gönderir; tarayıcıya hiç inmez.
     # Boş bırakılırsa doğrulama kapalıdır (yerel geliştirme).
     demo_api_token: str = ""

@@ -84,7 +84,6 @@ SAAT_EKSIGI_CEZASI = 20_000
 # hafifletmek istendiğinde ilk başvurulacak düğme.
 UC_FARKI_CEZALANDIR = True
 RASTGELE_TOHUM = 20261001
-ISCI_SAYISI = 8
 
 # Sayısı TAM olması gereken görevler. Ambulans fiziksel bir araçtır: ihtiyaç
 # satırı "en az 2" der ama 3 kişi göndermek hata olur. Diğer slotlarda fazlası
@@ -300,7 +299,7 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     sonuc.hedefler = olcumler["hedefler"]
 
     solver = cp_model.CpSolver()
-    solver.parameters.num_workers = ISCI_SAYISI
+    solver.parameters.num_workers = get_settings().solver_workers
     solver.parameters.random_seed = RASTGELE_TOHUM
 
     model.minimize(sum(agirlik * ifade for agirlik, ifade in temel + adalet_terimleri))
@@ -1014,7 +1013,7 @@ def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
                        "saat_eksigi_cezasi": SAAT_EKSIGI_CEZASI,
                        "atama_maliyeti": ATAMA_MALIYETI, "rozet_maliyeti": ROZET_MALIYETI},
         "adalet_hedefleri": cozum.hedefler,
-        "cozucu": {"tohum": RASTGELE_TOHUM, "isci": ISCI_SAYISI},
+        "cozucu": {"tohum": RASTGELE_TOHUM, "isci": get_settings().solver_workers},
         "sorumlu_cumartesi": SORUMLU_CUMARTESI,
         "model": {"degisken": cozum.degisken_sayisi,
                   "gorev_degiskeni": cozum.gorev_degiskeni, "kisit": cozum.kisit_sayisi,

@@ -86,14 +86,51 @@ async def kosu_ac(draft_id: int, time_limit_s: int) -> int:
         return (await cur.fetchone())["id"]
 
 
+# Bir koşu, süre limitinin bu katı kadar zamandır 'CALISIYOR' duruyorsa ÖLMÜŞ
+# sayılır. Sebep: arka plan görevi süreçle birlikte ölür (deploy, çökme, yeniden
+# başlatma) ama satır 'CALISIYOR' kalır — ve çift tıklama koruması o ölü satırı
+# bulup döndürdüğü için taslak bir daha HİÇ çözülemezdi.
+OLU_KOSU_KATSAYISI = 3
+
+
+async def olu_kosulari_kapat() -> int:
+    """Süresini fazlasıyla aşmış 'CALISIYOR' satırları HATA'ya çeker.
+
+    Zaman aşımı koşunun kendi time_limit_seconds'ından türer: 60 sn limitli bir
+    koşu 3 dakikadır sürüyorsa süreç ölmüş demektir.
+    """
+    async with cursor() as cur:
+        await cur.execute(
+            """
+            UPDATE solver_runs
+               SET status = 'HATA', finished_at = CURRENT_TIMESTAMP
+             WHERE status = 'CALISIYOR'
+               AND started_at < CURRENT_TIMESTAMP
+                   - (COALESCE(time_limit_seconds, 60) * %s) * INTERVAL '1 second'
+            RETURNING id
+            """,
+            (OLU_KOSU_KATSAYISI,),
+        )
+        return len(await cur.fetchall())
+
+
 async def calisan_kosu(draft_id: int) -> dict | None:
     """Aynı taslak için zaten süren bir koşu var mı? (çift tıklama koruması)"""
+    await olu_kosulari_kapat()
     async with cursor() as cur:
         await cur.execute(
             _KOSU + " WHERE r.draft_id = %s AND r.status = 'CALISIYOR' ORDER BY r.started_at DESC LIMIT 1",
             (draft_id,),
         )
         return await cur.fetchone()
+
+
+async def suren_kosu_sayisi() -> int:
+    """Şu an kaç taslak çözülüyor (ölüler ayıklandıktan sonra)."""
+    await olu_kosulari_kapat()
+    async with cursor() as cur:
+        await cur.execute("SELECT count(*) AS adet FROM solver_runs WHERE status = 'CALISIYOR'")
+        return (await cur.fetchone())["adet"]
 
 
 async def kosu(run_id: int) -> dict | None:

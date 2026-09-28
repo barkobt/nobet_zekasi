@@ -143,7 +143,17 @@ async def coz(draft_id: int, istek: SolveRequest, arka_plan: BackgroundTasks) ->
             poll_url=f"/api/solver-runs/{suren['id']}",
         )
 
-    sure = istek.time_limit_s or get_settings().solver_time_limit_s
+    # Eşzamanlılık sınırı: her çözüm solver_workers kadar iş parçacığı tutar.
+    # Sınırsız bırakılırsa birkaç eşzamanlı istek API'yi yanıt veremez hale getirir
+    # ve yoklama istekleri de cevapsız kalır — yani kullanıcı ne olduğunu göremez.
+    ayarlar = get_settings()
+    if await repo.suren_kosu_sayisi() >= ayarlar.solver_max_concurrent:
+        raise HTTPException(
+            status_code=409,
+            detail="Şu anda başka bir çizelge çözülüyor. Bitmesini bekleyip tekrar deneyin.",
+        )
+
+    sure = istek.time_limit_s or ayarlar.solver_time_limit_s
     run_id = await repo.kosu_ac(draft_id, sure)
 
     def calistir() -> None:

@@ -106,7 +106,10 @@ Aynı değer hem Railway'e hem Vercel'e girilir; ikisi eşleşmezse API 401 dön
 |---|---|---|---|
 | `DATABASE_URL` | Railway | Neon **pooled** dizesi (`-pooler` içerir) | **Baran** — dashboard |
 | `DEMO_API_TOKEN` | Railway | `openssl rand -hex 32` çıktısı | **Baran** — dashboard |
-| `SOLVER_IMPL` | Railway | `stub` | Claude — CLI ✅ |
+| `SOLVER_IMPL` | Railway | `cpsat` | Claude — CLI |
+| `SOLVER_WORKERS` | Railway | Railway'in vCPU sayısı (varsayılan 8 fazla olabilir) | Claude — CLI |
+| `SOLVER_MAX_CONCURRENT` | Railway | `1` | Claude — CLI |
+| `ENVIRONMENT` | Railway | `production` (dokümantasyon uçlarını kapatır) | Claude — CLI |
 | `SOLVER_TIME_LIMIT_S` | Railway | `60` | Claude — CLI ✅ |
 | `DB_POOL_MIN` / `DB_POOL_MAX` | Railway | `1` / `10` | Claude — CLI ✅ |
 | `API_BASE_URL` | Vercel | `https://nobet-zekasi-api-production.up.railway.app` | Claude — CLI ✅ |
