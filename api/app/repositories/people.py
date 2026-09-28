@@ -192,25 +192,30 @@ async def izin_sil(staff_id: int, absence_id: int) -> dict | None:
         return await cur.fetchone()
 
 
+async def musaitlik_dolu_gunler(staff_id: int, bas: date, bit: date) -> list[dict]:
+    """Aralıkta kişinin ZATEN isteği olan günler. Ekleme bunları görünce durur."""
+    async with cursor() as cur:
+        await cur.execute(
+            """SELECT target_date, rule_type, status FROM availability_rules
+                WHERE staff_id = %s AND target_date BETWEEN %s AND %s
+                ORDER BY target_date""",
+            (staff_id, bas, bit),
+        )
+        return await cur.fetchall()
+
+
 async def musaitlik_ekle(staff_id: int, bas: date, bit: date, tur: str,
                          guc: str, note: str | None) -> int:
-    """Tek gün ya da aralık. Aynı kişiye aynı güne TEK istek: mevcut olan güncellenir.
+    """Tek gün ya da aralık. Aynı kişiye aynı güne TEK istek.
 
-    Tablodaki tekillik (staff_id, target_date, rule_type) üzerine; farklı TÜRDE ikinci
-    bir istek eklenmesin diye o günün başka türdeki isteği önce siliniyor.
+    Çakışma kontrolü çağıranda (router): burada sessizce ezmek, kullanıcının
+    farkında olmadan eski isteğini silmek olurdu.
     """
     gunler = [bas + timedelta(days=i) for i in range((bit - bas).days + 1)]
     async with cursor() as cur:
-        await cur.execute(
-            """DELETE FROM availability_rules
-                WHERE staff_id = %s AND target_date = ANY(%s) AND rule_type <> %s""",
-            (staff_id, gunler, tur),
-        )
         await cur.executemany(
             """INSERT INTO availability_rules (staff_id, target_date, rule_type, status, note)
-               VALUES (%s, %s, %s, %s, %s)
-               ON CONFLICT (staff_id, target_date, rule_type)
-               DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note""",
+               VALUES (%s, %s, %s, %s, %s)""",
             [(staff_id, g, tur, guc, note) for g in gunler],
         )
         return len(gunler)

@@ -116,6 +116,17 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
     donem = set(v.gunler)
     ihlaller: list[Ihlal] = []
 
+    # Merve kuralı: sadece gündüz çalışan birinin O GÜNE ait SADECE_GECE isteği
+    # varsa o gün gece çalışabilir (model.py'deki gece_istisnasi ile aynı tanım).
+    # Kişinin genel çalışma tipi değişmez, istisna tek güne aittir. Bu istisna
+    # kontrolcüde yoksa meşru her gece C-017 ihlali sayılır ve E-10'a kırmızı
+    # "çizelge güvenilir değil" satırı düşer.
+    gece_istisnasi = {
+        (i.personel_id, i.gun)
+        for i in v.kesin_istekler + v.tercih_istekler
+        if i.tur == "SADECE_GECE"
+    }
+
     # ---------------- A: Adım 2 kuralları ----------------
     for (p_id, g), kodlar in sorted(donem_plan.items(), key=lambda t: (t[0][1], t[0][0])):
         if len(kodlar) > 1:
@@ -124,7 +135,7 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
         p = kisi[p_id]
         for kod in kodlar:
             gece_mi = kod in gece_kodlari
-            if gece_mi and p.uygunluk == "sadece_gunduz":
+            if gece_mi and p.uygunluk == "sadece_gunduz" and (p_id, g) not in gece_istisnasi:
                 ihlaller.append(Ihlal("A-2", "Çalışma tipi (C-017)", p.ad, g,
                                       f"sadece gündüz çalışabilir, {kod} yazılmış"))
             if not gece_mi and p.uygunluk == "sadece_gece":

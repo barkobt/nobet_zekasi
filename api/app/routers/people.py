@@ -273,6 +273,23 @@ async def musaitlik_ekle(staff_id: int, istek: AvailabilityCreate) -> PersonDeta
         raise HTTPException(status_code=422, detail="Bitiş tarihi başlangıçtan önce olamaz.")
     if (son - istek.target_date).days > 92:
         raise HTTPException(status_code=422, detail="Aralık en fazla 3 ay olabilir.")
+
+    # Aynı güne ikinci istek SESSİZCE EZİLMEZ: kullanıcı eski isteğini kaybettiğini
+    # fark etmez. Hangi günlerin dolu olduğunu ve orada ne yazdığını söylüyoruz.
+    dolu = await repo.musaitlik_dolu_gunler(staff_id, istek.target_date, son)
+    if dolu:
+        ornek = ", ".join(
+            f"{_tarih(d['target_date'])} ({MUSAITLIK_ADI.get(d['rule_type'], d['rule_type'])}"
+            f" · {GUC_ADI.get(d['status'], d['status'])})"
+            for d in dolu[:3]
+        )
+        devam = f" ve {len(dolu) - 3} gün daha" if len(dolu) > 3 else ""
+        raise HTTPException(
+            status_code=409,
+            detail=f"Bu günlerde zaten istek var: {ornek}{devam}. "
+                   "Önce mevcut isteği düzenleyin ya da silin.",
+        )
+
     await repo.musaitlik_ekle(
         staff_id, istek.target_date, son, istek.rule_type, istek.strength, istek.note
     )

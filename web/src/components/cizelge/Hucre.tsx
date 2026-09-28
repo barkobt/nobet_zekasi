@@ -3,7 +3,7 @@ import { CircleDot, Pin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  GOREV, IZIN_ADI, istekMetni, sayi, type Cell, type CellRequest,
+  GOREV, IZIN_ADI, IZIN_KISA, istekMetni, sayi, type Cell, type CellRequest,
 } from "@/lib/cizelge";
 
 /**
@@ -30,13 +30,19 @@ export function Hucre({
   const elle = cell !== undefined && (cell.source === "manuel" || cell.is_locked === true);
 
   if (absence) {
+    const tam = IZIN_ADI[absence] ?? "İzinli";
     return (
       <Sarmal request={request} elle={elle}>
-        <div className="flex h-full items-center justify-center">
-          <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-            {dar ? (IZIN_ADI[absence] ?? "İzinli").slice(0, 2) : IZIN_ADI[absence] ?? "İzinli"}
-          </span>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex h-full items-center justify-center">
+              <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+                {dar ? (IZIN_KISA[absence] ?? "İ") : tam}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>{tam}</TooltipContent>
+        </Tooltip>
       </Sarmal>
     );
   }

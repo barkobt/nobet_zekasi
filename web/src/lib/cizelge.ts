@@ -20,6 +20,14 @@ export const GOREV: Record<string, { kisa: string; tam: string }> = {
   GOZLEM:   { kisa: "GÖZ", tam: "Gözlem alanı" },
 };
 
+/** Aylık görünümde hücre dar: kısaltma. Kelimeyi kırpmak "Yı"/"Ra" üretiyordu. */
+export const IZIN_KISA: Record<string, string> = {
+  yillik_izin:   "Yİ",
+  rapor:         "R",
+  ucretsiz_izin: "Üİ",
+  diger:         "D",
+};
+
 export const IZIN_ADI: Record<string, string> = {
   yillik_izin:   "Yıllık izin",
   rapor:         "Rapor",
