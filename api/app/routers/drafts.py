@@ -133,8 +133,16 @@ async def getir(draft_id: int) -> Draft:
 @router.post("/drafts/{draft_id}/solve", response_model=SolveAccepted, status_code=202,
              summary="Çöz — arka planda çalıştırır")
 async def coz(draft_id: int, istek: SolveRequest, arka_plan: BackgroundTasks) -> SolveAccepted:
-    if await repo.getir(draft_id) is None:
+    if (taslak := await repo.getir(draft_id)) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+
+    # Yayınlanmış çizelge solver'a kapalı. E-09 yayınlanmışı salt okunur gösteriyor
+    # ama solver o korumanın dışındaydı: "Çöz" yayındaki nöbeti sessizce değiştirebiliyordu.
+    if taslak["status"] == "yayinlandi":
+        raise HTTPException(
+            status_code=409,
+            detail="Bu çizelge yayında. Değiştirmek için önce kopya oluşturun.",
+        )
 
     # Çift tıklama koruması: süren koşu varsa yenisini açma, mevcudu döndür.
     if (suren := await repo.calisan_kosu(draft_id)) is not None:

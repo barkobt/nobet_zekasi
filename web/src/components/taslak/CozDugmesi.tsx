@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, sunucuAciklamasi } from "@/lib/api";
 import type { SolveAccepted, SolverRun } from "@/lib/taslak";
 
 /**
@@ -43,6 +43,14 @@ export function CozDugmesi({ draftId, calisanRunId }: { draftId: number; calisan
   }, [kosu, qc]);
 
   const suruyor = baslat.isPending || kosu?.status === "CALISIYOR" || runId !== null;
+
+  if (baslat.isError) {
+    return (
+      <span className="text-danger" style={{ fontSize: "var(--text-xs)" }} role="alert">
+        {sunucuAciklamasi(baslat.error) ?? "Çözüm başlatılamadı."}
+      </span>
+    );
+  }
 
   return (
     <Button

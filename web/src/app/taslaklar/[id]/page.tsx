@@ -12,7 +12,7 @@ import { TaslakPaneli } from "@/components/taslak/TaslakPaneli";
 import { ExcelDugmesi } from "@/components/ExcelDugmesi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, sunucuAciklamasi } from "@/lib/api";
 import { sayi, type Schedule } from "@/lib/cizelge";
 import { aralikEtiketi, type Draft, type SolveAccepted, type SolverRun } from "@/lib/taslak";
 
@@ -145,6 +145,13 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
           </Button>
         </div>
       </div>
+
+      {/* Çöz reddedildiyse (yayında, başka koşu sürüyor) sunucunun cümlesi. */}
+      {coz.isError && (
+        <p className="px-6 pb-2 text-danger" style={{ fontSize: "var(--text-xs)" }} role="alert">
+          {sunucuAciklamasi(coz.error) ?? "Çözüm başlatılamadı."}
+        </p>
+      )}
 
       {/* İlerleme çubuğu: süre limiti biliniyor, ilerleme tahmin değil ölçüm */}
       {calisiyor && (

@@ -63,6 +63,15 @@ açık oluşur.
 
 ### A4. API erişimi
 
+> **Canlıda doğrulandı (28.09).** Railway API'ye token'sız ve yanlış token'la
+> doğrudan istek atıldı: `/api/staff`, `/api/drafts` → **401**. `/api/health` →
+> 200 (beklenen). Koruma çalışıyor. Vercel'de token boşken sitenin "çalışıyor"
+> görünmesinin sebebi, korumasız tek sayfanın giriş ekranı olması: `/` ve
+> `/personel` oturumsuz **307 → /giris** veriyor, veri isteyen hiçbir sayfa
+> açılmıyor. `/openapi.json` ve `/docs` hâlâ 200 — `ENVIRONMENT=production`
+> Railway'e girilince kapanacak.
+
+
 `api/app/main.py:34-49` — tüm istekler `x-demo-token` başlığıyla doğrulanıyor.
 Token web'in **sunucu tarafı** proxy'sinde kalıyor (`web/src/app/api/[...path]/route.ts`),
 tarayıcıya hiç inmiyor.
@@ -104,6 +113,7 @@ Demo için kabul edilebilir; gerçek kullanıcı hesaplarına geçilirse yeniden
 |---|---|---|
 | "Çöz"e art arda basmak | `drafts.py:140` — süren koşu varsa yenisi açılmıyor, mevcut `run_id` dönüyor | **Korumalı** (aynı taslak için) |
 | **Farklı taslakları aynı anda çözmek** | Koruma **yok**. Her çözüm `asyncio.to_thread` ile CP-SAT'ı `num_workers=8` ile 60 sn çalıştırır | **Açık risk.** 3 taslak = 24 çözücü iş parçacığı. Railway'in çekirdek sayısı bunun çok altında; API yanıt veremez hale gelir |
+| **Yayınlanmış çizelgeyi çözmek** | Solver `schedule_drafts.status`'e bakmıyordu: "Çöz" yayındaki nöbeti sessizce değiştirebiliyordu. E-09 yayınlanmışı salt okunur gösteriyor ama solver o korumanın dışındaydı | **Kapatıldı** (28.09): `POST /solve` yayınlanmış taslakta 409 döner, arayüz "Bu çizelge yayında. Değiştirmek için önce kopya oluşturun." yazar |
 | Silme uçları | 7 adet DELETE (`taslak`, `personel`, `izin`, `istek`, `uyumsuzluk`, `sözleşme`, `ihtiyaç satırı`). Hepsi token arkasında, onay gerektirmiyor | Orta — token'ı olan her istek kalıcı veri silebilir. `assignments` FK'si `RESTRICT` olduğu için ataması olan personel silinemiyor (pasife alınıyor), bu iyi |
 | Hata mesajları | Ham veritabanı hatası dışarı verilmiyor; `setup.py:130` dışında `detail=str(hata)` kalıbı yok. Solver hataları `solver_diagnostics`'e yazılıyor, HTTP yanıtına değil | **Temiz** |
 | **Yarıda kalan koşu** | `repositories/drafts.py:89` süren koşuyu `status='CALISIYOR'` ile arar, **zaman aşımı yok** | **Açık risk.** Railway süreci yeniden başlarsa (deploy, çökme, uyku) arka plan görevi ölür ama satır `CALISIYOR` kalır. Çift tıklama koruması bu ölü satırı bulup döndürür → **o taslak bir daha hiç çözülemez.** Elle `UPDATE solver_runs SET status='HATA'` gerekir |
