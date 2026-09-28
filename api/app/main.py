@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 
 from app.db import close_pool, open_pool
 from app.routers import (
-    demand, drafts, export, health, overview, people, reports, schedule, setup, staff,
+    counters, demand, drafts, export, health, overview, people, reports, schedule,
+    setup, staff,
 )
 from app.settings import get_settings
 
@@ -70,3 +71,4 @@ app.include_router(overview.router, prefix="/api")
 app.include_router(demand.router, prefix="/api")
 app.include_router(people.router, prefix="/api")
 app.include_router(setup.router, prefix="/api")
+app.include_router(counters.router, prefix="/api")

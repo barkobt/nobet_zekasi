@@ -72,6 +72,12 @@ class Row(BaseModel):
     full_name: str
     role_name: str
     is_orientation: bool
+    is_active: bool = True
+    in_fairness: bool = Field(
+        default=True,
+        description="Saat/gece adaleti ve 200 saat karşılaştırmasına giriyor mu. "
+                    "Ayrılan ve ay içinde başlayan personel mevcuda sayılır, adalete girmez.",
+    )
     initials: str
     cells: dict[str, Cell] = Field(description="ISO tarih → hücre; çalışılmayan gün anahtarı yok")
     absences: dict[str, str] = Field(default_factory=dict, description="ISO tarih → izin türü")
@@ -84,6 +90,20 @@ class Row(BaseModel):
         description="Hedefe göre fark: pozitif fazla, negatif eksik. Hedef yoksa null."
     )
     shift_count: int
+    counters: dict[str, float | None] = Field(
+        default_factory=dict,
+        description="Görünen aralığa göre sayaç değerleri: kod → değer (bkz. /api/counters)",
+    )
+
+
+class CounterView(BaseModel):
+    """Izgaranın bu görünümde hangi sayacı göstereceği. Ayar veritabanından gelir."""
+
+    key: str
+    badge: str
+    label: str
+    always_shown: bool = Field(description="'Detayları göster' kapalıyken de görünür")
+    visible: bool = Field(description="Bu görünüm (haftalık/aylık) için açık mı")
 
 
 class Group(BaseModel):
@@ -101,6 +121,7 @@ class Summary(BaseModel):
     overtime_hours: float
     fairness_gap: float = Field(description="Kişiler arası saat farkı: en çok − en az")
     shortfall_count: int = Field(description="Seçili aralıkta eksik kalan slot sayısı")
+    total_nights: int = Field(default=0, description="Görünen aralıkta toplam gece vardiyası")
 
 
 class DraftInfo(BaseModel):
@@ -125,6 +146,10 @@ class Schedule(BaseModel):
     days: list[DayHeader]
     groups: list[Group]
     summary: Summary
+    view: Literal["weekly", "monthly"] = Field(
+        description="Görünen aralığın türü; sayaç görünürlüğü buna göre seçilir"
+    )
+    counters: list[CounterView] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list, description="Izgaranın altındaki açıklama satırları")
 
 

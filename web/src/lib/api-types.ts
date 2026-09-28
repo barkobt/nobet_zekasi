@@ -748,6 +748,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/counters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Görünür sayaç ayarları */
+        get: operations["sayaclar_api_counters_get"];
+        /** Sayaç ayarlarını kaydet */
+        put: operations["sayaclari_kaydet_api_counters_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/prefs/{pref_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Arayüz tercihi oku */
+        get: operations["tercih_oku_api_prefs__pref_key__get"];
+        /** Arayüz tercihi yaz */
+        put: operations["tercih_yaz_api_prefs__pref_key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1030,6 +1066,65 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /**
+         * Counter
+         * @description visible_counters bir satırı. `key` API ve JSON anahtarı, `badge` ekranda görünen.
+         */
+        Counter: {
+            /** Key */
+            key: string;
+            /** Badge */
+            badge: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Always Shown
+             * @description G · N · S: 'Detayları göster' kapalıyken de satırda durur, kapatılamaz
+             */
+            always_shown: boolean;
+            /** Weekly On */
+            weekly_on: boolean;
+            /** Monthly On */
+            monthly_on: boolean;
+        };
+        /** CounterList */
+        CounterList: {
+            /** Counters */
+            counters: components["schemas"]["Counter"][];
+        };
+        /** CounterUpdate */
+        CounterUpdate: {
+            /** Key */
+            key: string;
+            /** Weekly On */
+            weekly_on: boolean;
+            /** Monthly On */
+            monthly_on: boolean;
+        };
+        /**
+         * CounterView
+         * @description Izgaranın bu görünümde hangi sayacı göstereceği. Ayar veritabanından gelir.
+         */
+        CounterView: {
+            /** Key */
+            key: string;
+            /** Badge */
+            badge: string;
+            /** Label */
+            label: string;
+            /**
+             * Always Shown
+             * @description 'Detayları göster' kapalıyken de görünür
+             */
+            always_shown: boolean;
+            /**
+             * Visible
+             * @description Bu görünüm (haftalık/aylık) için açık mı
+             */
+            visible: boolean;
+        };
         /** DayHeader */
         DayHeader: {
             /**
@@ -1121,7 +1216,7 @@ export interface components {
              * Severity
              * @enum {string}
              */
-            severity: "cakisma" | "ihlal" | "uyari";
+            severity: "hata" | "cakisma" | "ihlal" | "uyari";
             /** Constraint Code */
             constraint_code?: string | null;
             /** Catalog Code */
@@ -1148,6 +1243,12 @@ export interface components {
             constraint_code?: string | null;
             /** Constraint Name */
             constraint_name: string;
+            /**
+             * Severity
+             * @description Gruptaki en ağır seviye — 'hata' kontrolcünün bulduğu katı kural ihlalidir
+             * @default ihlal
+             */
+            severity: string;
             /** Count */
             count: number;
             /** First Date */
@@ -1336,6 +1437,11 @@ export interface components {
             status: "ok" | "hata";
             /** Db */
             db: boolean;
+            /**
+             * Kullanici
+             * @description Veritabanına bağlanan rol — canlıda nobet_app olmalı
+             */
+            kullanici?: string | null;
             /** Tablo */
             tablo?: number | null;
             /** View */
@@ -1664,6 +1770,13 @@ export interface components {
              */
             buddy_staff_id?: number | null;
         };
+        /** Preference */
+        Preference: {
+            /** Pref Key */
+            pref_key: string;
+            /** Value */
+            value: unknown;
+        };
         /**
          * PublishPreview
          * @description Uygulamadan ÖNCE ne olacağını söyler. Kullanıcı sürprizle karşılaşmasın.
@@ -1750,6 +1863,17 @@ export interface components {
             role_name: string;
             /** Is Orientation */
             is_orientation: boolean;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * In Fairness
+             * @description Saat/gece adaleti ve 200 saat karşılaştırmasına giriyor mu. Ayrılan ve ay içinde başlayan personel mevcuda sayılır, adalete girmez.
+             * @default true
+             */
+            in_fairness: boolean;
             /** Initials */
             initials: string;
             /**
@@ -1783,6 +1907,13 @@ export interface components {
             period_diff: number | null;
             /** Shift Count */
             shift_count: number;
+            /**
+             * Counters
+             * @description Görünen aralığa göre sayaç değerleri: kod → değer (bkz. /api/counters)
+             */
+            counters?: {
+                [key: string]: number | null;
+            };
         };
         /** Schedule */
         Schedule: {
@@ -1792,6 +1923,14 @@ export interface components {
             /** Groups */
             groups: components["schemas"]["Group"][];
             summary: components["schemas"]["Summary"];
+            /**
+             * View
+             * @description Görünen aralığın türü; sayaç görünürlüğü buna göre seçilir
+             * @enum {string}
+             */
+            view: "weekly" | "monthly";
+            /** Counters */
+            counters?: components["schemas"]["CounterView"][];
             /**
              * Notes
              * @description Izgaranın altındaki açıklama satırları
@@ -2038,6 +2177,12 @@ export interface components {
              * @description Seçili aralıkta eksik kalan slot sayısı
              */
             shortfall_count: number;
+            /**
+             * Total Nights
+             * @description Görünen aralıkta toplam gece vardiyası
+             * @default 0
+             */
+            total_nights: number;
         };
         /** TemplateRow */
         TemplateRow: {
@@ -3680,6 +3825,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShiftType"][];
+                };
+            };
+        };
+    };
+    sayaclar_api_counters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CounterList"];
+                };
+            };
+        };
+    };
+    sayaclari_kaydet_api_counters_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CounterUpdate"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CounterList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tercih_oku_api_prefs__pref_key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pref_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preference"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tercih_yaz_api_prefs__pref_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pref_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Preference"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preference"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

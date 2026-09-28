@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.hedef import donem_hedefi, donem_turu, hedef_etiketi
 from app.repositories import schedule as repo
 from app.schemas.schedule import (
-    Cell, CellResult, CellUpdate, DayHeader, DraftInfo, Group, QualificationFlag, Row,
-    Schedule, ShiftHeader, SlotCoverage, Summary,
+    Cell, CellResult, CellUpdate, CounterView, DayHeader, DraftInfo, Group,
+    QualificationFlag, Row, Schedule, ShiftHeader, SlotCoverage, Summary,
 )
 
 router = APIRouter(prefix="/drafts", tags=["çizelge"])
@@ -140,6 +140,21 @@ async def cizelge(
     veri = await repo.cizelge_verisi(draft_id, gun_bas, gun_son)
 
     gunler = gun_basliklari(veri["kapsama"], gun_bas, gun_son)
+    aralik_gunleri = [gun_bas + timedelta(days=i) for i in range((gun_son - gun_bas).days + 1)]
+
+    # Görünen aralık haftalık mı aylık mı: sayaç görünürlüğü ikisi için ayrı ayarlanıyor.
+    # Ölçüt aralığın UZUNLUĞU: bir hafta 7 gün, ay görünümü 28-31 gün. 14 gün eşiği
+    # ikisinin arasında güvenli bir sınır.
+    gorunum = "monthly" if len(aralik_gunleri) > 14 else "weekly"
+    sayac_gorunurluk = [
+        CounterView(
+            key=c["key"], badge=c["badge"], label=c["label"],
+            always_shown=c["always_shown"],
+            visible=c["always_shown"] or (c["monthly_on"] if gorunum == "monthly"
+                                         else c["weekly_on"]),
+        )
+        for c in veri["sayaclar"]
+    ]
 
     # --- Hücreler -----------------------------------------------------------
     hucreler: dict[int, dict[str, Cell]] = {}
@@ -183,12 +198,30 @@ async def cizelge(
             hedef = donem_hedefi(
                 tur, float(m["min_hours"]) if m and m["min_hours"] else None, haftalik_ref
             )
+            # Sayaçlar GÖRÜNEN ARALIĞI ölçer (satır sonundaki period_hours ise taslağın
+            # tamamını). Haftalık görünümde "S" o haftanın saati, aylıkta ayın saati.
+            gorunen_hedef = donem_hedefi(
+                donem_turu(gun_bas, gun_son + timedelta(days=1)),
+                float(m["min_hours"]) if m and m["min_hours"] else None,
+                haftalik_ref,
+            )
+            sayaclar = repo.sayac_degerleri(
+                staff_id=k["id"],
+                hucreler={iso: {"shift_code": c.shift_code, "tasks": c.tasks}
+                          for iso, c in hucreler.get(k["id"], {}).items()},
+                gunler=aralik_gunleri,
+                vardiyalar=veri["vardiyalar"],
+                istekler=veri["istekler"],
+                hedef=gorunen_hedef,
+            )
             satirlar.append(
                 Row(
                     staff_id=k["id"],
                     full_name=k["full_name"],
                     role_name=k["role_name"],
                     is_orientation=k["is_orientation"],
+                    is_active=k["is_active"],
+                    in_fairness=k["adalete_girer"],
                     initials=_bas_harfler(k["full_name"]),
                     cells=hucreler.get(k["id"], {}),
                     absences=izinler.get(k["id"], {}),
@@ -196,15 +229,25 @@ async def cizelge(
                     period_target=hedef,
                     period_diff=round(planlanan - hedef, 1) if hedef is not None else None,
                     shift_count=int(m["shift_count"]) if m else 0,
+                    counters=sayaclar,
                 )
             )
         if satirlar:
             gruplar.append(Group(key=anahtar, label=etiket, rows=satirlar))
 
     # --- Alt bar ------------------------------------------------------------
+    # Alt bar GÖRÜNEN dönemi özetler (kullanıcının baktığı hafta ya da ay), o yüzden
+    # satır sayaçlarından toplanır — period_hours taslağın tamamını ölçüyor.
+    tum_satirlar = [r for g in gruplar for r in g.rows]
+    gorunen_saat = round(sum(r.counters.get("S") or 0 for r in tum_satirlar), 1)
+    gorunen_gece = int(sum(r.counters.get("N") or 0 for r in tum_satirlar))
     toplam_saat = round(sum(r.period_hours for g in gruplar for r in g.rows), 1)
     fazla_mesai = round(sum(float(m["overtime_max"]) for m in veri["aylik"]), 1)
-    calisan_saatler = [r.period_hours for g in gruplar for r in g.rows if r.period_hours > 0]
+    # Adalet farkı YALNIZ adalet havuzundan. Oryantasyon eşini gölgelediği için
+    # saati yüksek, sorumlunun programı sabit; onları katmak farkı yanlış büyütür
+    # ve ekran solver'ın raporladığı rakamla çelişirdi.
+    calisan_saatler = [s for r in tum_satirlar
+                       if r.in_fairness and (s := r.counters.get("S") or 0) > 0]
     adalet = round(max(calisan_saatler) - min(calisan_saatler), 1) if calisan_saatler else 0.0
     eksik = sum(1 for k in veri["kapsama"] if k["assigned"] < k["required"])
 
@@ -244,11 +287,14 @@ async def cizelge(
         days=gunler,
         groups=gruplar,
         summary=Summary(
-            total_hours=toplam_saat,
+            total_hours=gorunen_saat,
             overtime_hours=fazla_mesai,
             fairness_gap=adalet,
             shortfall_count=eksik,
+            total_nights=gorunen_gece,
         ),
+        view=gorunum,
+        counters=sayac_gorunurluk,
         notes=notlar,
     )
 

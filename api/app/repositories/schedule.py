@@ -46,6 +46,28 @@ FROM v_monthly_hours mh
 WHERE mh.draft_id = %(draft_id)s
 """
 
+# Hangi sayaç görünecek: ayar veritabanında (visible_counters). Hesap her sayaç için
+# YAPILIR, görünürlük bayrağı yanında taşınır — arayüz açıp kapatırken yeni istek atmaz.
+_SAYACLAR = """
+SELECT key, badge, label, always_shown, weekly_on, monthly_on
+FROM visible_counters ORDER BY sort_order
+"""
+
+# Vardiya süreleri: satır sayaçlarının saat toplamı buradan çıkar. Saat kodda
+# gömülü DEĞİL — GECE_0100 gibi sonradan eklenen vardiyalar kendiliğinden doğru sayılır.
+_VARDIYA_SURELERI = """
+SELECT code, duration_hours, crosses_midnight FROM shift_types
+"""
+
+# İSTEK sayacı (İST): görünen aralıkta karşılanamayan "mümkünse" tercihleri.
+# KESIN istekler katı kural — karşılanmamaları zaten kontrolcünün işi, sayaca girmez.
+_ISTEKLER = """
+SELECT ar.staff_id, ar.target_date, ar.rule_type, ar.status
+FROM availability_rules ar
+WHERE ar.status = 'MUMKUNSE'
+  AND ar.target_date BETWEEN %(gun_bas)s AND %(gun_son)s
+"""
+
 # Hedef saatler kodda değil veritabanında (app/hedef.py bunları kullanır).
 _HEDEF_PARAMETRELERI = """
 SELECT p.param_key, p.param_value
@@ -53,11 +75,28 @@ FROM constraint_params p
 WHERE p.param_key IN ('monthly_min_hours', 'weekly_reference_hours')
 """
 
+# Ayrılan personel: aktif değil ama bu taslakta ÇALIŞMIŞSA satırı görünmeli — kağıt
+# Eylül'de Efe ve Çağla'nın atamaları var, gizlenirse çizelge kağıtla uyuşmaz.
+#
+# adalete_girer: hastane kararı — sorumlu hemşire ve oryantasyondakiler mevcuda
+# sayılmaz; ayın tamamında sözleşmesi olmayan (ayrılan / sonradan başlayan) mevcuda
+# SAYILIR ama saat adaleti ve 200 saat karşılaştırmasına girmez. solver/data.py'deki
+# Personel.adalete_girer ile aynı kural: ekran ve solver aynı rakamı söylesin.
 _PERSONEL = """
-SELECT s.id, s.full_name, s.is_orientation, r.code AS role_code, r.name AS role_name
+SELECT s.id, s.full_name, s.is_orientation, s.is_active,
+       r.code AS role_code, r.name AS role_name,
+       (NOT s.is_orientation
+        AND r.code <> 'sorumlu_hemsire'
+        AND EXISTS (SELECT 1 FROM contracts ct
+                     WHERE ct.staff_id = s.id
+                       AND ct.valid_period @> (SELECT period FROM schedule_drafts
+                                                WHERE id = %(draft_id)s))
+       ) AS adalete_girer
 FROM staff s
 JOIN roles r ON r.id = s.role_id
 WHERE s.is_active
+   OR EXISTS (SELECT 1 FROM assignments a
+               WHERE a.staff_id = s.id AND a.draft_id = %(draft_id)s)
 ORDER BY CASE r.code
            WHEN 'sorumlu_hemsire' THEN 1
            WHEN 'egitim_hemsire'  THEN 2
@@ -96,7 +135,7 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
     """Ekranın tamamını besleyen ham satırlar. Biçimlendirme router'da."""
     p = {"draft_id": draft_id, "gun_bas": gun_bas, "gun_son": gun_son}
     async with cursor() as cur:
-        await cur.execute(_PERSONEL)
+        await cur.execute(_PERSONEL, p)
         personel = await cur.fetchall()
 
         await cur.execute(_ATAMALAR, p)
@@ -114,6 +153,15 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         await cur.execute(_HEDEF_PARAMETRELERI)
         hedefler = {r["param_key"]: float(r["param_value"]) for r in await cur.fetchall()}
 
+        await cur.execute(_VARDIYA_SURELERI)
+        vardiyalar = {r["code"]: r for r in await cur.fetchall()}
+
+        await cur.execute(_ISTEKLER, {"gun_bas": gun_bas, "gun_son": gun_son})
+        istekler = await cur.fetchall()
+
+        await cur.execute(_SAYACLAR)
+        sayaclar = await cur.fetchall()
+
     return {
         "personel": personel,
         "atamalar": atamalar,
@@ -121,6 +169,9 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         "aylik": aylik,
         "izinler": izinler,
         "hedefler": hedefler,
+        "vardiyalar": vardiyalar,
+        "istekler": istekler,
+        "sayaclar": sayaclar,
     }
 
 
@@ -260,3 +311,89 @@ async def hucre_yaz(draft_id: int, staff_id: int, gun: date,
         )
 
     return True, uyarilar
+
+
+# ---------------------------------------------------------------- sayaçlar
+# Satır özeti ve alt bardaki bütün sayaçlar BURADA hesaplanır. Izgara, aylık
+# görünüm ve alt bar aynı sayıyı iki yerde hesaplamasın: bir sayacın tanımı
+# değişirse tek bir yer değişir.
+
+def sayac_degerleri(
+    staff_id: int,
+    hucreler: dict[str, dict],
+    gunler: list[date],
+    vardiyalar: dict[str, dict],
+    istekler: list[dict],
+    hedef: float | None,
+) -> dict[str, float]:
+    """Bir kişinin GÖRÜNEN ARALIKTAKİ sayaçları.
+
+    `hucreler`: ISO tarih → {"shift_code", "tasks"}. Aralığın dışı çağırana ait.
+    Saat toplamı vardiya süresinden gelir, hedef farkı dönem hedefinden.
+    """
+    gunduz = gece = 0
+    saat = 0.0
+    triyaj = gozlem = ambulans = 0
+    hafta_sonu = pazar = 0
+
+    for iso, h in hucreler.items():
+        vd = vardiyalar.get(h["shift_code"])
+        if vd is None:
+            continue
+        if vd["crosses_midnight"]:
+            gece += 1
+        else:
+            gunduz += 1
+        saat += float(vd["duration_hours"])
+
+        gorevler = set(h.get("tasks") or ())
+        triyaj += "TRIYAJ" in gorevler
+        gozlem += "GOZLEM" in gorevler
+        ambulans += "AMBULANS" in gorevler
+
+        g = date.fromisoformat(iso)
+        if g.isoweekday() >= 6:
+            hafta_sonu += 1
+        if g.isoweekday() == 7:
+            pazar += 1
+
+    # Boş gün: o gün hiç vardiya BAŞLAMAYAN gün. İzin de boş gündür — kişi
+    # çalışmıyor. Gece vardiyasının ertesi günü de boştur (vardiya bir önceki
+    # gün başladı), bu yüzden "başlayan vardiya" ölçütü doğru olan.
+    bos_gun = sum(1 for g in gunler if g.isoformat() not in hucreler)
+
+    # Karşılanamayan "mümkünse" tercihler. Tür başına ayrı ölçüt:
+    #   BOS_GUN        → o gün çalışmışsa karşılanmadı
+    #   SADECE_GUNDUZ  → o gün gece çalışmışsa karşılanmadı
+    #   SADECE_GECE    → o gün gündüz çalışmışsa karşılanmadı
+    karsilanmayan = 0
+    for i in istekler:
+        if i["staff_id"] != staff_id:
+            continue
+        h = hucreler.get(i["target_date"].isoformat())
+        if h is None:
+            continue                     # o gün çalışmıyor → BOS_GUN karşılandı
+        vd = vardiyalar.get(h["shift_code"])
+        gece_mi = bool(vd and vd["crosses_midnight"])
+        tur = i["rule_type"]
+        if tur in ("BOS_GUN", "off_talebi"):
+            karsilanmayan += 1
+        elif tur == "SADECE_GUNDUZ" and gece_mi:
+            karsilanmayan += 1
+        elif tur == "SADECE_GECE" and not gece_mi:
+            karsilanmayan += 1
+
+    saat = round(saat, 1)
+    return {
+        "G": gunduz,
+        "N": gece,
+        "S": saat,
+        "HF": round(saat - hedef, 1) if hedef is not None else None,
+        "TRY": triyaj,
+        "GOZ": gozlem,
+        "AMB": ambulans,
+        "HS": hafta_sonu,
+        "PZ": pazar,
+        "BG": bos_gun,
+        "IST": karsilanmayan,
+    }
