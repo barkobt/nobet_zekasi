@@ -3,6 +3,42 @@
 Demo canlı link üzerinden yapılacak; yerelde çalıştırma seçeneği yok.
 Zincir: **Neon** (veritabanı) → **Railway** (api) → **Vercel** (web).
 
+---
+
+## ⚠ DEPLOY GIT PUSH İLE OLMUYOR
+
+**Ne Railway ne Vercel GitHub'a bağlı.** `git push` hiçbir deploy tetiklemez —
+kod GitHub'a gider, canlı eski sürümde kalır ve bu sessizce olur.
+
+Her ikisi de **CLI ile elden** deploy edilir:
+
+```bash
+# API — api/ klasöründen
+cd api && railway up
+
+# Web — web/ klasöründen
+cd web && vercel --prod --yes
+```
+
+**Deploy ettiğini nasıl anlarsın:**
+
+```bash
+# API: yeni kod aktifse "kullanici" alanı gelir
+curl -s https://nobet-zekasi-api-production.up.railway.app/api/health
+
+# Web: en üstteki satırın yaşı (Age) dakikalar içinde olmalı
+cd web && vercel ls --yes | head -5
+```
+
+Railway'de `railway up` **çalışma dizinini yükler**, git'i okumaz: commit edilmemiş
+değişiklikler de gider. Deploy etmeden önce `git status --short` boş olsun.
+
+İleride GitHub'a bağlamak istenirse: Railway → servis → Settings → Source →
+Connect Repo (Root Directory `api`), Vercel → Project → Settings → Git. Bu
+yapılana kadar **her deploy elle**.
+
+---
+
 Sıra önemli: web, API'nin adresini ister; API, veritabanının adresini ister.
 
 ---
