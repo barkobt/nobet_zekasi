@@ -18,8 +18,10 @@ class Settings(BaseSettings):
 
     # Hangi solver çağrılacak. model.py bitene kadar 'stub'.
     solver_impl: Literal["stub", "cpsat"] = "stub"
-    # Demo ayarı: yöneticiler 25 saniyeden uzun beklemesin.
-    solver_time_limit_s: int = 25
+    # Adım 5 ölçümü: adalet katmanıyla çözüm kalitesi ~30 sn'de platoya oturuyor
+    # ama optimallik kanıtlanmıyor. 60 sn'de plato her koşuda yakalanıyor;
+    # 25 sn'de üç koşudan birinde daha dengesiz bir çizelge çıkıyordu.
+    solver_time_limit_s: int = 60
 
     # Web'in sunucu tarafı proxy'si bu token'ı gönderir; tarayıcıya hiç inmez.
     # Boş bırakılırsa doğrulama kapalıdır (yerel geliştirme).

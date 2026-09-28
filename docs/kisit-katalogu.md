@@ -39,6 +39,65 @@ Kaynak: **Yasal** = UI'da gevşetilemez · **Kurumsal** = gevşetilebilir · **T
 - Süpervizörler ve oryantasyondaki personel günlük mevcut (C-005/C-006) sayımına dahil edilmez.
 - Kısa gece vardiya tipi (GECE_0100) kaldırıldı.
 - Merve Armut yalnızca gündüz çalışır (C-017 kapsamında).
+- **O-006, O-007, O-008 eklendi** (28.09, `seeds/016`):
+
+  | Kod | Kural | Ağırlık |
+  |---|---|---|
+  | O-006 | Karşılanamayan personel isteği (BEKLEMEDE) | 22.000 |
+  | O-007 | Triyajda hasta iletişimi tercihi | 2.200 |
+  | O-008 | Ambulans ekibi 1 triyaj + 1 gözlem tercihi | 2.200 |
+
+  O-006'nın ağırlığı hesapla konuldu: bir karşılanmayan istek ≈ saat adaletinde
+  5 saatlik bozulma → 10 yarım saat × 2.200 = 22.000.
+- **C-011'den HASTA_ILT şartı kaldırıldı** (28.09, `seeds/016`). Triyaj slotu artık
+  yalnız TRIYAJ yetkinliği ister; hasta iletişimi şart değil TERCİH (O-007). Şart
+  olarak dururken hasta iletişimi olmayan bir triyaj yetkilisi havuzdan tamamen
+  düşüyordu.
+- **`ambulance_crew_size` eklendi** (28.09, `seeds/016`, katalog kodu yok). C-009
+  yalnız "ambulans sonrası alanda kalan" kuralını anlatıyor ve **katı** kaldı;
+  ambulans ekip mevcudu (2 kişi) ayrı, gevşetilebilir kurala taşındı. Üst sınır
+  katı: araç 2 kişiliktir.
+- **Eksik cezaları kademelendi ve kurallar soft'a çevrildi** (28.09, `seeds/016`).
+  Solver bu kuralları zaten gevşetiyordu; katalog "Hard" diyordu ama gerçek davranış
+  "çok pahalı ama gevşetilebilir". Şema CHECK'i ağırlıklı kuralın soft olmasını
+  istediği için `is_hard` artık FALSE ve **gerçek davranış veritabanında görünüyor**:
+
+  | Kural | Eski | Yeni ağırlık |
+  |---|---|---|
+  | C-005 / C-006 genel mevcut | Hard | **2.000.000** |
+  | C-007 ekip lideri | Hard | **1.500.000** |
+  | C-011 triyaj | Hard | **1.200.000** |
+  | `ambulance_crew_size` ambulans mevcudu | — | **900.000** |
+  | C-010 gözlem | Hard | **700.000** |
+  | `all_crew_triage_or_observation` | Hard | **600.000** |
+  | `count_authority_required` sayım | Hard | **500.000** |
+  | **C-009 ambulans sonrası kalan** | Hard | **Hard kaldı** |
+
+  Değerler **hastane teyidi beklemektedir** (açıklamalarına da yazıldı). En küçüğü
+  (sayım, 500.000) C-004'ün yarım saat başına cezasından (20.000) 25 kat büyük:
+  bir vardiyada sayım yetkilisinin olmaması, birinin aylık hedefinin 12,5 saat
+  altında kalmasına bedel.
+- **O-003, O-004, O-005 eklendi** (28.09, `seeds/015`): gece adaleti, hafta sonu
+  adaleti, ambulans görev dengesi. Üçü de soft.
+- **Yumuşak ağırlıklar etkin değerlere çekildi** (28.09, `seeds/015`). Notion'daki
+  200/220 istenen önceliği ifade etmiyordu (fazla mesai ile adalet neredeyse eşitti).
+  Ağırlık artık "yarım saat başına ceza" anlamında ve sıralamayı kendisi taşıyor:
+
+  | Kod | Eski | Yeni | Kademe |
+  |---|---|---|---|
+  | O-002 adalet | 220 | **2.200** | 3 |
+  | O-003 gece adaleti | — | **2.200** | 3 |
+  | O-004 hafta sonu adaleti | — | **2.200** | 3 |
+  | O-001 fazla mesai | 200 | 200 | 4 |
+  | O-005 ambulans dengesi | — | **200** | 4 |
+  | C-003 haftalık 50 sa | 10 | 10 | 5 |
+
+  Kapsama/görev eksiği (100.000.000/kişi) ve C-004 eksik saati (50.000/yarım saat)
+  katı kurallar olduğu için ağırlıkları `constraints`'te değil `solver/model.py`'de.
+- **C-021 eklendi** (28.09, `seeds/014`): gece çalışan ertesi gün gündüze yazılamaz.
+  Gece 08:30'da biter, gündüz 08:30'da başlar — arada dinlenme yok. C-014 iki gece
+  sonrasını düzenliyordu, tek gece sonrası açıkta kalmıştı. Hard, kurumsal
+  (24 saatlik vardiya açılırsa gevşetilebilsin diye). **Notion'a da işlenmeli.**
 
 ## Bilinen açık sorular
 - C-004: izin/rapor günü başına hedeften kaç saat düşülecek.

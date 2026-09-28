@@ -36,11 +36,35 @@ Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
 - Ayarlar `pydantic-settings` ile.
 - Solver çalıştırma: POST ile `solver_runs` kaydı + `BackgroundTasks`; frontend GET ile
   durum yoklar. **Kuyruk sistemi (Celery/Redis) YOK.**
-- `api/solver/model.py` **Baran'ındır, dokunulmaz.** Aramızdaki sözleşme
-  `api/solver/interface.py`: `run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult`
-  (senkron, kendi DB bağlantısını açar).
+- Solver'ın API ile sözleşmesi `api/solver/interface.py`:
+  `run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult`
+  (senkron, kendi DB bağlantısını açar). Ayrıntısı `docs/solver-contract.md`.
 - Veritabanı zaten uyguladığı kuralları (tekillik, çakışma, CHECK) API'de tekrarlama;
   hatayı yakala ve Türkçeye çevir.
+
+## Solver çalışma şekli
+
+- Solver adım adım yazılır; her adım Baran'ın onayıyla ilerler.
+- Her adımda ÖNCE planı sade Türkçeyle anlat (ne yapacaksın, neden böyle), kod yazmadan
+  dur ve onay bekle.
+- Onaydan sonra kodu yaz ve çalıştır.
+- Raporda kritik kod parçalarını göster (SQL sorguları, veri yapısı, kurallar). Her
+  parçanın altında 2-3 cümleyle ne yaptığını sade dille açıkla. Standart/tekrar eden
+  kodu gösterme, sadece "şunlar da var" de.
+- Emin olmadığın bir şeyi tahmin etme; "Sorular" başlığında sor.
+
+### Adım sırası
+
+| Adım | Kapsam |
+|---|---|
+| 1 | Veriyi oku (`data.py`, `inspect.py`) — bitti |
+| 2 | En basit çizelge: günde 1 vardiya, kapsama, sorumlunun programı — bitti |
+| 3 | Asla bozulmayan kurallar (C-002, C-014, C-016, C-020, gece→gündüz yasağı) + kontrolcü (`validate.py`) |
+| 4 | Görevler: triyaj, gözlem, ambulans |
+| 5 | Adalet (O-002) ve 200 saat (C-004, O-001) |
+| 6 | Eksik açıklamaları (teşhis metinleri) |
+
+Adalet Adım 3 DEĞİL, Adım 5'tir.
 
 ## Web
 
