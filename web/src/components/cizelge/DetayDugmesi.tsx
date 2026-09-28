@@ -12,26 +12,31 @@ type Preference = components["schemas"]["Preference"];
 /** Tercih anahtarı: kullanıcı başına veritabanında (localStorage DEĞİL) —
  *  sunum makinesinden ya da başka bir tarayıcıdan aynı görünüm açılsın. */
 export const DETAY_ANAHTARI = "cizelge_detaylar";
+export const OZET_ANAHTARI = "cizelge_ozet_paneli";
 
-export function useDetaylar() {
+/** Veritabanında duran açık/kapalı tercihi (localStorage DEĞİL). */
+function useTercih(anahtar: string) {
   const qc = useQueryClient();
   const { data } = useQuery({
-    queryKey: ["pref", DETAY_ANAHTARI],
-    queryFn: () => api<Preference>(`/prefs/${DETAY_ANAHTARI}`),
+    queryKey: ["pref", anahtar],
+    queryFn: () => api<Preference>(`/prefs/${anahtar}`),
   });
   const acik = data?.value === true;
 
   const yaz = useMutation({
     mutationFn: (deger: boolean) =>
-      api<Preference>(`/prefs/${DETAY_ANAHTARI}`, {
+      api<Preference>(`/prefs/${anahtar}`, {
         method: "PUT",
-        body: JSON.stringify({ pref_key: DETAY_ANAHTARI, value: deger }),
+        body: JSON.stringify({ pref_key: anahtar, value: deger }),
       }),
-    onSuccess: (y) => qc.setQueryData(["pref", DETAY_ANAHTARI], y),
+    onSuccess: (y) => qc.setQueryData(["pref", anahtar], y),
   });
 
   return { acik, cevir: () => yaz.mutate(!acik), bekliyor: yaz.isPending };
 }
+
+export const useDetaylar = () => useTercih(DETAY_ANAHTARI);
+export const useOzetPaneli = () => useTercih(OZET_ANAHTARI);
 
 export function DetayDugmesi() {
   const { acik, cevir, bekliyor } = useDetaylar();
