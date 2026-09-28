@@ -36,6 +36,56 @@ WHERE a.draft_id = %(draft_id)s
   AND a.work_date BETWEEN %(gun_bas)s AND %(gun_son)s
 """
 
+# DÖNEM DIŞI günler: taslağın aralığının dışında kalan ama ekranda görünen günler
+# (hafta Pazartesi başlar, taslak ayın 1'inde). İçerik YAYINLANMIŞ çizelgeden okunur
+# ve salt okunurdur — komşu ayın nöbetini buradan değiştirmek, kimsenin haberi
+# olmadan yayınlanmış bir çizelgeyi değiştirmek olurdu.
+_DIS_ATAMALAR = """
+SELECT a.staff_id,
+       a.work_date,
+       st.code AS shift_code,
+       st.crosses_midnight,
+       a.is_locked,
+       a.source,
+       COALESCE(g.kodlar, ARRAY[]::text[]) AS tasks
+FROM assignments a
+JOIN schedule_drafts d ON d.id = a.draft_id
+JOIN shift_types st    ON st.id = a.shift_type_id
+LEFT JOIN LATERAL (
+    SELECT array_agg(c.code ORDER BY c.code) AS kodlar
+    FROM assignment_tasks t
+    JOIN competencies c ON c.id = t.competency_id
+    WHERE t.assignment_id = a.id
+) g ON TRUE
+WHERE d.status = 'yayinlandi'
+  AND d.id <> %(draft_id)s
+  AND a.work_date BETWEEN %(gun_bas)s AND %(gun_son)s
+  AND d.period @> a.work_date
+  AND NOT (SELECT period FROM schedule_drafts WHERE id = %(draft_id)s) @> a.work_date
+"""
+
+# Dönem dışı günlerin kapsama sayıları da yayınlanmış çizelgeden gelir: sütun
+# başlığındaki G x/y o gün gerçekte kaç kişi çalıştığını göstersin.
+_DIS_KAPSAMA = """
+SELECT cov.day, cov.shift_code, cov.slot_code, cov.assigned, cov.required,
+       cov.qualified, cov.remaining_after_ambulance
+FROM v_daily_coverage cov
+JOIN schedule_drafts d ON d.id = cov.draft_id
+WHERE d.status = 'yayinlandi'
+  AND d.id <> %(draft_id)s
+  AND cov.day BETWEEN %(gun_bas)s AND %(gun_son)s
+  AND d.period @> cov.day
+  AND NOT (SELECT period FROM schedule_drafts WHERE id = %(draft_id)s) @> cov.day
+"""
+
+# Hücredeki istek işareti: hangi gün kimin ne isteği var, karşılandı mı.
+# Sayaçtaki İST yalnız "mümkünse"leri sayar; işaret KESİN istekleri de gösterir.
+_HUCRE_ISTEKLERI = """
+SELECT ar.staff_id, ar.target_date, ar.rule_type, ar.status, ar.note
+FROM availability_rules ar
+WHERE ar.target_date BETWEEN %(gun_bas)s AND %(gun_son)s
+"""
+
 # Satır sonu: aylık toplam ve 200 saat hedefine uzaklık.
 # v_monthly_hours ayın TAMAMINI sayar — seçili hafta değil. Satır sonu zaten
 # "kişinin aylık toplamı" demek (DESIGN §6), o yüzden doğru olan bu.
@@ -162,6 +212,18 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         await cur.execute(_SAYACLAR)
         sayaclar = await cur.fetchall()
 
+        await cur.execute(_DIS_ATAMALAR, p)
+        dis_atamalar = await cur.fetchall()
+
+        await cur.execute(_DIS_KAPSAMA, p)
+        dis_kapsama = await cur.fetchall()
+
+        await cur.execute(_HUCRE_ISTEKLERI, {"gun_bas": gun_bas, "gun_son": gun_son})
+        hucre_istekleri = await cur.fetchall()
+
+        await cur.execute("SELECT period FROM schedule_drafts WHERE id = %(draft_id)s", p)
+        donem = (await cur.fetchone())["period"]
+
     return {
         "personel": personel,
         "atamalar": atamalar,
@@ -172,6 +234,10 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         "vardiyalar": vardiyalar,
         "istekler": istekler,
         "sayaclar": sayaclar,
+        "dis_atamalar": dis_atamalar,
+        "dis_kapsama": dis_kapsama,
+        "hucre_istekleri": hucre_istekleri,
+        "donem": donem,
     }
 
 
@@ -318,6 +384,26 @@ async def hucre_yaz(draft_id: int, staff_id: int, gun: date,
 # görünüm ve alt bar aynı sayıyı iki yerde hesaplamasın: bir sayacın tanımı
 # değişirse tek bir yer değişir.
 
+def istek_karsilandi(rule_type: str, hucre: dict | None, vardiyalar: dict) -> bool:
+    """Bir istek o gün karşılanmış mı. Sayaç (İST) ve hücre işareti AYNI ölçütü kullanır.
+
+    BOS_GUN       → o gün hiç çalışmıyorsa karşılandı
+    SADECE_GUNDUZ → çalışmıyorsa ya da gündüzdeyse karşılandı
+    SADECE_GECE   → çalışmıyorsa ya da gecedeyse karşılandı
+    """
+    if hucre is None:
+        return True
+    vd = vardiyalar.get(hucre["shift_code"])
+    gece_mi = bool(vd and vd["crosses_midnight"])
+    if rule_type in ("BOS_GUN", "off_talebi"):
+        return False
+    if rule_type == "SADECE_GUNDUZ":
+        return not gece_mi
+    if rule_type == "SADECE_GECE":
+        return gece_mi
+    return True
+
+
 def sayac_degerleri(
     staff_id: int,
     hucreler: dict[str, dict],
@@ -366,22 +452,13 @@ def sayac_degerleri(
     #   BOS_GUN        → o gün çalışmışsa karşılanmadı
     #   SADECE_GUNDUZ  → o gün gece çalışmışsa karşılanmadı
     #   SADECE_GECE    → o gün gündüz çalışmışsa karşılanmadı
-    karsilanmayan = 0
-    for i in istekler:
-        if i["staff_id"] != staff_id:
-            continue
-        h = hucreler.get(i["target_date"].isoformat())
-        if h is None:
-            continue                     # o gün çalışmıyor → BOS_GUN karşılandı
-        vd = vardiyalar.get(h["shift_code"])
-        gece_mi = bool(vd and vd["crosses_midnight"])
-        tur = i["rule_type"]
-        if tur in ("BOS_GUN", "off_talebi"):
-            karsilanmayan += 1
-        elif tur == "SADECE_GUNDUZ" and gece_mi:
-            karsilanmayan += 1
-        elif tur == "SADECE_GECE" and not gece_mi:
-            karsilanmayan += 1
+    karsilanmayan = sum(
+        1 for i in istekler
+        if i["staff_id"] == staff_id
+        and not istek_karsilandi(i["rule_type"],
+                                 hucreler.get(i["target_date"].isoformat()),
+                                 vardiyalar)
+    )
 
     saat = round(saat, 1)
     return {

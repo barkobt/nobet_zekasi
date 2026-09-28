@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.hedef import donem_hedefi, donem_turu, hedef_etiketi
 from app.repositories import schedule as repo
 from app.schemas.schedule import (
-    Cell, CellResult, CellUpdate, CounterView, DayHeader, DraftInfo, Group,
-    QualificationFlag, Row, Schedule, ShiftHeader, SlotCoverage, Summary,
+    Cell, CellRequest, CellResult, CellUpdate, CounterView, DayHeader, DraftInfo,
+    Group, QualificationFlag, Row, Schedule, ShiftHeader, SlotCoverage, Summary,
 )
 
 router = APIRouter(prefix="/drafts", tags=["çizelge"])
@@ -40,7 +40,8 @@ def _bas_harfler(ad: str) -> str:
     return "".join(p[0].upper() for p in parcalar[:2])
 
 
-def gun_basliklari(kapsama_satirlari: list[dict], gun_bas: date, gun_son: date) -> list[DayHeader]:
+def gun_basliklari(kapsama_satirlari: list[dict], gun_bas: date, gun_son: date,
+                   donem: object | None = None) -> list[DayHeader]:
     """Kapsama satırlarını gün sütunlarına çevirir.
 
     Hem E-09 çizelgesi hem E-06 ihtiyaç ekranı bunu kullanır: aynı sayılar,
@@ -103,6 +104,8 @@ def gun_basliklari(kapsama_satirlari: list[dict], gun_bas: date, gun_son: date) 
                 weekday=GUN_ADI[gun.weekday()],
                 label=f"{gun.day} {AY_ADI[gun.month - 1]}",
                 is_weekend=gun.weekday() >= 5,
+                # donem verilmezse (E-06 ihtiyaç ekranı) her gün dönem içi sayılır.
+                in_period=donem is None or donem.lower <= gun < donem.upper,
                 shifts=vardiyalar,
             )
         )
@@ -139,7 +142,11 @@ async def cizelge(
 
     veri = await repo.cizelge_verisi(draft_id, gun_bas, gun_son)
 
-    gunler = gun_basliklari(veri["kapsama"], gun_bas, gun_son)
+    # Dönem dışı günlerin başlığı yayınlanmış çizelgenin kapsamasından gelir:
+    # 26 Eki–1 Kas haftasında 26-31 Ekim'in G 6/6'sı Ekim çizelgesinden okunur.
+    gunler = gun_basliklari(
+        veri["kapsama"] + veri["dis_kapsama"], gun_bas, gun_son, veri["donem"]
+    )
     aralik_gunleri = [gun_bas + timedelta(days=i) for i in range((gun_son - gun_bas).days + 1)]
 
     # Görünen aralık haftalık mı aylık mı: sayaç görünürlüğü ikisi için ayrı ayarlanıyor.
@@ -157,14 +164,46 @@ async def cizelge(
     ]
 
     # --- Hücreler -----------------------------------------------------------
+    donem = veri["donem"]
+    sureler = {k: float(v["duration_hours"]) for k, v in veri["vardiyalar"].items()}
+
     hucreler: dict[int, dict[str, Cell]] = {}
-    for a in veri["atamalar"]:
-        hucreler.setdefault(a["staff_id"], {})[a["work_date"].isoformat()] = Cell(
+    # Dönem dışı satırlar ÖNCE yazılır ki taslağın kendi satırı (varsa) üstüne yazsın.
+    for a in veri["dis_atamalar"] + veri["atamalar"]:
+        g = a["work_date"]
+        icinde = donem.lower <= g < donem.upper
+        hucreler.setdefault(a["staff_id"], {})[g.isoformat()] = Cell(
             shift_code=a["shift_code"],
             shift_label=VARDIYA_ETIKET.get(a["shift_code"], "G"),
             tasks=list(a["tasks"] or []),
             is_locked=a["is_locked"],
             source=a["source"],
+            hours=sureler.get(a["shift_code"], 0.0),
+            editable=icinde,
+        )
+
+    # --- Hücredeki istek işaretleri -----------------------------------------
+    ISTEK_ADI = {"BOS_GUN": "Boş gün", "SADECE_GUNDUZ": "Sadece gündüz",
+                 "SADECE_GECE": "Sadece gece"}
+    GUC_ADI = {"KESIN": "Kesin", "MUMKUNSE": "Mümkünse"}
+    istek_hucreleri: dict[int, dict[str, CellRequest]] = {}
+    for i in veri["hucre_istekleri"]:
+        tur = i["rule_type"]
+        if tur not in ISTEK_ADI:
+            continue                     # eski türler (off_talebi vb.) ekranda gösterilmez
+        iso = i["target_date"].isoformat()
+        h = hucreler.get(i["staff_id"], {}).get(iso)
+        istek_hucreleri.setdefault(i["staff_id"], {})[iso] = CellRequest(
+            type=tur,
+            type_label=ISTEK_ADI[tur],
+            strength=i["status"],
+            strength_label=GUC_ADI.get(i["status"], i["status"]),
+            met=repo.istek_karsilandi(
+                tur,
+                {"shift_code": h.shift_code} if h else None,
+                veri["vardiyalar"],
+            ),
+            note=i["note"],
         )
 
     izinler: dict[int, dict[str, str]] = {}
@@ -225,6 +264,7 @@ async def cizelge(
                     initials=_bas_harfler(k["full_name"]),
                     cells=hucreler.get(k["id"], {}),
                     absences=izinler.get(k["id"], {}),
+                    requests=istek_hucreleri.get(k["id"], {}),
                     period_hours=planlanan,
                     period_target=hedef,
                     period_diff=round(planlanan - hedef, 1) if hedef is not None else None,

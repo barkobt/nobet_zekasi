@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 
@@ -25,11 +25,15 @@ export default function GorunurSayaclarSayfasi() {
     queryFn: () => api<CounterList>("/counters"),
   });
 
-  // Yerel taslak: kullanıcı birkaç anahtarı çevirip bir kez kaydeder.
-  const [taslak, setTaslak] = useState<Counter[] | null>(null);
-  useEffect(() => {
-    if (data) setTaslak(data.counters);
-  }, [data]);
+  // Kullanıcının çevirdiği anahtarlar, sunucudan geleni EZMEDEN üstte durur:
+  // state'i effect ile senkronlamak yerine örtü olarak uyguluyoruz.
+  const [ortu, setOrtu] = useState<Record<string, { w: boolean; m: boolean }>>({});
+  const taslak: Counter[] | null =
+    data?.counters.map((c) =>
+      ortu[c.key]
+        ? { ...c, weekly_on: ortu[c.key].w, monthly_on: ortu[c.key].m }
+        : c,
+    ) ?? null;
 
   const kaydet = useMutation({
     mutationFn: (liste: Counter[]) =>
@@ -45,22 +49,27 @@ export default function GorunurSayaclarSayfasi() {
       qc.setQueryData(["counters"], yeni);
       // Izgara sayaçları bu ayardan besleniyor: kaydedince yenilensin.
       qc.invalidateQueries({ queryKey: ["schedule"] });
-      setTaslak(yeni.counters);
+      setOrtu({});
     },
   });
 
   const degisti =
-    taslak !== null &&
     data !== undefined &&
-    taslak.some((c, i) => {
-      const o = data.counters[i];
-      return c.weekly_on !== o.weekly_on || c.monthly_on !== o.monthly_on;
+    Object.entries(ortu).some(([k, v]) => {
+      const o = data.counters.find((c) => c.key === k);
+      return o !== undefined && (o.weekly_on !== v.w || o.monthly_on !== v.m);
     });
 
   function cevir(key: string, alan: "weekly_on" | "monthly_on", deger: boolean) {
-    setTaslak((eski) =>
-      (eski ?? []).map((c) => (c.key === key ? { ...c, [alan]: deger } : c)),
-    );
+    const su = taslak?.find((c) => c.key === key);
+    if (!su) return;
+    setOrtu((e) => ({
+      ...e,
+      [key]: {
+        w: alan === "weekly_on" ? deger : su.weekly_on,
+        m: alan === "monthly_on" ? deger : su.monthly_on,
+      },
+    }));
   }
 
   return (

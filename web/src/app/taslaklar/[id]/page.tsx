@@ -3,11 +3,13 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Loader2, Menu, Play } from "lucide-react";
+import { ChevronLeft, Loader2, Menu, Play } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { HataKutusu } from "@/components/HataKutusu";
 import { Izgara } from "@/components/cizelge/Izgara";
+import { DonemGezgini } from "@/components/cizelge/DonemGezgini";
+import { DetayDugmesi, useDetaylar } from "@/components/cizelge/DetayDugmesi";
 import { TaslakPaneli } from "@/components/taslak/TaslakPaneli";
 import { ExcelDugmesi } from "@/components/ExcelDugmesi";
 import { Badge } from "@/components/ui/badge";
@@ -15,13 +17,9 @@ import { Button } from "@/components/ui/button";
 import { api, sunucuAciklamasi } from "@/lib/api";
 import { sayi, type Schedule } from "@/lib/cizelge";
 import { aralikEtiketi, type Draft, type SolveAccepted, type SolverRun } from "@/lib/taslak";
+import { aralik, iso as isoGun, type Olcek } from "@/lib/donem";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
-const gunEkle = (i: string, n: number) => {
-  const d = new Date(i + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + n);
-  return iso(d);
-};
 
 export default function TaslakSayfasi({ params }: { params: Promise<{ id: string }> }) {
   const draftId = Number(use(params).id);
@@ -34,14 +32,21 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     queryFn: () => api<Draft>(`/drafts/${draftId}`),
   });
 
-  // Görünen aralık: taslağın kendi dönemi. Uzun dönemde haftaya bölünür.
-  const [ofset, setOfset] = useState(0);
-  const bas = taslak ? gunEkle(taslak.period_start, ofset * 7) : null;
-  const sonrakiHafta = bas ? gunEkle(bas, 6) : null;
-  const taslakSon = taslak ? gunEkle(taslak.period_end, -1) : null;
-  const son = sonrakiHafta && taslakSon
-    ? (sonrakiHafta > taslakSon ? taslakSon : sonrakiHafta)
-    : null;
+  // Görünen aralık DÖNEME KIRPILMAZ: hafta her zaman Pazartesi–Pazar, ay her zaman
+  // 1'inden sonuna. Aralığa düşen dönem dışı günler taralı ve salt okunur gelir
+  // (içerikleri yayınlanmış çizelgeden).
+  const [olcek, setOlcek] = useState<Olcek>("hafta");
+  // Çapa kullanıcı gezmediyse taslağın ilk günü. Türetiliyor, effect ile
+  // senkronlanmıyor: taslak gelene kadar null, geldiğinde doğru haftaya düşer.
+  const [secilenCapa, setCapa] = useState<Date | null>(null);
+  const capa =
+    secilenCapa ?? (taslak ? new Date(taslak.period_start + "T00:00:00Z") : null);
+
+  const [gorunenBas, gorunenSon] = capa ? aralik(capa, olcek) : [null, null];
+  const bas = gorunenBas ? isoGun(gorunenBas) : null;
+  const son = gorunenSon ? isoGun(gorunenSon) : null;
+
+  const { acik: detaylar } = useDetaylar();
 
   const { data: cizelge, isLoading, error: hata } = useQuery({
     queryKey: ["schedule", draftId, bas, son],
@@ -88,7 +93,6 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
   }
 
   const calisiyor = coz.isPending || runId !== null;
-  const sonHafta = taslak && bas && gunEkle(bas, 7) > gunEkle(taslak.period_end, -1);
 
   return (
     <AppShell>
@@ -114,17 +118,8 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {taslak && taslak.day_count > 7 && (
-            <>
-              <Button variant="outline" size="icon" aria-label="Önceki hafta"
-                      disabled={ofset === 0} onClick={() => setOfset((o) => o - 1)}>
-                <ChevronLeft size={16} strokeWidth={1.75} />
-              </Button>
-              <Button variant="outline" size="icon" aria-label="Sonraki hafta"
-                      disabled={!!sonHafta} onClick={() => setOfset((o) => o + 1)}>
-                <ChevronRight size={16} strokeWidth={1.75} />
-              </Button>
-            </>
+          {capa && (
+            <DonemGezgini olcek={olcek} capa={capa} onCapa={setCapa} onOlcek={setOlcek} />
           )}
 
           <ExcelDugmesi draftId={draftId} />
@@ -171,13 +166,17 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
         </div>
       ) : (
         <>
-          <Izgara data={cizelge} draftId={draftId} onDegisti={tazele} />
+          <Izgara data={cizelge} draftId={draftId} onDegisti={tazele} detaylar={detaylar} />
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 px-1">
-            <Ozet etiket="Atanan saat" deger={`${sayi(cizelge.summary.total_hours)} sa`} />
-            <Ozet etiket="Adalet farkı" deger={`${sayi(cizelge.summary.fairness_gap)} sa`} />
-            <Ozet etiket="Eksik slot" deger={String(cizelge.summary.shortfall_count)}
-                  vurgu={cizelge.summary.shortfall_count > 0} />
+          {/* Alt bar: GÖRÜNEN dönemin toplamları. Sağda detay anahtarı. */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-1">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+              <Ozet etiket="Toplam saat" deger={`${sayi(cizelge.summary.total_hours)} sa`} />
+              <Ozet etiket="Toplam gece" deger={String(cizelge.summary.total_nights ?? 0)} />
+              <Ozet etiket="Eksik vardiya" deger={String(cizelge.summary.shortfall_count)}
+                    vurgu={cizelge.summary.shortfall_count > 0} />
+            </div>
+            <DetayDugmesi />
           </div>
 
           {(cizelge.notes ?? []).length > 0 && (

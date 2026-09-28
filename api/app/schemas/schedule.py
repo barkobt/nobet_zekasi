@@ -54,7 +54,23 @@ class DayHeader(BaseModel):
     weekday: str = Field(description="Pzt, Sal, …")
     label: str = Field(description="Gün + kısa ay, örn. '21 Eyl'")
     is_weekend: bool
+    in_period: bool = Field(
+        default=True,
+        description="Taslağın döneminin içinde mi. False ise içerik yayınlanmış "
+                    "çizelgeden gelir ve DÜZENLENEMEZ (ızgarada taralı gösterilir).",
+    )
     shifts: list[ShiftHeader]
+
+
+class CellRequest(BaseModel):
+    """Hücredeki istek işareti. Tooltip bu üç alandan kurulur."""
+
+    type: Literal["BOS_GUN", "SADECE_GUNDUZ", "SADECE_GECE"]
+    type_label: str = Field(description="'Boş gün' / 'Sadece gündüz' / 'Sadece gece'")
+    strength: Literal["KESIN", "MUMKUNSE"]
+    strength_label: str = Field(description="'Kesin' / 'Mümkünse'")
+    met: bool = Field(description="Çizelgede karşılandı mı")
+    note: str | None = None
 
 
 class Cell(BaseModel):
@@ -65,6 +81,8 @@ class Cell(BaseModel):
     tasks: list[str] = Field(default_factory=list, description="Görev kodları: TRIYAJ, AMBULANS, GOZLEM")
     is_locked: bool = False
     source: str
+    hours: float = Field(default=0.0, description="Vardiyanın süresi; 'Detayları göster' açıkken hücrede yazar")
+    editable: bool = Field(default=True, description="Dönem dışı günler salt okunur")
 
 
 class Row(BaseModel):
@@ -81,6 +99,9 @@ class Row(BaseModel):
     initials: str
     cells: dict[str, Cell] = Field(description="ISO tarih → hücre; çalışılmayan gün anahtarı yok")
     absences: dict[str, str] = Field(default_factory=dict, description="ISO tarih → izin türü")
+    requests: dict[str, CellRequest] = Field(
+        default_factory=dict, description="ISO tarih → o güne yazılmış istek"
+    )
     period_hours: float = Field(description="Taslağın DÖNEMİNDEKİ toplam planlanan saat")
     period_target: float | None = Field(
         description="Dönem hedefi: tam ay → 200, tam hafta → 50. "

@@ -8,17 +8,19 @@ import type { DayHeader, ShiftHeader } from "@/lib/cizelge";
  *
  * Tooltip her vardiya için AYRI açılır: G'nin üstünde gündüz, N'nin üstünde gece.
  */
-export function GunBasligi({ gun }: { gun: DayHeader }) {
+export function GunBasligi({ gun, dar }: { gun: DayHeader; dar?: boolean }) {
+  // Aylık görünümde 31 sütun var: gün adı ve tarih tek satıra iner, sayaçlar
+  // alt alta. Tooltip aynı kalır — detay hep orada.
   return (
-    <div className="flex flex-col items-center gap-1 px-1 py-2">
+    <div className={"flex flex-col items-center px-1 py-2 " + (dar ? "gap-0.5" : "gap-1")}>
       <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
-        {gun.weekday}
+        {dar ? gun.weekday.slice(0, 1) : gun.weekday}
       </span>
-      <span className="font-medium" style={{ fontSize: "var(--text-xs)" }}>
-        {gun.label}
+      <span className="font-medium tabular-nums" style={{ fontSize: "var(--text-xs)" }}>
+        {dar ? gun.label.split(" ")[0] : gun.label}
       </span>
 
-      <div className="flex gap-1.5">
+      <div className={dar ? "flex flex-col items-center" : "flex gap-1.5"}>
         {gun.shifts.map((v) => (
           <Tooltip key={v.code}>
             <TooltipTrigger asChild>

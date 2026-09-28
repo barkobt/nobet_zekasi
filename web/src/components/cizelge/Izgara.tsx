@@ -5,7 +5,8 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { GunBasligi } from "./GunBasligi";
 import { Hucre } from "./Hucre";
-import { fark, sayi, type Schedule } from "@/lib/cizelge";
+import { SatirOzeti } from "./SatirOzeti";
+import { sayi, type Schedule } from "@/lib/cizelge";
 import { HucreDuzenle } from "./HucreDuzenle";
 
 /**
@@ -15,14 +16,35 @@ import { HucreDuzenle } from "./HucreDuzenle";
  *   satır sonu = aylık toplam + 200 hedefine göre fark
  * İlk sütun ve başlık satırı sabit (sticky).
  */
+/**
+ * Dönem dışı gün: çapraz taralı ve soluk. İçerik YAYINLANMIŞ çizelgeden gelir ve
+ * düzenlenemez — komşu ayın nöbetini buradan değiştirmek, yayınlanmış bir çizelgeyi
+ * kimsenin haberi olmadan değiştirmek olurdu.
+ */
+const DONEM_DISI: React.CSSProperties = {
+  backgroundImage:
+    "repeating-linear-gradient(45deg, var(--border) 0 1px, transparent 1px 7px)",
+};
+
 export function Izgara({
-  data, draftId, onDegisti,
+  data, draftId, onDegisti, detaylar = false,
 }: {
   data: Schedule;
   /** Verilirse hücreler düzenlenebilir olur (taslak içi ekran). */
   draftId?: number;
   onDegisti?: () => void;
+  /** "Detayları göster" açık mı: ek sayaçlar + hücrede saat etiketi. */
+  detaylar?: boolean;
 }) {
+  // Aylık görünümde gün sayısı 28-31: hücreler daralır, yalnız G/N harfi kalır.
+  const aylik = data.view === "monthly";
+  const sayaclar = data.counters ?? [];
+
+  // Aylık görünümde 31 sütun yan yana: haftaların nerede bittiği ancak bir ayraçla
+  // okunur. Pazartesi sütununun soluna daha belirgin bir çizgi konur.
+  const haftaBasi = (iso: string) =>
+    aylik && new Date(iso + "T00:00:00Z").getUTCDay() === 1;
+  const ayrac = "border-l-2 border-l-border";
   // Hedef saat orantılanmaz (27.09): tam ay → 200 (C-004), tam hafta → 50 (C-003),
   // başka uzunlukta hedef yok ve fark sütunu "—" gösterir. Kırmızı yalnız hedef
   // varken ve altında kalınmışken.
@@ -52,19 +74,26 @@ export function Izgara({
               <th
                 key={g.day}
                 className={
-                  "sticky top-0 z-20 min-w-[92px] border-b bg-card p-0 " +
-                  (g.is_weekend ? "bg-background" : "")
+                  "sticky top-0 z-20 border-b bg-card p-0 " +
+                  (aylik ? "min-w-[38px] " : "min-w-[92px] ") +
+                  (g.is_weekend ? "bg-background " : "") +
+                  (g.in_period === false ? "opacity-55 " : "") +
+                  (haftaBasi(g.day) ? ayrac + " " : "")
                 }
+                style={g.in_period === false ? DONEM_DISI : undefined}
               >
-                <GunBasligi gun={g} />
+                <GunBasligi gun={g} dar={aylik} />
               </th>
             ))}
-            <th className="sticky right-0 top-0 z-30 min-w-[110px] border-b border-l bg-card p-0 align-bottom">
+            <th
+              className="sticky right-0 top-0 z-30 border-b border-l bg-card p-0 align-bottom"
+              style={{ minWidth: detaylar ? 300 : 150 }}
+            >
               <span
                 className="block px-3 pb-2 text-right text-muted-foreground"
                 style={{ fontSize: "var(--text-xs)" }}
               >
-                Dönem toplamı
+                Özet
               </span>
             </th>
           </tr>
@@ -110,6 +139,28 @@ export function Izgara({
                           {satir.initials}
                         </span>
                         <span className="truncate font-medium">{satir.full_name}</span>
+                        {satir.period_target != null && (
+                          <span
+                            className="shrink-0 rounded-sm px-1.5 py-0.5 tabular-nums"
+                            style={{
+                              background: "var(--brand-soft)",
+                              color: "var(--brand)",
+                              fontSize: "var(--text-xs)",
+                            }}
+                            title="Dönem hedefi"
+                          >
+                            {sayi(satir.period_target)}s
+                          </span>
+                        )}
+                        {!satir.is_active && (
+                          <span
+                            className="shrink-0 text-muted-foreground"
+                            style={{ fontSize: "var(--text-xs)" }}
+                            title="Ayrıldı — kapsamaya sayılır, adalet hesabına girmez"
+                          >
+                            ayrıldı
+                          </span>
+                        )}
                         {satir.is_orientation && (
                           <span
                             className="shrink-0 text-muted-foreground"
@@ -122,22 +173,33 @@ export function Izgara({
                       </div>
                     </th>
 
-                    {data.days.map((g) => (
+                    {data.days.map((g) => {
+                      const hucre = satir.cells[g.day] ?? undefined;
+                      const izin = (satir.absences ?? {})[g.day] ?? undefined;
+                      const istek = (satir.requests ?? {})[g.day] ?? undefined;
+                      // Dönem dışı gün ASLA düzenlenmez; hücre yoksa da düzenlenemez
+                      // (o günün sahibi başka bir çizelge).
+                      const duzenlenir =
+                        draftId !== undefined && g.in_period !== false;
+                      return (
                       <td
                         key={g.day}
                         className={
                           "h-10 border-l p-0 align-middle group-hover:bg-accent " +
-                          (g.is_weekend ? "bg-background/60" : "")
+                          (g.is_weekend ? "bg-background/60 " : "") +
+                          (g.in_period === false ? "opacity-55 " : "") +
+                          (haftaBasi(g.day) ? ayrac + " " : "")
                         }
+                        style={g.in_period === false ? DONEM_DISI : undefined}
                       >
-                        {draftId ? (
+                        {duzenlenir ? (
                           <HucreDuzenle
-                            draftId={draftId}
+                            draftId={draftId!}
                             staffId={satir.staff_id}
                             staffName={satir.full_name}
                             gun={g.day}
-                            cell={satir.cells[g.day] ?? undefined}
-                            absence={(satir.absences ?? {})[g.day] ?? undefined}
+                            cell={hucre}
+                            absence={izin}
                             onKaydedildi={() => onDegisti?.()}
                           >
                             <button
@@ -146,36 +208,29 @@ export function Izgara({
                               aria-label={`${satir.full_name} — ${g.label}`}
                             >
                               <Hucre
-                                cell={satir.cells[g.day] ?? undefined}
-                                absence={(satir.absences ?? {})[g.day] ?? undefined}
+                                cell={hucre}
+                                absence={izin}
+                                request={istek}
+                                saatGoster={detaylar && !aylik}
+                                dar={aylik}
                               />
                             </button>
                           </HucreDuzenle>
                         ) : (
                           <Hucre
-                            cell={satir.cells[g.day] ?? undefined}
-                            absence={(satir.absences ?? {})[g.day] ?? undefined}
+                            cell={hucre}
+                            absence={izin}
+                            request={istek}
+                            saatGoster={detaylar && !aylik}
+                            dar={aylik}
                           />
                         )}
                       </td>
-                    ))}
+                      );
+                    })}
 
-                    <td className="sticky right-0 z-10 border-l bg-card px-3 text-right group-hover:bg-accent">
-                      <div className="flex flex-col leading-tight">
-                        <span className="font-medium">{sayi(satir.period_hours)} sa</span>
-                        <span
-                          className={
-                            satir.period_diff !== null &&
-                            satir.period_diff !== undefined &&
-                            satir.period_diff < 0
-                              ? "text-danger font-medium"
-                              : "text-muted-foreground"
-                          }
-                          style={{ fontSize: "var(--text-xs)" }}
-                        >
-                          {fark(satir.period_diff)}
-                        </span>
-                      </div>
+                    <td className="sticky right-0 z-10 border-l bg-card group-hover:bg-accent">
+                      <SatirOzeti satir={satir} sayaclar={sayaclar} detaylar={detaylar} />
                     </td>
                   </tr>
                 ))}

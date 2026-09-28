@@ -7,6 +7,8 @@ export type Row = components["schemas"]["Row"];
 export type Group = components["schemas"]["Group"];
 export type Cell = components["schemas"]["Cell"];
 export type SlotCoverage = components["schemas"]["SlotCoverage"];
+export type CounterView = components["schemas"]["CounterView"];
+export type CellRequest = components["schemas"]["CellRequest"];
 
 /**
  * Görev rozetleri (DESIGN §5): kısaltma rozette, tam adı tooltip'te.
@@ -35,3 +37,8 @@ export const fark = (n: number | null | undefined) =>
   n === null || n === undefined
     ? "—"
     : n === 0 ? "0" : n > 0 ? `+${sayi(n)}` : `−${sayi(Math.abs(n))}`;
+
+
+/** İstek işareti tooltip'i: "Boş gün isteği (Kesin) — karşılandı". */
+export const istekMetni = (i: CellRequest) =>
+  `${i.type_label} isteği (${i.strength_label}) — ${i.met ? "karşılandı" : "karşılanamadı"}`;

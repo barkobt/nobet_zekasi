@@ -17,7 +17,13 @@ export function sunucuAciklamasi(hata: unknown): string | null {
 
 /** Tek fetch sarmalayıcı. Tarayıcı hep aynı origin'e gider; proxy Railway'e iletir. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, { ...init, cache: "no-store" });
+  // Gövde varsa content-type ŞART: proxy yalnız var olan başlığı iletiyor, FastAPI
+  // başlıksız JSON gövdesini okumuyor ve 422 dönüyor. Çağıran açıkça verdiyse ona dokunma.
+  const headers = new Headers(init?.headers);
+  if (init?.body !== undefined && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  const res = await fetch(`/api${path}`, { ...init, headers, cache: "no-store" });
   if (!res.ok) {
     const govde = await res.text().catch(() => "");
     throw new Error(`API ${res.status}: ${govde || res.statusText}`);

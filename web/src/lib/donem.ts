@@ -32,3 +32,39 @@ export function aralik(capa: Date, olcek: Olcek): [Date, Date] {
 
 export const kaydir = (capa: Date, olcek: Olcek, yon: number) =>
   olcek === "hafta" ? gunEkle(capa, yon * 7) : ayBasi(capa, yon);
+
+export const AY_ADI = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+];
+export const AY_KISA = [
+  "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara",
+];
+
+/** ISO 8601 hafta numarası — üst bardaki "Hafta 45" için. */
+export function haftaNo(temel: Date): number {
+  // Perşembe'ye taşı: ISO haftası, yılın ilk Perşembe'sini içeren haftadır.
+  const d = gunEkle(haftaBasi(temel), 3);
+  const ilk = gunEkle(haftaBasi(new Date(Date.UTC(d.getUTCFullYear(), 0, 4))), 3);
+  return 1 + Math.round((d.getTime() - ilk.getTime()) / (7 * 86400000));
+}
+
+/**
+ * Üst bardaki dönem etiketi:
+ *   hafta → "Hafta 45 · 2–8 Kas 2026"
+ *   ay    → "Kasım 2026"
+ */
+export function donemEtiketi(capa: Date, olcek: Olcek): string {
+  if (olcek === "ay") {
+    const b = ayBasi(capa);
+    return `${AY_ADI[b.getUTCMonth()]} ${b.getUTCFullYear()}`;
+  }
+  const [b, s] = aralik(capa, "hafta");
+  const ayB = AY_KISA[b.getUTCMonth()];
+  const ayS = AY_KISA[s.getUTCMonth()];
+  const gunler =
+    ayB === ayS
+      ? `${b.getUTCDate()}–${s.getUTCDate()} ${ayS} ${s.getUTCFullYear()}`
+      : `${b.getUTCDate()} ${ayB} – ${s.getUTCDate()} ${ayS} ${s.getUTCFullYear()}`;
+  return `Hafta ${haftaNo(b)} · ${gunler}`;
+}

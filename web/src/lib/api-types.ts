@@ -892,6 +892,51 @@ export interface components {
             is_locked: boolean;
             /** Source */
             source: string;
+            /**
+             * Hours
+             * @description Vardiyanın süresi; 'Detayları göster' açıkken hücrede yazar
+             * @default 0
+             */
+            hours: number;
+            /**
+             * Editable
+             * @description Dönem dışı günler salt okunur
+             * @default true
+             */
+            editable: boolean;
+        };
+        /**
+         * CellRequest
+         * @description Hücredeki istek işareti. Tooltip bu üç alandan kurulur.
+         */
+        CellRequest: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "BOS_GUN" | "SADECE_GUNDUZ" | "SADECE_GECE";
+            /**
+             * Type Label
+             * @description 'Boş gün' / 'Sadece gündüz' / 'Sadece gece'
+             */
+            type_label: string;
+            /**
+             * Strength
+             * @enum {string}
+             */
+            strength: "KESIN" | "MUMKUNSE";
+            /**
+             * Strength Label
+             * @description 'Kesin' / 'Mümkünse'
+             */
+            strength_label: string;
+            /**
+             * Met
+             * @description Çizelgede karşılandı mı
+             */
+            met: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** CellResult */
         CellResult: {
@@ -1144,6 +1189,12 @@ export interface components {
             label: string;
             /** Is Weekend */
             is_weekend: boolean;
+            /**
+             * In Period
+             * @description Taslağın döneminin içinde mi. False ise içerik yayınlanmış çizelgeden gelir ve DÜZENLENEMEZ (ızgarada taralı gösterilir).
+             * @default true
+             */
+            in_period: boolean;
             /** Shifts */
             shifts: components["schemas"]["ShiftHeader"][];
         };
@@ -1889,6 +1940,13 @@ export interface components {
              */
             absences?: {
                 [key: string]: string;
+            };
+            /**
+             * Requests
+             * @description ISO tarih → o güne yazılmış istek
+             */
+            requests?: {
+                [key: string]: components["schemas"]["CellRequest"];
             };
             /**
              * Period Hours

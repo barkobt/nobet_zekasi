@@ -3,48 +3,29 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { ExcelDugmesi } from "@/components/ExcelDugmesi";
 import { Izgara } from "@/components/cizelge/Izgara";
+import { DonemGezgini } from "@/components/cizelge/DonemGezgini";
+import { DetayDugmesi, useDetaylar } from "@/components/cizelge/DetayDugmesi";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { sayi, type Schedule } from "@/lib/cizelge";
+import { aralik, iso as isoGun, type Olcek } from "@/lib/donem";
 import type { components } from "@/lib/api-types";
 
 type DraftOzet = components["schemas"]["Draft"];
 
-/** pzt + 6 gün (kapsayıcı son gün) */
-const bitisHesap = (pzt: string) => {
-  const d = new Date(pzt + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + 6);
-  return d.toISOString().slice(0, 10);
-};
 
 /**
  * E-09: yalnızca YAYINLANMIŞ çizelgeyi gösterir ve SALT OKUNURDUR.
  * Düzenleme taslak içinden yapılır (/taslaklar/[id]) — yayınlanmış bir çizelgeyi
  * kazara değiştirmek, kimsenin haberi olmadan nöbeti değiştirmek demektir.
  */
-const REFERANS_PZT = "2026-09-21";
+const REFERANS_GUN = "2026-09-21";
 
-const isoGun = (d: Date) => d.toISOString().slice(0, 10);
-const haftaKaydir = (pzt: string, adet: number) => {
-  const d = new Date(pzt + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + adet * 7);
-  return isoGun(d);
-};
 
-const AY_ADI = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
-const araliktaEtiket = (pzt: string) => {
-  const b = new Date(pzt + "T00:00:00Z");
-  const s = new Date(b); s.setUTCDate(s.getUTCDate() + 6);
-  const ayB = AY_ADI[b.getUTCMonth()], ayS = AY_ADI[s.getUTCMonth()];
-  return ayB === ayS
-    ? `${b.getUTCDate()}–${s.getUTCDate()} ${ayS} ${s.getUTCFullYear()}`
-    : `${b.getUTCDate()} ${ayB} – ${s.getUTCDate()} ${ayS} ${s.getUTCFullYear()}`;
-};
 
 export default function CizelgeSayfasi() {
   return (
@@ -55,7 +36,13 @@ export default function CizelgeSayfasi() {
 }
 
 function Icerik() {
-  const [pzt, setPzt] = useState(REFERANS_PZT);
+  // Görünen aralık: hafta HER ZAMAN Pazartesi–Pazar, ay 1'inden sonuna.
+  const [olcek, setOlcek] = useState<Olcek>("hafta");
+  const [capa, setCapa] = useState(new Date(REFERANS_GUN + "T00:00:00Z"));
+  const [gorunenBas, gorunenSon] = aralik(capa, olcek);
+  const pzt = isoGun(gorunenBas);
+  const bitis = isoGun(gorunenSon);
+  const { acik: detaylar } = useDetaylar();
 
   // Seçili haftayla çakışan YAYINLANMIŞ taslak
   const { data: taslaklar } = useQuery({
@@ -63,14 +50,12 @@ function Icerik() {
     queryFn: () => api<DraftOzet[]>("/drafts"),
   });
   const yayinlanan = (taslaklar ?? []).find(
-    (t) => t.status === "yayinlandi" && t.period_start <= bitisHesap(pzt) && t.period_end > pzt,
+    (t) => t.status === "yayinlandi" && t.period_start <= bitis && t.period_end > pzt,
   );
   const taslakId = yayinlanan?.id;
-  const son = haftaKaydir(pzt, 1);
-  const bitis = isoGun(new Date(new Date(son + "T00:00:00Z").getTime() - 86400000));
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["schedule", taslakId, pzt],
+    queryKey: ["schedule", taslakId, pzt, bitis],
     queryFn: () => api<Schedule>(`/drafts/${taslakId}/schedule?from=${pzt}&to=${bitis}`),
     enabled: taslakId !== undefined,
   });
@@ -90,23 +75,7 @@ function Icerik() {
 
         <div className="flex items-center gap-1">
           {taslakId !== undefined && <ExcelDugmesi draftId={taslakId} />}
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Önceki hafta"
-            onClick={() => setPzt((p) => haftaKaydir(p, -1))}
-          >
-            <ChevronLeft size={16} strokeWidth={1.75} />
-          </Button>
-          <span className="min-w-[150px] text-center font-medium">{araliktaEtiket(pzt)}</span>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Sonraki hafta"
-            onClick={() => setPzt((p) => haftaKaydir(p, 1))}
-          >
-            <ChevronRight size={16} strokeWidth={1.75} />
-          </Button>
+          <DonemGezgini olcek={olcek} capa={capa} onCapa={setCapa} onOlcek={setOlcek} />
         </div>
       </div>
 
@@ -127,18 +96,20 @@ function Icerik() {
       ) : (
         <>
           {/* draftId verilmiyor → hücreler düzenlenemez */}
-          <Izgara data={data} />
+          <Izgara data={data} detaylar={detaylar} />
 
-          {/* DESIGN §6 alt barı */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 px-1">
-            <Ozet etiket="Atanan saat" deger={`${sayi(data!.summary.total_hours)} sa`} />
-            <Ozet etiket="Fazla mesai" deger={`${sayi(data!.summary.overtime_hours)} sa`} />
-            <Ozet etiket="Adalet farkı" deger={`${sayi(data!.summary.fairness_gap)} sa`} />
-            <Ozet
-              etiket="Eksik slot"
-              deger={String(data!.summary.shortfall_count)}
-              vurgu={data.summary.shortfall_count > 0}
-            />
+          {/* DESIGN §6 alt barı — görünen dönemin toplamları */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-1">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+              <Ozet etiket="Toplam saat" deger={`${sayi(data.summary.total_hours)} sa`} />
+              <Ozet etiket="Toplam gece" deger={String(data.summary.total_nights ?? 0)} />
+              <Ozet
+                etiket="Eksik vardiya"
+                deger={String(data.summary.shortfall_count)}
+                vurgu={data.summary.shortfall_count > 0}
+              />
+            </div>
+            <DetayDugmesi />
           </div>
 
           {(data.notes ?? []).length > 0 && (
