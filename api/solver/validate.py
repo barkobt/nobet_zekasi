@@ -431,8 +431,16 @@ def main(argv: list[str]) -> int:
 
     print()
     kati = [i for i in ihlaller if i.kati]
+    # Hüküm KAYNAĞA göre değişir. Solver ürettiyse katı ihlal modelde hata demektir;
+    # elle girilmiş ya da kağıttan aktarılmış çizelgede ise ihlal ÖLÇÜMDÜR — kağıt
+    # zaten kuralları bilmiyordu, düzeltilecek bir model yok.
+    solverin_mi = any(a.get("source") == "solver" for a in atamalar)
     if kati:
-        print(f"  SONUÇ: {len(kati)} KATI kural ihlali — modelde hata var.")
+        if solverin_mi:
+            print(f"  SONUÇ: {len(kati)} KATI kural ihlali — modelde hata var.")
+        else:
+            print(f"  SONUÇ: {len(kati)} katı kural ihlali — çizelge elle hazırlanmış,"
+                  " ölçüm sonucudur.")
         if len(ihlaller) > len(kati):
             print(f"          Ayrıca {len(ihlaller) - len(kati)} gevşek slot eksiği"
                   " (kadro yetmedi, beklenen).")

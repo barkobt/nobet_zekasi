@@ -272,6 +272,8 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     x: dict[tuple[int, date, str], cp_model.IntVar] = {}
     for p in atanabilirler:
         for g in v.gunler:
+            if g not in p.calisabilir_gunler:
+                continue          # sözleşmesi o günü kapsamıyor (ayrılmış / henüz başlamamış)
             if (p.id, g) in engelli:
                 continue
             for s in v.vardiyalar:
@@ -379,7 +381,11 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     if takviye and takviye_kural and takviye_kural.agirlik:
         temel.append((int(takviye_kural.agirlik), sum(takviye.values())))
 
-    adalet_terimleri, olcumler = _adalet_ve_saat(model, v, x, t, kapsama_sayilan)
+    # Adalet havuzu kapsama havuzundan AYRI: ayrılan ve ay içinde başlayan personel
+    # sahada mevcuda sayılır ama ayın tamamını çalışmadığı için saat/gece/hafta sonu
+    # adaletine ve 200 saate girmez (hastane kararı). Bkz. Personel.adalete_girer.
+    adalet_havuzu = {p.id for p in v.personel if p.adalete_girer}
+    adalet_terimleri, olcumler = _adalet_ve_saat(model, v, x, t, adalet_havuzu)
     adalet_terimleri += _tercihler(model, v, x, t, kapsama_sayilan, olcumler)
     sonuc.hedefler = olcumler["hedefler"]
 
@@ -601,7 +607,7 @@ def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict, engelli: se
 
 
 def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
-                    kapsama_sayilan: set[int]) -> tuple[list[tuple[int, object]], dict]:
+                    adalet_havuzu: set[int]) -> tuple[list[tuple[int, object]], dict]:
     """C-004, O-001…O-005 ve C-003.
 
     Ağırlıklar VERİTABANINDAN (constraints.default_weight), kodda gizli çarpan yok.
@@ -613,7 +619,7 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     Döndürür: (amaç terimleri, çözümden sonra okunacak değişkenler)
     """
     terimler: list[tuple[int, object]] = []
-    kisiler = [p for p in v.personel if p.id in kapsama_sayilan]
+    kisiler = [p for p in v.personel if p.id in adalet_havuzu]
     sure = {vd.kod: vd.sure_yb for vd in v.vardiyalar}
     gece_kodlari = {vd.kod for vd in v.vardiyalar if vd.gece_mi}
     gece_yb = max((vd.sure_yb for vd in v.vardiyalar if vd.gece_mi), default=29)

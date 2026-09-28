@@ -1,0 +1,96 @@
+
+KONTROL — Eylül 2026 (kağıt) (#10)
+──────────────────────────────────
+  Dönem: 31 Ağu 2026 – 29 Eyl 2026  ·  387 atama  ·  geçmişten 0 atama
+
+  ✓ A-1    Günde en fazla 1 vardiya                       katı    
+  ✗ A-2    Çalışma tipi — sadece gündüz / sadece gece (C-017) katı    6 ihlal
+        · Merve Armut      31 Ağu Pzt    sadece gündüz çalışabilir, GECE yazılmış
+        · Şükran Ünlü       4 Eyl Cum    sadece gündüz çalışabilir, GECE yazılmış
+        · Merve Armut       7 Eyl Pzt    sadece gündüz çalışabilir, GECE yazılmış
+        · Merve Armut      18 Eyl Cum    sadece gündüz çalışabilir, GECE yazılmış
+        · Merve Armut      21 Eyl Pzt    sadece gündüz çalışabilir, GECE yazılmış
+        · Merve Armut      25 Eyl Cum    sadece gündüz çalışabilir, GECE yazılmış
+  ✓ A-3    İzin / rapor günü boş                          katı    
+  ✓ A-4    Kesin istek (BOS_GUN / SADECE_GUNDUZ / SADECE_GECE) katı    
+  ✓ A-5    Kısa Cumartesi vardiyası yalnız sorumluya      katı    
+  ✗ C-002  En fazla 2 gece arka arkaya                    katı    3 ihlal
+        · Muhammet Edem    21 Eyl Pzt    19.09–21.09 arası 3 gece arka arkaya
+        · Muhammet Edem    22 Eyl Sal    20.09–22.09 arası 3 gece arka arkaya
+        · Zehra Kutucu     29 Eyl Sal    27.09–29.09 arası 3 gece arka arkaya
+  ✗ C-014  2 gece sonrası ertesi gün hiç çalışmaz         katı    3 ihlal
+        · Muhammet Edem    21 Eyl Pzt    2 gece sonrası (19.09–20.09) ertesi gün çalışıyor
+        · Muhammet Edem    22 Eyl Sal    2 gece sonrası (20.09–21.09) ertesi gün çalışıyor
+        · Zehra Kutucu     29 Eyl Sal    2 gece sonrası (27.09–28.09) ertesi gün çalışıyor
+  ✗ C-021  Gece sonrası gündüz yasağı                     katı    4 ihlal
+        · Fatih Sırcan     22 Eyl Sal    21.09 gecesinden sonra gündüz
+        · Kader Can        24 Eyl Per    23.09 gecesinden sonra gündüz
+        · Birol Karaca     26 Eyl Cmt    25.09 gecesinden sonra gündüz
+        · Derya Torun      28 Eyl Pzt    27.09 gecesinden sonra gündüz
+  ✓ C-016  Haftada en az 1 boş gün                        katı    
+  ✗ C-020  Oryantasyon eşiyle aynı gün aynı vardiyada     katı    1 ihlal
+        · Çağla Sarıtaş    31 Ağu Pzt    GUNDUZ vardiyasında eşi (Şükran Ünlü) yok
+  ! D-1    C-011 · triyajda en az 3 kişi                  gevşek  4 ihlal
+        · —                13 Eyl Paz    GECE: 2/3
+        · —                22 Eyl Sal    GECE: 2/3
+        · —                25 Eyl Cum    GUNDUZ: 2/3
+        · —                28 Eyl Pzt    GECE: 2/3
+  ! D-2    C-010 · gözlemde en az 2 kişi                  gevşek  20 ihlal
+        · —                 1 Eyl Sal    GUNDUZ: 1/2
+        · —                 2 Eyl Çar    GUNDUZ: 1/2
+        · —                 2 Eyl Çar    GECE: 1/2
+        · —                 4 Eyl Cum    GUNDUZ: 1/2
+        · —                 5 Eyl Cmt    GUNDUZ: 0/2
+        · —                 8 Eyl Sal    GUNDUZ: 1/2
+        · —                10 Eyl Per    GUNDUZ: 1/2
+        · —                10 Eyl Per    GECE: 1/2
+        · —                11 Eyl Cum    GUNDUZ: 1/2
+        · —                11 Eyl Cum    GECE: 1/2
+        · —                12 Eyl Cmt    GUNDUZ: 1/2
+        · —                12 Eyl Cmt    GECE: 1/2
+        … 8 ihlal daha
+  ✓ D-3    Triyaj ve gözlem aynı kişide olamaz            katı    
+  ✓ D-4    Vardiyadaki herkes ya triyajda ya gözlemde     gevşek  
+  ! D-5    Ambulans mevcudu (2 kişi)                      gevşek  17 ihlal
+        · —                 1 Eyl Sal    GUNDUZ: 1/2
+        · —                 7 Eyl Pzt    GECE: 1/2
+        · —                10 Eyl Per    GUNDUZ: 0/2
+        · —                10 Eyl Per    GECE: 1/2
+        · —                11 Eyl Cum    GUNDUZ: 0/2
+        · —                11 Eyl Cum    GECE: 0/2
+        · —                12 Eyl Cmt    GUNDUZ: 0/2
+        · —                12 Eyl Cmt    GECE: 0/2
+        · —                13 Eyl Paz    GECE: 0/2
+        · —                14 Eyl Pzt    GUNDUZ: 1/2
+        · —                18 Eyl Cum    GUNDUZ: 1/2
+        · —                19 Eyl Cmt    GECE: 1/2
+        … 5 ihlal daha
+  ✓ D-6    C-007 · vardiyada en az 1 ekip lideri          gevşek  
+  ✓ D-7    Vardiyada en az 1 sayım yetkilisi              gevşek  
+  ! D-8    Rozet verilen kişide yetkinlik var mı          uyarı   20 ihlal
+        · Muhammet Edem    31 Ağu Pzt    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Muhammet Edem     1 Eyl Sal    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Eda Karakuş       2 Eyl Çar    TRIYAJ rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Eda Karakuş       4 Eyl Cum    TRIYAJ rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Eda Karakuş       5 Eyl Cmt    TRIYAJ rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Muhammet Edem     7 Eyl Pzt    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Muhammet Edem    14 Eyl Pzt    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Muhammet Edem    18 Eyl Cum    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Muhammet Edem    19 Eyl Cmt    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Derya Torun      21 Eyl Pzt    TRIYAJ rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Muhammet Edem    21 Eyl Pzt    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        · Zehra Kutucu     21 Eyl Pzt    AMBULANS rozeti var ama yetkinliği yok (elle yazılmış — bilinçli istisna olabilir)
+        … 8 ihlal daha
+  ✗ D-9    C-009 · ambulans sonrası alanda kalan          katı    1 ihlal
+        · —                21 Eyl Pzt    GECE: gozlemta 0/1 kişi kaldı
+  ✗ D-11   C-022 · oryantasyon acil takviye               katı    6 ihlal
+        · Çağla Sarıtaş     4 Eyl Cum    GUNDUZ: (c) ekip zaten yeterli (6/5) · (c) takviyeyle gereken aşılıyor (6+1 > 5)
+        · Çağla Sarıtaş     5 Eyl Cmt    GUNDUZ: (c) ekip zaten yeterli (5/5) · (c) takviyeyle gereken aşılıyor (5+1 > 5)
+        · Güven Göl        26 Eyl Cmt    GUNDUZ: (c) ekip zaten yeterli (6/5) · (c) takviyeyle gereken aşılıyor (6+1 > 5) · (d) takviyedeyken ambulansa çıkmış
+        · Ayşe Kartal      27 Eyl Paz    GUNDUZ: eşi yok, ekip 4/5 — meşru takviye
+        · Ayşe Kartal      28 Eyl Pzt    GECE: eşi yok, ekip 4/5 — meşru takviye
+        · Ayşe Kartal      29 Eyl Sal    GECE: (c) ekip zaten yeterli (5/5) · (c) takviyeyle gereken aşılıyor (5+1 > 5)
+
+  SONUÇ: 22 katı kural ihlali — çizelge elle hazırlanmış, ölçüm sonucudur.
+          Ayrıca 63 gevşek slot eksiği (kadro yetmedi, beklenen).
+

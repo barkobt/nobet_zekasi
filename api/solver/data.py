@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 
 import psycopg
@@ -73,6 +73,10 @@ class Personel:
     hedef_kaynagi: str            # 'sozlesme' | 'kural_varsayilani'
     kapsamaya_sayilir: bool
     kapsama_disi_nedeni: str | None
+    aktif: bool                   # staff.is_active — ayrılanlar False
+    calisabilir_gunler: frozenset[date]   # sözleşmesinin dönem İÇİNDE kapsadığı günler
+    adalete_girer: bool           # saat/gece/hafta sonu adaleti ve 200 saat havuzu
+    adalet_disi_nedeni: str | None
 
 
 @dataclass(frozen=True)
@@ -248,8 +252,8 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
                 unit_id=taslak["unit_id"],
                 donem_bas=taslak["bas"],
                 donem_bit=taslak["bit"],
-                gunler=_gunler(cur, draft_id),
-                personel=_personel(cur, taslak["bas"], kurallar),
+                gunler=(gunler := _gunler(cur, draft_id)),
+                personel=_personel(cur, taslak["bas"], gunler, kurallar),
                 vardiyalar=_vardiyalar(cur, taslak["unit_id"]),
                 yokluklar=_yokluklar(cur, draft_id),
                 sabit_atamalar=_sabit_atamalar(cur, draft_id),
@@ -328,24 +332,42 @@ def _kurallar(cur) -> dict[str, Kural]:
     }
 
 
-def _personel(cur, donem_bas: date, kurallar: Mapping[str, Kural]) -> tuple[Personel, ...]:
+def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
+              kurallar: Mapping[str, Kural]) -> tuple[Personel, ...]:
     # Sözleşme: monthly_target_hours NULL = "kural varsayılanı geçerli".
     # Varsayılan koda YAZILMAZ, constraint_params'tan okunur (bugün 200).
     varsayilan = kurallar["monthly_min_hours"].parametreler["monthly_min_hours"]
+    son_gun = (gunler[-1] + timedelta(days=1)) if gunler else donem_bas
 
+    # is_active FİLTRESİ YOK. Ayrılan personel (Efe, Çağla) kağıt Eylül'de çalışmış:
+    # okunmazsa kontrolcü ve raporlar onların atamalarında çöker. Kimin hangi GÜN
+    # çalışabileceğini aktiflik değil SÖZLEŞME söyler — aşağıdaki calisabilir_gunler.
     cur.execute(
         """
         SELECT s.id, s.full_name, r.code AS role_code, s.shift_eligibility,
-               s.is_orientation, s.buddy_staff_id, ct.monthly_target_hours
+               s.is_orientation, s.buddy_staff_id, s.is_active,
+               ct.monthly_target_hours
         FROM staff s
         JOIN roles r ON r.id = s.role_id
-        LEFT JOIN contracts ct ON ct.staff_id = s.id AND ct.valid_period @> %s::date
-        WHERE s.is_active
+        LEFT JOIN contracts ct ON ct.staff_id = s.id
+                              AND ct.valid_period && daterange(%s::date, %s::date)
         ORDER BY s.id
         """,
-        (donem_bas,),
+        (donem_bas, son_gun),
     )
     satirlar = cur.fetchall()
+
+    # Sözleşmeler AYRI okunuyor. Tek sorguda LEFT JOIN ile okumak iki farklı durumu
+    # birbirine karıştırıyordu: "sözleşme satırı hiç yok" (eski kayıt, kısıtlama
+    # yapmayalım) ile "sözleşmesi var ama bu dönemle kesişmiyor" (ayrılmış, hiçbir
+    # gün çalışamaz). İkisi de NULL dönüyordu ve Efe Ekim'de adalet havuzuna giriyordu.
+    cur.execute(
+        """SELECT staff_id, lower(valid_period) AS bas, upper(valid_period) AS bit
+           FROM contracts"""
+    )
+    sozlesmeler: dict[int, list[tuple[date, date | None]]] = {}
+    for r in cur.fetchall():
+        sozlesmeler.setdefault(r["staff_id"], []).append((r["bas"], r["bit"]))
 
     cur.execute(
         """
@@ -367,6 +389,30 @@ def _personel(cur, donem_bas: date, kurallar: Mapping[str, Kural]) -> tuple[Pers
         else:
             neden = None
         hedef = r["monthly_target_hours"]
+
+        # Sözleşmenin dönem içinde kapsadığı günler. Hiç sözleşme satırı olmayan
+        # kişide (eski kayıtlar) kısıtlama yapmıyoruz: bugünkü davranış korunur.
+        araliklar = sozlesmeler.get(r["id"])
+        if araliklar is None:
+            calisabilir = frozenset(gunler)
+        else:
+            calisabilir = frozenset(
+                g for g in gunler
+                if any(g >= bas and (bit is None or g < bit) for bas, bit in araliklar)
+            )
+
+        # ADALET HAVUZU (hastane kararı): ayrılan personel ve ay içinde sonradan
+        # başlayanlar KAPSAMA sayımına girer — o gün sahada gerçekten çalışıyorlar —
+        # ama saat/gece/hafta sonu adaletine ve 200 saate GİRMEZ: ayın tamamını
+        # çalışmadıkları için düşük saatleri adaletsizlik gibi görünür ve solver
+        # bunu telafi etmeye çalışırdı.
+        adalet_disi = None
+        if neden is not None:
+            adalet_disi = neden
+        elif gunler and len(calisabilir) < len(gunler):
+            adalet_disi = ("dönemin tamamında sözleşmesi yok "
+                           f"({len(calisabilir)}/{len(gunler)} gün)")
+
         kisiler.append(
             Personel(
                 id=r["id"],
@@ -380,6 +426,10 @@ def _personel(cur, donem_bas: date, kurallar: Mapping[str, Kural]) -> tuple[Pers
                 hedef_kaynagi="sozlesme" if hedef is not None else "kural_varsayilani",
                 kapsamaya_sayilir=neden is None,
                 kapsama_disi_nedeni=neden,
+                aktif=r["is_active"],
+                calisabilir_gunler=calisabilir,
+                adalete_girer=adalet_disi is None,
+                adalet_disi_nedeni=adalet_disi,
             )
         )
     return tuple(kisiler)
