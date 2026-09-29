@@ -25,6 +25,12 @@ class Staff(BaseModel):
 class HealthCheck(BaseModel):
     status: Literal["ok", "hata"]
     db: bool
+    cekirdek: int | None = Field(
+        default=None, description="Sunucunun gördüğü CPU çekirdeği — çözüm kalitesini belirler"
+    )
+    solver_isci: int | None = Field(
+        default=None, description="SOLVER_WORKERS ayarı; çekirdekten fazlası fayda etmez"
+    )
     kullanici: str | None = Field(
         default=None, description="Veritabanına bağlanan rol — canlıda nobet_app olmalı"
     )

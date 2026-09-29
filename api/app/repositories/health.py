@@ -1,6 +1,9 @@
 """Sağlık kontrolü — havuzun çalıştığını ve şemanın kodla uyumlu olduğunu kanıtlar."""
 
+import os
+
 from app.db import cursor
+from app.settings import get_settings
 
 # Kodun ihtiyaç duyduğu, en son migration'ların getirdiği nesneler.
 # Burada yoklanması, "deploy edilen kod ile deploy edilen şema aynı mı?" sorusunu
@@ -62,6 +65,12 @@ async def kontrol() -> dict:
     sema_guncel = not eksik
     return {
         "kullanici": satir["kullanici"],
+        # Çözüm kalitesi işçi sayısına çok duyarlı: CP-SAT'ta paralel işçiler
+        # farklı arama stratejileri deniyor. Canlıda 2 işçiyle Ekim'in saat farkı
+        # 23 sa çıkarken yerelde 8 işçiyle 3 sa çıkıyordu; sorunun veri değil
+        # yapılandırma olduğu ancak buraya bakılarak anlaşılabildi.
+        "cekirdek": os.cpu_count(),
+        "solver_isci": get_settings().solver_workers,
         "tablo": satir["tablo"],
         "view": satir["view"],
         "aktif_personel": satir["aktif_personel"],
