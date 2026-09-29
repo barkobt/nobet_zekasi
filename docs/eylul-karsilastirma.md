@@ -22,6 +22,11 @@ kopyalama yok, başlangıç ipucu verilmedi.
 | Gece farkı | **14** | **12** |
 | Geçersiz acil takviye | 5 | 0 |
 
+> **29.09.2026 — bu tablodaki sayılar 28.09 kural setine aittir.** O tarihten sonra
+> molalar mesaiden çıktı (net saat, `migration 023`) ve iki yeni izin kuralı eklendi
+> (C-023, C-024 + kişiye özel desenler, `migration 024`). Yeni kural setiyle ölçüm
+> §7'de; aşağıdaki tablo kayıt olarak duruyor, **güncellenmedi**.
+
 Bütün sayılar kontrolcünün (`uv run python -m solver.validate`) çıktısından;
 iki çizelge aynı kurallarla, aynı programla ölçüldü. Ham `v_daily_coverage`
 görünümü kullanılmadı: o görünüm "kağıtta görev belirtilmemiş" durumunu
@@ -189,3 +194,62 @@ Aynı kadro ve aynı izinlerle:
 Kağıdı hazırlayan sorumlu hemşire hatalı çalışmadı — bu kadar kuralı elle,
 aynı anda tutmak mümkün değil. Sistemin yaptığı, aynı kuralları her hücrede
 aynı anda kontrol edebilmek.
+
+---
+
+## 7. Yeni kural setiyle yeniden ölçüm (29.09.2026)
+
+29.09'da iki şey değişti:
+
+1. **Molalar mesaiye dahil değil** (`migration 023`): gündüz 80 dk, gece 210 dk
+   düşülüyor. Net süreler gündüz 8 sa 10 dk, gece 11 sa. Aylık 200 saat hedefi,
+   haftalık 50 saat referansı, adalet farkı ve raporlar net saatle ölçülüyor.
+2. **İzin desenleri** (`migration 024`): C-023 (gündüzcü haftada tam 1 izin),
+   C-024 (üst üste en fazla 2 izinsiz boş gün) ve kişiye özel haftalık desenler
+   (sorumlunun sabit programı, eğitim hemşiresinin hafta sonu izni).
+
+### Yeni kuralların Eylül'de bulduğu ihlaller
+
+| Kural | Kağıt Eylül | Sistem Eylül |
+|---|---:|---:|
+| A-6 izin günü penceresi | 1 | 4 |
+| A-7 sabit haftalık desen | 4 | 0 |
+| C-023 gündüzcü haftada tam 1 izin | 8 | 9 |
+| C-024 ardışık izin sınırı | 2 | 8 |
+| **Yeni ihlal toplamı** | **15** | **21** |
+| **Katı ihlal toplamı (yeni set)** | **37** | **21** |
+
+**Sistem Eylül'ün 21 ihlali bir model hatası DEĞİL:** o taslak bu kurallar
+yokken çözüldü. Kontrolcü "modelde hata var" diyor çünkü solver ürünü bir
+çizelgede katı ihlal normalde hata demektir — burada yalnızca taslağın eski
+olduğunu gösteriyor. Eylül yeniden çözülmedi; sunumun konusu Ekim.
+
+### Ekim 2026 — yeni kural setiyle (canlıda yayında)
+
+Boş taslaktan, kopyalama ve ipucu olmadan çözüldü.
+
+| Ölçü | Brütle çözülen (eski Ekim) | **Netle çözülen (yayındaki)** |
+|---|---:|---:|
+| Çözüm durumu | FEASIBLE | **OPTIMAL** (40 sn) |
+| Atama | 386 | 453 |
+| Eksik kadro | 23 | **0** |
+| Kişi başı net saat (ortalama) | 176,4 sa | **206,4 sa** |
+| 200 saat altında kalan kişi | 20 | **0** |
+| Adalet farkı | 15,0 sa | **8,2 sa** |
+| 3+ gün ardışık boşluk | 9 blok (en uzun 5 gün) | **0 blok** (en uzun 2 gün) |
+| Kontrolcü | — | **24 kuralda temiz** |
+
+Adalet farkındaki 8,2 saatin tamamı yapısaldır: eğitim hemşiresi haftada zorunlu
+6 gün çalıştığı için 212,3 saate çıkıyor. Ekibin kendi içindeki yayılım **1,33 saat**.
+
+### Bedeli: gündüz kadrosu
+
+| Vardiya | Şablon asgarisi | Çözümdeki ekip |
+|---|---:|---:|
+| Gündüz | 5 | **6,19** |
+| Gece | 5 | 5,03 |
+
+Sebep aritmetik: gece talebi 155 vardiya, 13 dönen kişiye bölününce kişi başı
+12 gece = 132 sa net. 200'e ulaşmak için 9 gündüz daha gerekiyor. Üç gündüzcü de
+25'er gün çalışınca toplam 192 gündüz-gün çıkıyor; talep 155. **Karar hastanede**
+(bkz. `kisit-katalogu.md` → açık sorular).

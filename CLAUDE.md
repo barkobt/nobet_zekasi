@@ -1,7 +1,9 @@
-# Nöbet Zekâsı — Acıbadem Smart Planner
+# Clinorq
 
-Acıbadem Kent ASG acil servisi için CP-SAT tabanlı hemşire nöbet planlama sistemi.
-İç kod adı **Nöbet Zekâsı**, dışarıya **Acıbadem Smart Planner**.
+Erişkin acil servis için CP-SAT tabanlı hemşire nöbet planlama sistemi.
+Ürün adı her yerde **Clinorq** (logoda küçük harf: `clinorq`). Hastanenin adı,
+logosu ve hiçbir marka öğesi üründe, kodda ya da dokümanda geçmez — yasal
+zorunluluk (29.09.2026). Kurum adı bir ayardır (E-14), koda gömülmez.
 Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
 
 ## Monorepo
@@ -11,7 +13,7 @@ Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
 | `db/` | PostgreSQL şeması: `migrations/`, `seeds/`, `queries/`, `scripts/` |
 | `api/` | FastAPI servisi + solver |
 | `web/` | Next.js arayüzü |
-| `docs/` | Ekran haritası, kısıt kataloğu, `brand/` logoları, `mockups/` düzen taslakları |
+| `docs/` | Ekran haritası, kısıt kataloğu, `brand/clinorq/` logo seti, `mockups/` düzen taslakları |
 
 ## Veritabanı
 
@@ -24,7 +26,9 @@ Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
   dolduramaz (o anda tablolar boştur) — sınıflandırma/varsayılan veri seed'e yazılır.
 - Sıfırdan kurulum: `./db/scripts/rebuild.sh` (yerel) veya
   `DATABASE_URL="postgres://..." ./db/scripts/rebuild.sh --yes` (Neon).
-- Beklenen: 22 tablo, 6 view, 20 personel, 91 atama, 1 bilinen uygunluk ihlali.
+- Sıfırdan kurulumda beklenen: **26 tablo** (migrate.sh ile 27 — fark `schema_migrations`,
+  aracın kendi defteri), **7 view**, 22 personel (20 aktif), 882 atama, 13 uygunluk ihlali.
+  İhlallerin 1'i referans haftasından, 12'si kağıt Eylül'den gelir; ikisi de gerçektir.
 - `db/seeds/009` kağıt çizelgenin birebir aktarımıdır; **gerçeği kurala uydurmak için
   değiştirilmez.** İçindeki bilinen ihlal `v_task_eligibility_violations`'ta görünür.
 
@@ -36,6 +40,16 @@ Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
 - Ayarlar `pydantic-settings` ile.
 - Solver çalıştırma: POST ile `solver_runs` kaydı + `BackgroundTasks`; frontend GET ile
   durum yoklar. **Kuyruk sistemi (Celery/Redis) YOK.**
+- Kişiye özel çalışma deseni `staff_weekly_patterns`'ta **veri**dir — sorumlunun sabit
+  programı dahil. Solver'da kişi adı, gün numarası ya da rol adı gömülü DEĞİL;
+  kapsama dışı rol de `roles.counts_toward_coverage` bayrağından okunur.
+- **Kapsama ile 200 saat havuzu ayrı sorular.** Kapsamaya sayılmamak (ekip kadrosunun
+  yerine geçmemek) hedefsiz kalmak demek değildir. Havuz dışı olmanın gerekçesi sabit
+  programlı ya da oryantasyonda olmaktır.
+- **Saat birimi DAKİKA.** Molalar mesaiye dahil değil; net süre tek yerde tanımlı
+  (`v_shift_types_net`), her tüketici oradan okur. Solver da dakikayla çalışır
+  (`solver/data.py` → `_dk`). Saate çevirme yalnız GÖSTERİM içindir: gündüzün neti
+  8 sa 10 dk, saat cinsinden devirli ondalık — ara hesapta yuvarlanırsa toplam kayar.
 - Solver'ın API ile sözleşmesi `api/solver/interface.py`:
   `run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult`
   (senkron, kendi DB bağlantısını açar). Ayrıntısı `docs/solver-contract.md`.
@@ -62,6 +76,8 @@ Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
 | 3 | Asla bozulmayan kurallar (C-002, C-014, C-016, C-020, gece→gündüz yasağı) + kontrolcü (`validate.py`) |
 | 4 | Görevler: triyaj, gözlem, ambulans |
 | 5 | Adalet (O-002) ve 200 saat (C-004, O-001) |
+| 5b | Molalar mesaiye dahil değil → net saat (migration 023) — bitti |
+| 5c | İzin desenleri C-023/C-024 + kişiye özel haftalık desen (migration 024) — bitti |
 | 6 | Eksik açıklamaları (teşhis metinleri) |
 
 Adalet Adım 3 DEĞİL, Adım 5'tir.

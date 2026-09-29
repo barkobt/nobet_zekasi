@@ -84,7 +84,7 @@ pooled bir uç verilirse uyarır.
  tablo | view | personel | atama | uygunluk_ihlali
 -------+------+----------+-------+-----------------
     22 |    6 |       20 |    91 |               1
-Bitti. Beklenen: 22 tablo, 6 view, 20 personel, 91 atama, 1 uygunluk ihlali.
+Bitti. Beklenen: 26 tablo, 7 view, 22 personel (20 aktif), 882 atama, 13 uygunluk ihlali.
 ```
 
 `seeds/009` sırasında **tek bir WARNING** görürsün (Güven Göl / AMBULANS) — beklenen.
@@ -109,17 +109,17 @@ Servis ayarlarında **Root Directory = `api`** olmalı.
 
 Deploy sonrası Railway'in verdiği alan adını not al (`https://xxx.up.railway.app`).
 
-**Doğrulama:** `curl https://<railway-url>/api/health` → `{"status":"ok","db":true,"tablo":22,...}`
+**Doğrulama:** `curl https://<railway-url>/api/health` → `{"status":"ok","db":true,"tablo":27,...}`
 
 ---
 
 ## 3) Vercel — web  *(kuruldu)*
 
-Proje: **acibadem-smart-planner** · Adres: **https://acibadem-smart-planner.vercel.app**
+Proje: **clinorq** · Adres: **https://clinorq.vercel.app**
 
 ```bash
 cd web
-vercel link --yes --project acibadem-smart-planner
+vercel link --yes --project clinorq
 printf 'https://nobet-zekasi-api-production.up.railway.app' | vercel env add API_BASE_URL production
 vercel --prod --yes
 ```
@@ -164,8 +164,13 @@ aşağıdaki kabul kontrolü yapılır.
 ## Canlı kabul kontrolü
 
 1. `https://nobet-zekasi-api-production.up.railway.app/api/health`
-   → `{"status":"ok","db":true,"tablo":22,"view":6,"aktif_personel":20}`
-2. `https://acibadem-smart-planner.vercel.app/` → şifre ekranı çıkmalı
+   → `{"status":"ok","db":true,"tablo":27,"view":7,"aktif_personel":20,"sema_guncel":true}`
+
+   Tablo sayısını ezberleme: **`sema_guncel`** alanına bak. `/api/health` sayıyı
+   `information_schema`'dan okur, beklentiyi kodda tutmaz; şema eskiyse
+   `eksik_migration` hangi migration'ın uygulanmadığını adıyla söyler.
+   Neon'da 27 çıkar (26 şema tablosu + `schema_migrations` defteri).
+2. `https://clinorq.vercel.app/` → şifre ekranı çıkmalı
 3. Yanlış şifre → "Şifre hatalı." · doğru şifre → `/personel`, Neon'dan **20 kişi**
 4. Tarayıcı ağ sekmesinde Railway adresi ve `DEMO_API_TOKEN` **görünmemeli**
    (tüm istekler `<vercel-url>/api/...` adresine gitmeli)
@@ -331,3 +336,111 @@ olmasın diye). Ama kaynak kötüyse ipucu aramayı o kötü yerde tutuyor:
 **Kural:** "kopyala → çöz" akışı kaynağın kalitesini miras alır. Kötü bir
 çizelgeden başlanıyorsa **boş taslak açıp sıfırdan çözmek** gerekir.
 Canlıda `SOLVER_NO_IMPROVEMENT_S` 60'a çekildi.
+
+---
+
+## Yeniden adlandırma — Clinorq (29.09.2026)
+
+Hastane; adının, logosunun ve hiçbir marka öğesinin kullanılmamasını istedi
+(yasal zorunluluk). Kod ve doküman tarafı bitti; altyapı adları **Baran'ın kendi
+terminalinden** değiştirilir çünkü hepsi hesap sahibi yetkisi ister.
+
+### 1. GitHub deposu
+
+```bash
+gh repo rename clinorq
+git remote set-url origin git@github.com:<kullanıcı>/clinorq.git
+git remote -v                       # doğrula
+```
+
+GitHub eski adresi yönlendirir, ama yönlendirme kalıcı değildir: Vercel ve
+Railway'in depo bağlantısını **yeni adla** bir kez yenile.
+
+### 2. Vercel projesi ve adresi
+
+```bash
+cd web
+vercel project ls                                  # mevcut adı gör
+# Ad değişikliği dashboard'dan: Settings → General → Project Name → clinorq
+vercel link --yes --project clinorq                # yerel bağlantıyı tazele
+vercel --prod --yes
+```
+
+> **Sunumdan önce:** adres `acibadem-smart-planner.vercel.app` → `clinorq.vercel.app`
+> olarak değişir. Eski link **çalışmayı bırakır**. Yeni linki ekiptekilere yeniden
+> gönder; 1 Ekim sabahı fark edilmesi geç olur.
+
+### 3. Railway servisi
+
+```bash
+railway service                     # bağlı servisi gör
+# Ad değişikliği dashboard'dan: Service → Settings → Name → clinorq-api
+railway up
+```
+
+Railway adresi servis adından türer. Adres değişirse **Vercel'deki
+`API_BASE_URL` da güncellenmeli**, yoksa arayüz boş veri gösterir:
+
+```bash
+cd web
+vercel env rm API_BASE_URL production --yes
+printf 'https://<yeni-railway-adresi>' | vercel env add API_BASE_URL production
+vercel --prod --yes
+```
+
+### 4. Veritabanı adı
+
+Neon'daki veritabanı adı **`neondb`**, uygulama rolü **`nobet_app`**, nesnelerin
+sahibi **`neondb_owner`**. (Handoff "DB adı nobet_app" diyordu — o rolün adı,
+veritabanının değil; 29.09'da yedek dosyasından doğrulandı.)
+
+İkisi de **değişmiyor**: iç adlar, kullanıcıya hiç görünmüyorlar ve değiştirmek
+bütün bağlantı dizelerini kırar. Sunum sonrasına.
+
+### Kabul
+
+- `grep -rni "acıbadem\|acibadem\|smart planner\|nöbet zekâsı" .` (git geçmişi hariç) → sıfır
+- Canlıda sekme ikonu, sol panel ve giriş ekranı clinorq
+- Excel çıktısının adı `Clinorq_Nobet_...xlsx`, başlığı Ayarlar → Kurum'daki metin
+
+---
+
+## Neon'a Bölüm 2 (net saat) uygulama sırası
+
+`migrate.sh` yalnız bekleyeni uygular, veriyi silmez. Migration 023 mevcut
+`v_assignment_hours`, `v_monthly_hours` ve `v_fairness` view'larını **düşürüp
+yeniden kurar** — veri tablolarına dokunmaz, ama kolon adları değişir.
+
+```bash
+DATABASE_URL_DIRECT="$PGURL_DIRECT" ./db/scripts/migrate.sh
+DATABASE_URL_DIRECT="$PGURL_DIRECT" ./db/scripts/migrate.sh --seed-file 030_mola_sureleri.sql
+DATABASE_URL_DIRECT="$PGURL_DIRECT" ./db/scripts/migrate.sh --seed-file 031_izin_desenleri.sql
+```
+
+`migrate.sh` 023 ve 024'ü birlikte uygular. 024 `v_daily_coverage`'ı da yeniden
+kurar (kapsama dışı rol artık `roles.counts_toward_coverage` bayrağından okunuyor)
+ve `staff_weekly_patterns` tablosunu ekler.
+
+**API ve web AYNI anda çıkmalı.** Eski API `planned_hours` / `worked_hours`
+kolonlarını okuyor; 023 uygulandıktan sonra o kolonlar yok ve eski sürüm
+"column does not exist" ile düşer. Sıra: migration → `railway up` → `vercel --prod`.
+
+Doğrulama:
+
+```bash
+psql "$PGURL_DIRECT" -c "SELECT code, duration_hours, break_minutes, net_minutes
+                           FROM v_shift_types_net WHERE is_active ORDER BY start_time;"
+```
+Beklenen: `GUNDUZ 9.50 / 80 / 490`, `GECE 14.50 / 210 / 660`.
+
+```bash
+psql "$PGURL_DIRECT" -c "SELECT code, counts_toward_coverage FROM roles ORDER BY code;"
+psql "$PGURL_DIRECT" -c "SELECT s.full_name, p.isodow, p.kind FROM staff_weekly_patterns p
+                           JOIN staff s ON s.id=p.staff_id ORDER BY 1,2;"
+```
+Beklenen: `sorumlu_hemsire` ve `egitim_hemsire` → `f`, diğerleri `t`.
+Desende Halit Güler 7 satır, Şükran Ünlü 2 satır.
+
+> Yayındaki Ekim **brütle çözülmüştü**; 023'ten sonra net saatle gösterilir ve
+> kişi başı ortalama 176 saate düşmüş görünür. Bu yüzden Bölüm 2 tek başına
+> canlıya ÇIKMAZ — yeniden çözülmüş Ekim ile birlikte tek dağıtımda gider.

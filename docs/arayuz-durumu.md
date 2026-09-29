@@ -1,14 +1,17 @@
 # Arayüz Durumu
 
-Son güncelleme: 27 Eylül 2026 · Demo: 1 Ekim 2026
+Son güncelleme: 29 Eylül 2026 · Demo: 1 Ekim 2026
 
 ## Canlı adresler
 
 | Katman | Adres |
 |---|---|
-| Arayüz (Vercel) | https://acibadem-smart-planner.vercel.app |
+| Arayüz (Vercel) | https://clinorq.vercel.app |
 | API (Railway) | https://nobet-zekasi-api-production.up.railway.app |
-| Sağlık kontrolü | `…/api/health` → `sema_guncel` alanı uygulanmamış migration'ı adıyla söyler |
+| Sağlık kontrolü | `…/api/health` → `sema_guncel` uygulanmamış migration'ı adıyla söyler, `okunamayan_tablo` yetki eksiğini yakalar |
+
+Eski `acibadem-smart-planner.vercel.app` adresi **29.09'da kaldırıldı** (yasal
+gereklilik). Artık 404 veriyor; ekipteki herkese yeni adres gönderilmeli.
 
 Giriş tek ortak şifreyle; şifre yalnız Vercel ortam değişkeninde (`DEMO_PASSWORD`)
 ve yerelde `web/.env.local` içinde durur. Hiçbir dosyaya, loga veya commit'e yazılmaz.
@@ -22,10 +25,12 @@ ve yerelde `web/.env.local` içinde durur. Hiçbir dosyaya, loga veya commit'e y
 | E-08 | Taslaklar | `/taslaklar` · `/taslaklar/[id]` | Oluştur · çöz · kopyala · uygula (arşivleyerek) · sil |
 | E-06 | İhtiyaç | `/ihtiyac` | Şablon satırları, kapsama |
 | E-11 | Raporlar | `/raporlar` | Kişi özeti + Eksikler; bölüm başına Excel ve PDF |
-| E-04 | Personel | `/personel` | Künye, sözleşme, yetkinlik, müsaitlik, devamsızlık, uyumsuzluk; pasife alma ve silme |
+| E-04 | Personel | `/personel` | Künye, sözleşme, yetkinlik, müsaitlik, devamsızlık, uyumsuzluk, haftalık desen; pasife alma ve silme |
 | E-02 | Yetkinlik Matrisi | `/yetkinlik` | Düzenle kipi, rol grupları |
 | E-03 | Kural Seti | `/kurallar` | Hard/soft ve ağırlık; `source='yasal'` kilitli |
-| E-01 | Vardiya Tanımları | `/vardiyalar` | Salt okunur |
+| E-01 | Vardiya Tanımları | `/vardiyalar` | Brüt · mola (düzenlenebilir) · net süre |
+| E-13 | Görünür Sayaçlar | `/gorunur-sayaclar` | Haftalık/aylık sayaç anahtarları |
+| E-14 | Kurum | `/kurum` | Çıktı başlığındaki kurum adı |
 
 ## Çıktılar
 
