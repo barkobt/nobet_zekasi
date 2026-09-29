@@ -38,7 +38,30 @@ SELECT
     -- 015: güç sözlüğü KESIN / MUMKUNSE
     (SELECT count(*) FROM pg_constraint
       WHERE conname = 'ck_availability_rules_status'
-        AND pg_get_constraintdef(oid) LIKE '%%MUMKUNSE%%')                        AS m015_guc
+        AND pg_get_constraintdef(oid) LIKE '%%MUMKUNSE%%')                        AS m015_guc,
+    -- 022: kurum ayarları tablosu
+    (SELECT count(*) FROM information_schema.tables
+      WHERE table_schema='public' AND table_name='app_settings')                  AS m022_ayar,
+    -- 023: mola sütunu ve net süre view'ı
+    (SELECT count(*) FROM information_schema.columns
+      WHERE table_name='shift_types' AND column_name='break_minutes')             AS m023_mola,
+    (SELECT count(*) FROM information_schema.views
+      WHERE table_schema='public' AND table_name='v_shift_types_net')             AS m023_view,
+    -- 024: kapsama bayrağı ve haftalık desen tablosu
+    (SELECT count(*) FROM information_schema.columns
+      WHERE table_name='roles' AND column_name='counts_toward_coverage')          AS m024_kapsama,
+    (SELECT count(*) FROM information_schema.tables
+      WHERE table_schema='public' AND table_name='staff_weekly_patterns')         AS m024_desen,
+    -- OKUMA YETKİSİ: nesneler başka bir rolle kurulduysa (Neon'da sahip
+    -- neondb_owner, uygulama nobet_app) migration "başarılı" görünür ama
+    -- uygulama SELECT yapamaz. Şemanın varlığı yetmez, okunabilir de olmalı.
+    -- pg_class üzerinden OID ile: information_schema.tables + adla sorgulamak
+    -- güvenilmez, çünkü planlayıcı yetki fonksiyonunu şema filtresinden ÖNCE
+    -- değerlendirebiliyor ve public dışındaki bir ada takılıyor.
+    (SELECT count(*) FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind IN ('r', 'v')
+        AND NOT has_table_privilege(current_user, c.oid, 'SELECT'))               AS okunamayan
 """
 
 
@@ -62,6 +85,12 @@ async def kontrol() -> dict:
         eksik.append("014 (availability_rules.status)")
     if satir["m015_guc"] != 1:
         eksik.append("015 (istek gücü KESIN/MUMKUNSE)")
+    if satir["m022_ayar"] != 1:
+        eksik.append("022 (app_settings)")
+    if satir["m023_mola"] != 1 or satir["m023_view"] != 1:
+        eksik.append("023 (mola süresi / net saat)")
+    if satir["m024_kapsama"] != 1 or satir["m024_desen"] != 1:
+        eksik.append("024 (kapsama bayrağı / haftalık desen)")
     sema_guncel = not eksik
     return {
         "kullanici": satir["kullanici"],
@@ -76,4 +105,7 @@ async def kontrol() -> dict:
         "aktif_personel": satir["aktif_personel"],
         "sema_guncel": sema_guncel,
         "eksik_migration": ", ".join(eksik) if eksik else None,
+        # 0 değilse migration doğru koştu ama GRANT unutuldu. Ayrı alan:
+        # "şema eski" ile "şema yeni ama okuyamıyorum" farklı sorunlar.
+        "okunamayan_tablo": satir["okunamayan"],
     }

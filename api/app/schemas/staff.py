@@ -37,6 +37,11 @@ class HealthCheck(BaseModel):
     tablo: int | None = None
     view: int | None = None
     aktif_personel: int | None = None
+    okunamayan_tablo: int | None = Field(
+        default=None,
+        description="Bağlanan rolün SELECT yapamadığı tablo sayısı. 0 olmalı; "
+                    "sıfırdan büyükse migration başka bir rolle koştu ve GRANT unutuldu.",
+    )
     sema_guncel: bool | None = Field(
         default=None,
         description="Veritabanı şeması deploy edilen kodun beklediği migration'ları içeriyor mu",
