@@ -35,8 +35,19 @@ SELECT d.id, d.name, d.status, d.created_at, d.published_at,
                   WHERE h.draft_id = d.id), 0)                                    AS total_hours,
        COALESCE((SELECT sum(m.overtime_max) FROM v_monthly_hours m
                   WHERE m.draft_id = d.id), 0)                                    AS overtime_hours,
-       COALESCE((SELECT max(m.worked_hours) - min(m.worked_hours) FROM v_monthly_hours m
-                  WHERE m.draft_id = d.id AND m.worked_hours > 0), 0)             AS fairness_gap
+       -- Adalet farkı YALNIZ adalet havuzundan (sorumlu, oryantasyon ve dönemin
+       -- tamamında sözleşmesi olmayanlar hariç). Havuz dışını katmak farkı yanlış
+       -- büyütüyor; ölçüt solver/data.py → Personel.adalete_girer ile aynı.
+       COALESCE((SELECT max(m.worked_hours) - min(m.worked_hours)
+                   FROM v_monthly_hours m
+                   JOIN staff st ON st.id = m.staff_id
+                   JOIN roles rl ON rl.id = st.role_id
+                  WHERE m.draft_id = d.id AND m.worked_hours > 0
+                    AND NOT st.is_orientation
+                    AND rl.code <> 'sorumlu_hemsire'
+                    AND EXISTS (SELECT 1 FROM contracts ct
+                                 WHERE ct.staff_id = st.id
+                                   AND ct.valid_period @> d.period)), 0)          AS fairness_gap
 FROM schedule_drafts d
 JOIN units u ON u.id = d.unit_id
 """
