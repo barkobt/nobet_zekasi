@@ -10,6 +10,16 @@ _LISTE = """
 SELECT d.id, d.name, d.status, d.created_at, d.published_at,
        lower(d.period) AS period_start, upper(d.period) AS period_end,
        u.name AS unit_name,
+       -- Son güncellenme: taslakta ayrı bir updated_at kolonu yok, en son NE
+       -- olduğuna bakıyoruz — yayınlanma, son çözüm koşusu, son atama yazımı.
+       GREATEST(
+           d.created_at,
+           COALESCE(d.published_at, d.created_at),
+           COALESCE((SELECT max(r.started_at) FROM solver_runs r WHERE r.draft_id = d.id),
+                    d.created_at),
+           COALESCE((SELECT max(a.created_at) FROM assignments a WHERE a.draft_id = d.id),
+                    d.created_at)
+       ) AS updated_at,
        (SELECT count(*) FROM assignments a WHERE a.draft_id = d.id)               AS assignment_count,
        (SELECT count(DISTINCT a.staff_id) FROM assignments a WHERE a.draft_id = d.id) AS staff_count,
        -- Eksik slot YALNIZCA atama bulunan günlerde sayılır. Aksi halde kısmi bir

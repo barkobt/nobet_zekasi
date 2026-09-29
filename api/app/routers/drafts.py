@@ -73,7 +73,7 @@ def _taslak(satir: dict, son_kosu: dict | None) -> Draft:
         period_start=bas, period_end=bitis, day_count=(bitis - bas).days,
         status=satir["status"],
         unit_name=satir["unit_name"], created_at=satir["created_at"],
-        published_at=satir["published_at"],
+        published_at=satir["published_at"], updated_at=satir.get("updated_at"),
         assignment_count=satir["assignment_count"], staff_count=satir["staff_count"],
         shortfall_count=satir["shortfall_count"],
         total_hours=round(float(satir["total_hours"]), 1),

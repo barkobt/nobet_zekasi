@@ -43,6 +43,11 @@ class Draft(BaseModel):
     unit_name: str
     created_at: datetime | None = None
     published_at: datetime | None = None
+    updated_at: datetime | None = Field(
+        default=None,
+        description="En son ne olduğu: yayınlanma, çözüm koşusu ya da atama yazımı. "
+                    "Taslaklar listesindeki 'Son 7 gün / 30 gün / Eski' ölçütü bu.",
+    )
 
     assignment_count: int = 0
     staff_count: int = Field(default=0, description="Ataması olan kişi sayısı")

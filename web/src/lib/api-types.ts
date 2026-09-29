@@ -1413,6 +1413,11 @@ export interface components {
             /** Published At */
             published_at?: string | null;
             /**
+             * Updated At
+             * @description En son ne olduğu: yayınlanma, çözüm koşusu ya da atama yazımı. Taslaklar listesindeki 'Son 7 gün / 30 gün / Eski' ölçütü bu.
+             */
+            updated_at?: string | null;
+            /**
              * Assignment Count
              * @default 0
              */

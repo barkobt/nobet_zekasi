@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreHorizontal } from "lucide-react";
+import { CalendarCheck, Copy, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { HataKutusu } from "@/components/HataKutusu";
@@ -15,13 +15,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { UygulaPenceresi } from "@/components/taslak/UygulaPenceresi";
 import { api } from "@/lib/api";
 import { aralikEtiketi, type Draft } from "@/lib/taslak";
+import { AY_KISA } from "@/lib/donem";
 
 /** Durum rozeti: taslağın gerçekte ne olduğunu tek kelimeyle söyler. */
 function durumRozeti(t: Draft): { ad: string; vurgu?: boolean } {
@@ -33,10 +33,34 @@ function durumRozeti(t: Draft): { ad: string; vurgu?: boolean } {
   return { ad: "Taslak" };
 }
 
+/** Sekmeler: son güncellenme zamanına göre. Arşiv ayrı sekme DEĞİL — arşivlenmiş
+ *  taslak hangi zaman aralığındaysa orada, "Arşiv" rozetiyle görünür. */
+const SEKMELER = [
+  { anahtar: "7",   ad: "Son 7 gün",  gun: 7 },
+  { anahtar: "30",  ad: "Son 30 gün", gun: 30 },
+  { anahtar: "eski", ad: "Eski",      gun: null },
+] as const;
+
+const SAYFA_BOYU = 10;
+
+const gunFarki = (iso: string | null | undefined) =>
+  iso === null || iso === undefined
+    ? Number.POSITIVE_INFINITY
+    : (Date.now() - +new Date(iso)) / 86400000;
+
+const kisaTarih = (iso: string | null | undefined) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${d.getDate()} ${AY_KISA[d.getMonth()]} ${d.getFullYear()}`;
+};
+
 export default function TaslaklarSayfasi() {
   const router = useRouter();
   const qc = useQueryClient();
   const [silinecek, setSilinecek] = useState<Draft | null>(null);
+  const [uygulanacak, setUygulanacak] = useState<Draft | null>(null);
+  const [sekme, setSekme] = useState<string>("7");
+  const [sayfa, setSayfa] = useState(0);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["drafts"], queryFn: () => api<Draft[]>("/drafts"),
@@ -59,12 +83,59 @@ export default function TaslaklarSayfasi() {
     },
   });
 
+  // Sekmeye düşen taslaklar, en yeni üstte.
+  const tumu = (data ?? []).slice().sort(
+    (a, b) => gunFarki(a.updated_at) - gunFarki(b.updated_at),
+  );
+  const sekmeninleri = (anahtar: string) => {
+    const s2 = SEKMELER.find((x) => x.anahtar === anahtar)!;
+    return s2.gun === null
+      ? tumu.filter((t) => gunFarki(t.updated_at) > 30)
+      : tumu.filter((t) => gunFarki(t.updated_at) <= s2.gun!);
+  };
+  const secili = sekmeninleri(sekme);
+  const eski = sekme === "eski";
+  const sayfaSayisi = Math.max(1, Math.ceil(secili.length / SAYFA_BOYU));
+  const gorunen = eski
+    ? secili.slice(sayfa * SAYFA_BOYU, (sayfa + 1) * SAYFA_BOYU)
+    : secili;
+
+  // Bilgi satırı: bu sekmedeki taslakların güncellenme aralığı.
+  const tarihler = secili.map((t) => t.updated_at).filter(Boolean) as string[];
+  const bilgi = tarihler.length
+    ? `Güncellenme: ${kisaTarih(tarihler[tarihler.length - 1])} – ${kisaTarih(tarihler[0])}`
+    : "Bu aralıkta taslak yok.";
+
   return (
     <AppShell>
       <div className="mb-4 flex items-center justify-between">
         <h1 style={{ fontSize: "var(--text-lg)", fontWeight: 600 }}>Taslaklar</h1>
         <YeniTaslak />
       </div>
+
+      <div className="mb-1 flex items-center gap-1 border-b">
+        {SEKMELER.map((x) => (
+          <button
+            key={x.anahtar}
+            type="button"
+            onClick={() => { setSekme(x.anahtar); setSayfa(0); }}
+            className={
+              "-mb-px border-b-2 px-3 pb-2 pt-1 " +
+              (sekme === x.anahtar
+                ? "border-brand font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground")
+            }
+          >
+            {x.ad}
+            <span className="ml-1.5 opacity-60" style={{ fontSize: "var(--text-xs)" }}>
+              {sekmeninleri(x.anahtar).length}
+            </span>
+          </button>
+        ))}
+      </div>
+      <p className="mb-3 text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+        {bilgi}
+      </p>
 
       <div className="rounded-lg border bg-card">
         {error ? (
@@ -76,18 +147,21 @@ export default function TaslaklarSayfasi() {
             <p className="text-muted-foreground">Henüz taslak yok.</p>
             <YeniTaslak />
           </div>
+        ) : gorunen.length === 0 ? (
+          <p className="p-6 text-muted-foreground">Bu aralıkta taslak yok.</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[320px]">Taslak</TableHead>
-                <TableHead className="w-[220px]">Dönem</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead className="w-[60px]" />
+                <TableHead className="w-[300px]">Taslak</TableHead>
+                <TableHead className="w-[230px]">Dönem</TableHead>
+                <TableHead className="w-[140px]">Durum</TableHead>
+                <TableHead className="w-[150px]">Son güncelleme</TableHead>
+                <TableHead className="w-[130px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((t) => {
+              {gorunen.map((t) => {
                 const rozet = durumRozeti(t);
                 return (
                   <TableRow
@@ -113,22 +187,42 @@ export default function TaslaklarSayfasi() {
                         {rozet.ad}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {kisaTarih(t.updated_at)}
+                    </TableCell>
+
+                    {/* Üç ikon: menüyü açmadan tek tıkla. Yayındaki çizelge silinemez. */}
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label="Taslak işlemleri">
-                            <MoreHorizontal size={16} strokeWidth={1.75} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => kopyala.mutate(t)}>
-                            Kopyala
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setSilinecek(t)}>
-                            Sil
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-0.5">
+                        <IkonDugme
+                          etiket="Kopyala"
+                          onTikla={() => kopyala.mutate(t)}
+                          bekliyor={kopyala.isPending}
+                        >
+                          <Copy size={16} strokeWidth={1.75} />
+                        </IkonDugme>
+
+                        <IkonDugme
+                          etiket={t.status === "yayinlandi" ? "Zaten yayında" : "Yayınla"}
+                          onTikla={() => setUygulanacak(t)}
+                          pasif={t.status === "yayinlandi"}
+                        >
+                          <CalendarCheck size={16} strokeWidth={1.75} />
+                        </IkonDugme>
+
+                        <IkonDugme
+                          etiket={
+                            t.status === "yayinlandi"
+                              ? "Yayındaki çizelge silinemez"
+                              : "Sil"
+                          }
+                          onTikla={() => setSilinecek(t)}
+                          pasif={t.status === "yayinlandi"}
+                          tehlike
+                        >
+                          <Trash2 size={16} strokeWidth={1.75} />
+                        </IkonDugme>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -137,6 +231,30 @@ export default function TaslaklarSayfasi() {
           </Table>
         )}
       </div>
+
+      {eski && sayfaSayisi > 1 && (
+        <div className="mt-3 flex items-center justify-end gap-2">
+          <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
+            Sayfa {sayfa + 1} / {sayfaSayisi}
+          </span>
+          <Button variant="outline" size="sm" disabled={sayfa === 0}
+                  onClick={() => setSayfa((p) => p - 1)}>
+            Önceki
+          </Button>
+          <Button variant="outline" size="sm" disabled={sayfa + 1 >= sayfaSayisi}
+                  onClick={() => setSayfa((p) => p + 1)}>
+            Sonraki
+          </Button>
+        </div>
+      )}
+
+      {uygulanacak && (
+        <UygulaPenceresi
+          taslak={uygulanacak}
+          acik
+          onKapat={() => setUygulanacak(null)}
+        />
+      )}
 
       <AlertDialog open={silinecek !== null} onOpenChange={(a) => !a && setSilinecek(null)}>
         <AlertDialogContent>
@@ -158,5 +276,38 @@ export default function TaslaklarSayfasi() {
         </AlertDialogContent>
       </AlertDialog>
     </AppShell>
+  );
+}
+
+/** Satır sonundaki ikon düğme: tooltip'li, pasifken de tooltip açılır. */
+function IkonDugme({
+  etiket, onTikla, pasif, tehlike, bekliyor, children,
+}: {
+  etiket: string;
+  onTikla: () => void;
+  pasif?: boolean;
+  tehlike?: boolean;
+  bekliyor?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* Pasif düğme tooltip tetiklemez; sarmalayıcı span o yüzden burada. */}
+        <span className="inline-flex">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={etiket}
+            disabled={pasif || bekliyor}
+            onClick={onTikla}
+            className={tehlike && !pasif ? "text-danger hover:text-danger" : ""}
+          >
+            {children}
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{etiket}</TooltipContent>
+    </Tooltip>
   );
 }

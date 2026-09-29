@@ -19,7 +19,6 @@ import { sayi, type Schedule } from "@/lib/cizelge";
 import { aralikEtiketi, type Draft, type SolveAccepted, type SolverRun } from "@/lib/taslak";
 import { aralik, iso as isoGun, type Olcek } from "@/lib/donem";
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export default function TaslakSayfasi({ params }: { params: Promise<{ id: string }> }) {
   const draftId = Number(use(params).id);
