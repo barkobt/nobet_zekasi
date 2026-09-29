@@ -336,8 +336,20 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
                     + (" (elle yazılmış — bilinçli istisna olabilir)" if elle else ""),
                     seviye_ustu="uyari" if elle else None,
                 ))
-        # Sorumlu ve oryantasyondakiler bölmenin dışında (seeds/011 ile aynı kural)
-        if p.kapsamaya_sayilir and not (gorevler & {"TRIYAJ", "GOZLEM"}):
+        # Sorumlu ve oryantasyondakiler bölmenin dışında (seeds/011 ile aynı kural).
+        #
+        # Kağıttan aktarılan (source='referans') ve HİÇ rozeti olmayan satır
+        # "kağıtta görev belirtilmemiş" demektir — kişi o gün triyajda ya da
+        # gözlemde olabilir, kağıt söylemiyor. Bunu ihlal saymak, elimizde
+        # olmayan bir bilgiyi eksiklik gibi göstermek olurdu. Solver'ın ürettiği
+        # satırda (source='solver') aynı durum gerçek bir eksiktir ve sayılır.
+        # Yalnız AMBULANS rozeti taşıyan satır da belirsizdir: kağıt ambulansı
+        # işaretlemiş ama kişinin triyajda mı gözlemde mi olduğunu yazmamış.
+        kagitta_belirtilmemis = (
+            a["source"] == "referans" and not (gorevler & {"TRIYAJ", "GOZLEM"})
+        )
+        if (p.kapsamaya_sayilir and not (gorevler & {"TRIYAJ", "GOZLEM"})
+                and not kagitta_belirtilmemis):
             ihlaller.append(Ihlal("D-4", "Rozetsiz çalışan", p.ad, a["work_date"],
                                   f"{a['vardiya_kodu']} vardiyasında ne triyaj ne gözlem"))
 
@@ -372,6 +384,20 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
                 asgari = int(kural.parametreler[param])
                 kalan = sum(1 for a in satirlar
                             if alan in a["gorevler"] and "AMBULANS" not in a["gorevler"])
+
+                # Kağıttan aktarılan çizelgede, o vardiyada alanı YAZILMAMIŞ ve
+                # ambulansa da çıkmamış biri varsa alanın boşaldığını İDDİA EDEMEYİZ:
+                # o kişi pekâlâ orada olabilir. Bilmediğimiz bir şeyi ihlal saymak
+                # kağıdı olduğundan kötü gösterir (temkinli sayım ilkesi).
+                belirsiz = any(
+                    a["source"] == "referans"
+                    and not (set(a["gorevler"]) & {"TRIYAJ", "GOZLEM"})
+                    and "AMBULANS" not in a["gorevler"]
+                    and kisi[a["staff_id"]].kapsamaya_sayilir
+                    for a in satirlar
+                )
+                if belirsiz:
+                    continue
                 # Alanda hiç kimse yoksa bu satır zaten D-1/D-2'de raporlandı
                 if any(alan in a["gorevler"] for a in satirlar) and kalan < asgari:
                     ihlaller.append(Ihlal("D-9", "C-009 · ambulans sonrası kalan", "—", g,

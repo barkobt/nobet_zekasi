@@ -14,12 +14,18 @@ kopyalama yok, başlangıç ipucu verilmedi.
 | Ölçü | Kağıt | Sistem |
 |---|---:|---:|
 | Kural ihlali (katı) | **22** | **0** |
-| Kadro eksiği olan vardiya | **30** | **0** |
-| Eksik kişi (toplam) | **38** | **0** |
-| Ambulans çıkınca alan boş kalan vardiya | **3** | **0** |
+| Ambulans mevcudu eksik olan vardiya | **18** | **0** |
+| Gözlem mevcudu eksik olan vardiya | **21** | **0** |
+| Triyaj mevcudu eksik olan vardiya | **4** | **0** |
+| Ambulans çıkınca alan boş kalan vardiya | **1** | **0** |
 | Saat farkı (en çok − en az) | **70,0 sa** | **31,5 sa** |
 | Gece farkı | **14** | **12** |
 | Geçersiz acil takviye | 5 | 0 |
+
+Bütün sayılar kontrolcünün (`uv run python -m solver.validate`) çıktısından;
+iki çizelge aynı kurallarla, aynı programla ölçüldü. Ham `v_daily_coverage`
+görünümü kullanılmadı: o görünüm "kağıtta görev belirtilmemiş" durumunu
+bilmiyor ve kağıdı olduğundan kötü gösteriyor (bkz. §5.6).
 
 Saat ve gece farkının gerçek okunuşu için §4'e bakın: sistemdeki 31,5 saatlik
 fark **dağıtım adaletsizliği değil**, izin ve çalışma tipi farkıdır.
@@ -44,9 +50,23 @@ Kontrolcü (`uv run python -m solver.validate`) ikisini de aynı kurallarla öl�
 C-022 satırlarının 7'sinden 2'si **meşru takviye** sayıldı (Ayşe Kartal 27-28 Eylül:
 eşi yokken ekip 4/5'ti, eklenince 5/5 oldu) — onlar uyarı, ihlal değil.
 
-Bunların yanında **65 gevşetilebilir slot eksiği** var (kadro yetmemiş).
-Ayrıca 20 rozet, yetkinliği olmayan kişiye verilmiş — elle yazıldığı için
-uyarı sayıldı, hata değil.
+Bunların yanında **57 gevşetilebilir slot eksiği** var (kadro yetmemiş).
+
+### Yetkinlik kaydıyla uyuşmayan rozetler (12 uyarı, ihlal değil)
+
+Kağıtta işaretli olup da kişinin kayıtlı yetkinliğinde bulunmayan rozetler.
+Elle yazıldığı için **uyarı** sayılıyor, hata değil:
+
+| Kişi | Rozet | Kaç gün |
+|---|---|---:|
+| Muhammet Edem | AMBULANS | 10 |
+| Zehra Kutucu | AMBULANS | 1 |
+| Güven Göl | AMBULANS | 1 |
+
+Üçü de kağıtta **pembe ile işaretli**, yani gerçekten ambulansa çıkmışlar.
+Muhammet ve Zehra'nın ambulans yetkisi **hastaneye soruldu**; cevap gelene
+kadar yetkinlik kayıtlarına dokunulmuyor. Yetki varsa bu 11 uyarı düşecek ve
+geriye yalnız Güven Göl'ün bilinen istisnası kalacak.
 
 ### Sistemde bulunan ihlal
 
@@ -57,25 +77,26 @@ Yok. Her çözümün sonunda kontrolcü kendiliğinden koşuyor; katı ihlal bul
 
 ## 3. Kadro eksikleri
 
-Sayılar `v_daily_coverage` görünümünden: bir vardiyanın bir slotu gerekenin
-altındaysa bir satır. (Kontrolcü çıktısı aynı eksikleri gün×vardiya kırılımıyla
-sayar, o yüzden orada satır sayısı farklı görünür.)
+Sayılar kontrolcüden: bir vardiyanın bir slotu gerekenin altındaysa bir satır.
 
-| Slot | Kağıt: kaç vardiyada | Kağıt: toplam eksik kişi | Sistem |
-|---|---:|---:|---|
-| Gözlem (en az 2) | 21 | 23 | 0 |
-| Ambulans (2 kişi) | 7 | 13 | 0 |
-| Genel mevcut (5 kişi) | 1 | 1 | 0 |
-| Triyaj (en az 3) | 1 | 1 | 0 |
+| Slot | Gereken | Kağıt: kaç vardiyada eksik | Sistem |
+|---|---|---:|---:|
+| Ambulans | 2 kişi | **18** | 0 |
+| Gözlem | en az 2 | **21** | 0 |
+| Triyaj | en az 3 | **4** | 0 |
+| Genel mevcut | 5 kişi | 1 | 0 |
+| Ekip lideri | en az 1 | 0 | 0 |
+| Sayım yetkilisi | en az 1 | 0 | 0 |
 
 Sistem çizelgesinde kadro eksiği **sıfır**: aynı 20 kişiyle, aynı izinlerle,
 her vardiyanın her slotu dolduruldu.
 
-**Ambulans çıkınca alan boşalması** kağıtta 3 vardiyada oldu — ambulansa çıkan
-2 kişi gidince triyajda ya da gözlemde kimse kalmadı. Sistemde C-009 katı kural
-olduğu için bu 0.
+**Ambulans çıkınca alan boşalması** kağıtta 1 vardiyada oldu (21 Eylül gecesi,
+gözlemde kimse kalmadı). Sistemde C-009 katı kural olduğu için 0.
 
----
+> Triyaj ve gözlem sayıları **en fazla bu kadar** demektir. Kağıtta 56 satırda
+> kişinin hangi alanda olduğu yazmıyor (§5.6); o kişiler alan sayımına
+> girmiyor. Gerçek eksik bu sayılardan **az** olabilir, çok olamaz.
 
 ## 4. Saat ve gece dağılımı
 
@@ -139,7 +160,16 @@ Bu belgedeki bütün sayılar şu kurallarla hesaplandı:
    girmiyorlar**. Adalet havuzu bu yüzden iki tarafta da 16 kişi.
 4. **Sorumlu hemşire ve oryantasyondakiler adalet havuzunda değil.** Sorumlunun
    programı sabit, oryantasyondakiler eğitmenlerini gölgeliyor.
-5. **İzin günü hedefi düşürür.** Aylık 200 saatlik hedef, izin/rapor günü başına
+5. **Kağıtta belirtilmeyen görev, ihlal sayılmaz.** Kağıtta bir kişinin
+   hangi alanda (triyaj / gözlem) olduğu her zaman yazmıyor — renk işareti yoksa
+   bilmiyoruz. İlk aktarımda "renk yoksa triyaj" varsaymıştık; bu, TRIYAJ
+   yetkinliği olmayan Eda Karakuş ve Derya Torun'a 8 gün triyaj rozeti yazdı ve
+   kontrolcü bunları "yetkinliksiz rozet" diye işaretledi. İhlal kağıdın değil
+   **bizim varsayımımızın** ürünüydü. O 8 rozet kaldırıldı (`seeds/028`), satırlar
+   rozetsiz bırakıldı — GOZLEM'e çevrilmedi, o da başka bir varsayım olurdu.
+   Kontrolcü artık kağıttan gelen ve alanı yazılmamış satırı ne "rozetsiz
+   çalışan" (D-4) sayıyor ne de o vardiyada alanın boşaldığını iddia ediyor (D-9).
+6. **İzin günü hedefi düşürür.** Aylık 200 saatlik hedef, izin/rapor günü başına
    7,5 saat iner (hastane onaylı). Hem çözücü hem ekran aynı hesabı yapıyor.
 
 ---
@@ -149,8 +179,10 @@ Bu belgedeki bütün sayılar şu kurallarla hesaplandı:
 Aynı kadro ve aynı izinlerle:
 
 - Kağıtta **22 kural ihlali** var, sistemde **hiç yok**.
-- Kağıtta **30 vardiyada kadro eksik**, sistemde **hiçbirinde**.
-- Kağıtta 3 kez **ambulans çıkınca alan boş kalmış**, sistemde hiç.
+- Kağıtta **18 vardiyada ambulans, 21 vardiyada gözlem, 4 vardiyada triyaj
+  mevcudu eksik**; sistemde hiçbirinde.
+- Kağıtta 1 kez **ambulans çıkınca alan boş kalmış** (21 Eylül gecesi),
+  sistemde hiç.
 - Gece çalışan 13 kişinin saati ve gece sayısı kağıtta **191,5–260 saat /
   6–14 gece** arasında dağılmış; sistemde **hepsi 221,5 saat ve 12 gece**.
 
