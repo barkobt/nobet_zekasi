@@ -102,6 +102,19 @@ Kişi başına aylık saat, 200 saat doluluk oranı, fazla mesai. Tablo: `monthl
 ### E-12 · Adalet Panosu
 Kişi başına gece sayısı, hafta sonu sayısı, toplam saat dağılımı. Tablo: türetilmiş view
 
+## Katman 5 — Ayarlar
+
+### E-13 · Görünür Sayaçlar
+Çizelge satır özetinde hangi sayaçların haftalık/aylık görüneceği. Tablo: `visible_counters`
+
+### E-14 · Kurum
+Excel çıktılarının başlığında birim adının önünde görünen kurum adı. Tek alan.
+Tablo: `app_settings` (`org_name`).
+
+Kurum adı **koda gömülemez**: hastanenin adının üründe geçmemesi yasal bir
+gerekliliktir (29.09.2026) ve gömülü metin her değişiklikte yeni dağıtım demektir.
+Boş bırakılırsa çıktı başlığında kurum satırı hiç yazılmaz.
+
 ---
 
 ## MVP Sınırı — 1 Ekim 2026 sunumu

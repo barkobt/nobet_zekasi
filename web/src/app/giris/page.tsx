@@ -4,10 +4,10 @@ import { cookies } from "next/headers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const COOKIE = "asp_demo";
+const COOKIE = "clinorq_demo";
 
 async function imza(parola: string): Promise<string> {
-  const veri = new TextEncoder().encode(`acibadem-smart-planner:${parola}`);
+  const veri = new TextEncoder().encode(`clinorq:${parola}`);
   const ozet = await crypto.subtle.digest("SHA-256", veri);
   return Array.from(new Uint8Array(ozet))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -44,13 +44,14 @@ export default async function GirisSayfasi({
     // DESIGN §4: giriş ekranı kabuğun dışında. Tek alan, tek birincil buton.
     <main className="flex h-dvh items-center justify-center bg-background">
       <form action={girisYap} className="w-[320px] rounded-lg border bg-card p-6">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-md bg-brand">
-            <img src="/brand/acibadem-mark.svg" alt="" className="size-5" />
-          </span>
-          <span style={{ fontSize: "var(--text-base)", fontWeight: 600 }}>
-            Acıbadem Smart Planner
-          </span>
+        {/* DESIGN §4.1: giriş ekranında dikey kilit, açık zemin → -color varyantı.
+            Logo zaten adı taşıdığı için yanına ayrıca ürün adı yazılmaz. */}
+        <div className="mb-6 flex justify-center">
+          <img
+            src="/brand/clinorq/stacked/clinorq-stacked-color.svg"
+            alt="Clinorq"
+            className="h-14 w-auto"
+          />
         </div>
 
         <label

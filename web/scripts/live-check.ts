@@ -22,7 +22,7 @@ const WEB = resolve(BURASI, "..");
 const KOK = resolve(WEB, "..");
 const CIKTI = join(KOK, "docs", "screenshots", "live");
 
-const BASE_URL = process.env.BASE_URL ?? "https://acibadem-smart-planner.vercel.app";
+const BASE_URL = process.env.BASE_URL ?? "https://clinorq.vercel.app";
 const GENISLIK = 1440;
 const YUKSEKLIK = 900;
 

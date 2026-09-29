@@ -1,8 +1,14 @@
-# Acıbadem Smart Planner — Tasarım Dili
+# Clinorq — Tasarım Dili
 
-> Bu belge arayüzün TEK tasarım kaynağıdır. `docs/mockups/` altındaki HTML taslakları
-> yalnızca **düzen (layout) referansıdır**: renk, yazı tipi, ikon seti ve içerikleri
-> oradan ALINMAZ. Bu belge ile bir taslak çelişirse bu belge geçerlidir.
+> Bu belge arayüzün TEK tasarım kaynağıdır.
+>
+> `docs/mockups/` altındaki HTML taslakları yalnızca **düzen (layout) referansıdır**:
+> renk, yazı tipi, ikon seti ve içerikleri oradan ALINMAZ. Bu belge ile bir taslak
+> çelişirse bu belge geçerlidir.
+>
+> `mockups/01–04` (dashboard taslakları) **silindi** (29.09.2026): dış araçtan gelmişlerdi
+> ve hastanenin adını, logosunu taşıyorlardı. Aşağıda adları geçtiği yerde yalnızca hangi
+> düzenden esinlenildiğini kaydederler; dosyalar git geçmişindedir.
 
 ## 1. İlke: az laf, çok iş
 
@@ -21,15 +27,15 @@ Bu bir **operasyon aracı**, pazarlama sayfası değil. Sorumlu hemşire ekrana 
 CSS değişkeni olarak `web/src/app/globals.css` içinde tanımlanır, shadcn/ui temasına bağlanır.
 Bileşenlerde **hex kodu yazılmaz**, yalnızca token kullanılır.
 
-> `--brand` logo zemininden ölçüldü (#1D265F). Kurumsal kimlik kılavuzundaki resmi değer
-> (acibadem.com.tr › Kurumsal Bilgiler › Kurumsal Kimlik) farklıysa yalnızca bu token güncellenir.
+> Değerler clinorq marka kılavuzundan (`docs/brand/clinorq/README.txt`) alındı.
+> Marka dosyaları değişirse yalnızca bu token'lar güncellenir.
 
 | Token | Değer | Kullanım |
 |---|---|---|
-| `--brand` | `#1D265F` (Acıbadem logo laciverti) | Sol menü + logo bloğu zemini, birincil buton, aktif sekme çizgisi |
-| `--brand-hover` | `#28337A` | Birincil buton hover, menü öğesi hover zemini |
-| `--brand-soft` | `#EDEEF6` | Aktif satır / seçili hücre zemini |
-| `--accent` | `#1C7ED6` | Link, odak halkası, bugün vurgusu. Başka hiçbir şey |
+| `--brand` | `#0B1F3A` (clinorq laciverti) | Sol menü + logo bloğu zemini, birincil buton, aktif sekme çizgisi |
+| `--brand-hover` | `#143254` | Birincil buton hover, menü öğesi hover zemini |
+| `--brand-soft` | `#E9EEF5` | Aktif satır / seçili hücre zemini |
+| `--accent` | `#1D7BEA` (clinorq mavisi) | Link, odak halkası, bugün vurgusu. Başka hiçbir şey |
 | `--bg` | `#F5F7FA` | Sayfa zemini |
 | `--surface` | `#FFFFFF` | Kart / tablo zemini |
 | `--border` | `#E3E8EF` | Tüm ayırıcı çizgiler (1px) |
@@ -39,6 +45,15 @@ Bileşenlerde **hex kodu yazılmaz**, yalnızca token kullanılır.
 | `--warn` | `#C77700` | Soft kural ihlali, sınırda |
 | `--danger` | `#C62828` | Eksik kadro, hard kural ihlali, INFEASIBLE |
 | `--ok-soft` / `--warn-soft` / `--danger-soft` | ilgili rengin %8 opaklığı | Rozet ve hücre zemini |
+
+Marka paletinin kalan iki rengi token olarak **kayıtlı ama arayüzde kullanılmaz**; yalnız
+logo dosyalarında ve koyu zemin varyantlarında geçerler. Bir bileşen bunları okursa
+DESIGN'ın "renk bilgi taşır" kuralı bozulur:
+
+| Token | Değer | Nerede |
+|---|---|---|
+| `--brand-teal` | `#0F8A85` (koyu zeminde `#1FB0A7`) | Logodaki nabız yayı |
+| `--brand-deep` | `#0B2447` | Uygulama ikonu karosu, koyu zemin varyantları |
 
 **Oran kuralı:** ekranın ~%85'i nötr, ~%10 marka, ~%5 durum rengi. Durum renkleri yalnızca
 gerçekten bir durum bildiriyorsa kullanılır. "Tam kadro" satırları yeşile boyanmaz;
@@ -77,24 +92,39 @@ Vardiya renkleri (tek yerde tanımlı, tüm ekranlarda aynı):
 
 ### 4.1 Logo bloğu
 
-Kaynak dosyalar `docs/brand/` altındadır (tek doğruluk kaynağı). `web/` iskeleti kurulunca
-ikisi de **`web/public/brand/` altına kopyalanır** ve arayüz yalnızca oradan (`/brand/...`) okur.
-Dosyalar Acıbadem SVG'sinden geometrisi korunarak ayrıldı: **yeniden çizilmez, renk/oran değiştirilmez,
-yerine başka logo (taslaklardaki görseller, "A" kutusu) konmaz.**
-- `acibadem-mark.svg`: "Λ" işareti, beyaz, şeffaf zemin, kare (viewBox 90×90)
-- `acibadem-wordmark.svg`: "ACIBADEM" yazısı, beyaz, şeffaf zemin (viewBox 636.65×76.43)
+Ürün adı **Clinorq**; wordmark'ta küçük harf yazılır (`clinorq`). Metinde cümle başında
+"Clinorq", logoda `clinorq`. Kurum adı (hastane) üründe **hiçbir yerde geçmez** — çıktı
+başlığındaki kurum adı bir ayardır, bkz. E-14 ve `db/seeds/029`.
 
-Bileşen: `web/src/components/shell/BrandLogo.tsx` (tek yerde; başka hiçbir yerde logo kullanılmaz).
+Kaynak dosyalar `docs/brand/clinorq/` altındadır (tek doğruluk kaynağı), aynısı
+`web/public/brand/clinorq/` altına kopyalanır; arayüz yalnızca oradan (`/brand/clinorq/...`)
+okur. **Yeniden çizilmez, renk/oran değiştirilmez, yerine başka logo konmaz.**
 
-| Durum | Görünüm |
+Klasörler: `symbol/` (yalnız işaret) · `wordmark/` (yalnız yazı) · `horizontal/` (işaret solda,
+yazı sağda) · `stacked/` (işaret üstte) · `app-icon/` · `favicon/`.
+Renk varyantı zemine göre seçilir: açık zeminde `-color`, koyu zeminde `-reverse`.
+
+> `wordmark/` dosyasındaki **"q" harfi işaretin kendisidir.** İşaretle wordmark'ı yan yana
+> koymak "q"yu iki kez gösterir; bitişik kullanım için her zaman `horizontal/` ya da
+> `stacked/` alınır.
+
+| Yer | Dosya |
 |---|---|
-| Menü açık (hover ya da sabit) | İşaret (24px) + ACIBADEM yazısı (13px yükseklik) |
-| Menü daraltılmış | Yalnız işaret (24px), tooltip: "Acıbadem Smart Planner" |
+| Sol menü, açık (hover ya da sabit) | `horizontal/clinorq-horizontal-reverse.svg`, 24px yükseklik |
+| Sol menü, daraltılmış | `symbol/clinorq-symbol-reverse.svg`, 23px yükseklik; tooltip: "Clinorq" |
+| Giriş (şifre) ekranı | `stacked/clinorq-stacked-color.svg`, 56px yükseklik |
+| Sekme ikonu | `favicon/favicon.svg` → `web/src/app/icon.svg` |
+| Ana ekran / apple-touch | `app-icon/clinorq-appicon-blue.svg` → `app/apple-icon.png` + manifest |
 
-- Geçiş: yalnız `opacity`, **150ms ease-out**. İşaret her durumda yerinde kalır, yazı solar.
+Bileşen: `web/src/components/shell/BrandLogo.tsx` (tek yerde; giriş ekranı dışında başka
+hiçbir yerde logo kullanılmaz).
+
+- Sol menüde iki dosya üst üste durur, geçiş yalnız `opacity`, **150ms ease-out**.
+  İşaret iki dosyada da sola dayalı ve aynı optik yükseklikte olduğu için geçişte yerinden
+  oynamaz — 24px/23px farkı bunu sağlayan düzeltmedir (dosyaların kendi iç boşlukları farklı).
   Menünün kendisi hover ile açıldığı için logonun ayrı bir hover davranışı yoktur.
 - `prefers-reduced-motion: reduce` → geçiş anlık (süre 0).
-- Logo bloğu bir link: tıklanınca ana sayfaya gider. `aria-label="Acıbadem Smart Planner — Ana Sayfa"`.
+- Logo bloğu bir link: tıklanınca ana sayfaya gider. `aria-label="Clinorq — Ana Sayfa"`.
 - Logo üzerine rozet, sürüm numarası, gölge veya parıltı eklenmez.
 - **İçerik alanı:** `--bg` zemin, 24px iç boşluk, maksimum genişlik yok (ızgaralar tam genişlik kullanır).
 - **Sayfa başlığı satırı:** solda başlık (20px/600), sağda en fazla 1 birincil + 2 ikincil buton.
@@ -125,6 +155,8 @@ Bileşen: `web/src/components/shell/BrandLogo.tsx` (tek yerde; başka hiçbir ye
 | E-03 Kural Seti | "Hangi kural açık, hangisi gevşetilebilir?" | tablo; Yasal kurallar kilit ikonuyla |
 | E-06 İhtiyaç Şablonu | "Vardiya başına kaç kişi/görev gerekiyor?" | `mockups/06` zaman çizelgesi, iki vardiyaya indirgenmiş |
 | E-01 Vardiya Tanımları | "Vardiyalar ve saatleri neler?" | basit liste |
+| E-13 Görünür Sayaçlar | "Çizelge satırında hangi sayaçlar görünsün?" | anahtar tablosu |
+| E-14 Kurum | "Çıktı başlığında hangi kurum adı yazsın?" | tek alan, tek buton |
 
 Uygulama **E-00 ana sayfasıyla** açılır (26.09 kararı; eski karar "doğrudan E-09" idi).
 `mockups/01, 03, 04, 07` (dashboard ve hasta akışı projeksiyonu) kapsam dışıdır —

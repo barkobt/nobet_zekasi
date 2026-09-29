@@ -16,7 +16,7 @@ export function Topbar({ period }: { period?: React.ReactNode }) {
     <header data-ustbar className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-6">
       <div className="flex items-baseline gap-3">
         <span style={{ fontSize: "var(--text-base)", fontWeight: 600 }}>
-          {sayfa?.label ?? "Acıbadem Smart Planner"}
+          {sayfa?.label ?? "Clinorq"}
         </span>
         <span className="text-muted-foreground" style={{ fontSize: "var(--text-xs)" }}>
           Erişkin Acil Servis

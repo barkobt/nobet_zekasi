@@ -1,4 +1,4 @@
-"""Nöbet Zekâsı API — Acıbadem Smart Planner.
+"""Clinorq API.
 
 Katmanlar: routers/ (HTTP) → repositories/ (SQL). schemas/ yalnızca API sözleşmesi.
 Veritabanının zaten uyguladığı kurallar burada tekrarlanmaz; hata yakalanıp çevrilir.
@@ -30,8 +30,8 @@ async def lifespan(app: FastAPI):
 _uretim = get_settings().uretim_mi
 
 app = FastAPI(
-    title="Nöbet Zekâsı API",
-    description="Acıbadem Kent ASG acil servisi nöbet planlama servisi.",
+    title="Clinorq API",
+    description="Acil servis nöbet planlama servisi.",
     version="0.1.0",
     lifespan=lifespan,
     docs_url=None if _uretim else "/docs",

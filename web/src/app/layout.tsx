@@ -8,8 +8,13 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Acıbadem Smart Planner",
-  description: "Acıbadem Kent ASG acil servisi nöbet planlama sistemi",
+  /* Sekme başlığı ve paylaşım kartları. Ürün adı yalnızca "Clinorq";
+     kurum adı arayüzde geçmez (ayar olarak tutulur, bkz. app_settings). */
+  title: "Clinorq",
+  description: "Acil servis nöbet planlama sistemi",
+  /* icon.svg ve apple-icon.png app/ altında dosya kuralıyla da bulunur;
+     manifest ana ekrana eklemede kullanılır. */
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

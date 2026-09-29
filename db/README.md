@@ -1,4 +1,4 @@
-# Nöbet Zekâsı — Veritabanı
+# Clinorq — Veritabanı
 
 PostgreSQL şeması: numaralı migration dosyaları + seed verisi.
 

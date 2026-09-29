@@ -3,17 +3,22 @@
 @import "shadcn/tailwind.css";
 
 /* ===========================================================================
-   Acıbadem Smart Planner — tasarım token'ları
+   Clinorq — tasarım token'ları
    TEK KAYNAK: kökteki DESIGN.md. Hex kodu YALNIZCA bu dosyada bulunur;
    bileşenlerde yalnızca token kullanılır (DESIGN §2).
    =========================================================================== */
 
 :root {
   /* --- DESIGN §2: renk --- */
-  --brand:        #1D265F;   /* Acıbadem logo laciverti: sol menü, birincil buton */
-  --brand-hover:  #28337A;
-  --brand-soft:   #EDEEF6;   /* aktif satır / seçili hücre zemini */
-  --accent:       #1C7ED6;   /* link, odak halkası, bugün vurgusu. Başka hiçbir şey */
+  --brand:        #0B1F3A;   /* clinorq laciverti: sol menü, birincil buton */
+  --brand-hover:  #143254;
+  --brand-soft:   #E9EEF5;   /* aktif satır / seçili hücre zemini */
+  --accent:       #1D7BEA;   /* clinorq mavisi: link, odak halkası, bugün vurgusu. Başka hiçbir şey */
+
+  /* Marka paletinin arayüzde İŞİ OLMAYAN iki rengi. Yalnız logo varlıkları ve
+     koyu zemin varyantları için kayıtlı; bileşen bunları okumaz (DESIGN §2). */
+  --brand-teal:   #0F8A85;   /* logodaki nabız yayı */
+  --brand-deep:   #0B2447;   /* koyu zemin / uygulama ikonu karosu */
 
   --bg:           #F5F7FA;
   --surface:      #FFFFFF;

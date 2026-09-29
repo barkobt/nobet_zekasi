@@ -93,12 +93,12 @@ işaretlemiş; **canlıya almadan önce dolu olduğu doğrulanmalı.**
 
 ### A5. Şifre ekranı
 
-`web/src/proxy.ts` — tek ortak şifre → `asp_demo` çerezi. Çerez bayrakları doğru:
+`web/src/proxy.ts` — tek ortak şifre → `clinorq_demo` çerezi. Çerez bayrakları doğru:
 `httpOnly`, `sameSite: lax`, `secure` (üretimde), `maxAge` 12 saat.
 
 **İki zayıflık:**
 
-1. Çerez değeri `SHA-256("acibadem-smart-planner:" + parola)` — **sunucuya ait
+1. Çerez değeri `SHA-256("clinorq:" + parola)` — **sunucuya ait
    ayrı bir gizli anahtar yok**. Ön ek bilindiği için, çerez bir kez sızarsa zayıf
    bir parola çevrimdışı sözlük saldırısıyla bulunabilir. HMAC + ayrı `SESSION_SECRET`
    bunu kapatır.

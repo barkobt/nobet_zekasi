@@ -9,10 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
  * Şifre sunucuda kalır; tarayıcıya yalnızca imza gider.
  * DEMO_PASSWORD boşsa koruma kapalıdır (yerel geliştirme).
  */
-const COOKIE = "asp_demo";
+const COOKIE = "clinorq_demo";
 
 async function imza(parola: string): Promise<string> {
-  const veri = new TextEncoder().encode(`acibadem-smart-planner:${parola}`);
+  const veri = new TextEncoder().encode(`clinorq:${parola}`);
   const ozet = await crypto.subtle.digest("SHA-256", veri);
   return Array.from(new Uint8Array(ozet))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -32,6 +32,10 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // /giris, statik dosyalar ve marka varlıkları korumanın dışında.
-  matcher: ["/((?!giris|_next/static|_next/image|brand|favicon.ico).*)"],
+  // /giris, statik dosyalar, marka varlıkları ve ikon/manifest korumanın dışında.
+  // İkonlar dışarıda kalmazsa tarayıcı sekme ikonunu isterken /giris'e yönlenir
+  // ve ikon hiç yüklenmez.
+  matcher: [
+    "/((?!giris|_next/static|_next/image|brand|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest).*)",
+  ],
 };

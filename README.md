@@ -1,6 +1,6 @@
-# Nöbet Zekâsı — Acıbadem Smart Planner
+# Clinorq
 
-Acıbadem Kent ASG erişkin acil servisi için CP-SAT tabanlı hemşire nöbet planlama sistemi.
+Erişkin acil servis için CP-SAT tabanlı hemşire nöbet planlama sistemi.
 
 Kurallar veritabanında yaşar, kodda değil: "bu ay gece kuralını gevşetelim" demek için
 deploy gerekmez. Çözücü aylık çalışır, çizelge haftalık gösterilir.
