@@ -295,3 +295,39 @@ API_BASE_URL=https://<railway-url> pnpm gen:api         # canlı API'den
 
 `DEMO_PASSWORD` girilene kadar site şifresizdir: kök adres `/personel`e yönlenir.
 Şifre girilince `/giris`e yönlenmeye başlar.
+
+---
+
+## Çözüm kalitesi — işçi sayısı ve ipucu tuzağı
+
+**29.09.2026'da öğrenilenler.** Aynı veri, aynı kurallarla canlıda Ekim'in saat
+farkı 23 sa çıkarken yerelde 3 sa çıkıyordu. İki ayrı sebep vardı:
+
+### 1. SOLVER_WORKERS
+
+Railway'de `SOLVER_WORKERS=2` ayarlıydı. CP-SAT'ta paralel işçiler **farklı arama
+stratejileri** deniyor; işçi sayısı çözüm kalitesini süreden daha çok belirliyor:
+
+| İşçi | Süre | Amaç | Saat farkı |
+|---:|---:|---:|---:|
+| 2 | 60 sn | 7.145.398 | 18,5 sa |
+| 2 | 180 sn | 3.191.111 | 18,5 sa |
+| 8 | 60 sn | 585.497 | **3,0 sa** |
+
+Süreyi üçe katlamak yetmiyor, işçi sayısı belirleyici. Railway konteyneri
+48 çekirdek görüyor; ayar **8**'e çekildi. `/api/health` artık `cekirdek` ve
+`solver_isci` alanlarını döndürüyor — bu fark bir daha veri sorunu sanılmasın.
+
+### 2. İpucu + erken durdurma birlikte kilitliyor
+
+Çözüm, taslakta duran atamaları başlangıç ipucu olarak kullanıyor (gerileme
+olmasın diye). Ama kaynak kötüyse ipucu aramayı o kötü yerde tutuyor:
+
+- Kötü bir Ekim'den (80,5 sa) kopyalanıp çözülünce 22 sa'da kilitlendi.
+- Süre 300 sn verilse bile koşu 20-37 sn'de bitiyordu: ipucu anında bulunuyor,
+  `SOLVER_NO_IMPROVEMENT_S` (15 sn) iyileşme göremeyip aramayı durduruyor.
+- **Boş taslakla (ipuçsuz) aynı ay 3,0 sa** verdi — makine yeterliydi.
+
+**Kural:** "kopyala → çöz" akışı kaynağın kalitesini miras alır. Kötü bir
+çizelgeden başlanıyorsa **boş taslak açıp sıfırdan çözmek** gerekir.
+Canlıda `SOLVER_NO_IMPROVEMENT_S` 60'a çekildi.
