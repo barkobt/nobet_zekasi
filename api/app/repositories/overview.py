@@ -48,8 +48,22 @@ SELECT
         AND c.day >= %(bas)s AND c.day < %(bitis)s)                    AS ihlal,
     COALESCE((SELECT sum(m.overtime_max) FROM v_monthly_hours m
                WHERE m.draft_id = %(draft_id)s), 0)                    AS fazla_mesai,
-    COALESCE((SELECT max(m.worked_hours) - min(m.worked_hours) FROM v_monthly_hours m
-               WHERE m.draft_id = %(draft_id)s AND m.worked_hours > 0), 0) AS adalet
+    -- Adalet farkı YALNIZ adalet havuzundan: sorumlu hemşirenin programı sabit,
+    -- oryantasyondakiler eğitmenlerini gölgelediği için saatleri yüksek, ayrılan
+    -- ve ay içinde başlayanlar ayın tamamını çalışmıyor. Hepsini katmak farkı
+    -- yanlış büyütüyor ve ana sayfa ile çizelge ekranı farklı sayı söylüyordu.
+    -- Ölçüt solver/data.py → Personel.adalete_girer ile aynı.
+    COALESCE((SELECT max(m.worked_hours) - min(m.worked_hours)
+                FROM v_monthly_hours m
+                JOIN staff s  ON s.id = m.staff_id
+                JOIN roles r  ON r.id = s.role_id
+               WHERE m.draft_id = %(draft_id)s AND m.worked_hours > 0
+                 AND NOT s.is_orientation
+                 AND r.code <> 'sorumlu_hemsire'
+                 AND EXISTS (SELECT 1 FROM contracts ct
+                              WHERE ct.staff_id = s.id
+                                AND ct.valid_period @> (SELECT period FROM schedule_drafts
+                                                         WHERE id = %(draft_id)s))), 0) AS adalet
 """
 
 _BIRIM = "SELECT name FROM units ORDER BY id LIMIT 1"

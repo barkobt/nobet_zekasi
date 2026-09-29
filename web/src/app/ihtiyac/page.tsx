@@ -12,7 +12,7 @@ import { Sablon } from "@/components/ihtiyac/Sablon";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
-import { aralik, iso, kaydir, type Olcek } from "@/lib/donem";
+import { aralik, donemEtiketi, iso, kaydir, type Olcek } from "@/lib/donem";
 import { sayi } from "@/lib/taslak";
 import type { components } from "@/lib/api-types";
 
@@ -53,8 +53,11 @@ function Icerik() {
 
         <TabsContent value="haftalik" className="mt-4">
           <div className="mb-4">
+            {/* Etiket sunucudan değil ortak yardımcıdan: çizelge ekranı
+                "Hafta 39 · 21–27 Eyl 2026" derken burası "21–27 Eyl 2026"
+                diyordu, aynı hafta iki ekranda farklı yazılıyordu. */}
             <DonemGezgini
-              etiket={data?.period_label ?? "…"}
+              etiket={donemEtiketi(capa, olcek)}
               olcek={olcek}
               onKaydir={(yon) => setCapa((c) => kaydir(c, olcek, yon))}
               onOlcek={setOlcek}
