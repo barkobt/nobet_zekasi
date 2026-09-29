@@ -1,4 +1,4 @@
-"""Arayüz ayarları: görünür sayaçlar ve kullanıcı tercihleri."""
+"""Arayüz ayarları: görünür sayaçlar, kullanıcı tercihleri, kurum ayarları."""
 
 from typing import Any
 
@@ -32,3 +32,20 @@ class CounterList(BaseModel):
 class Preference(BaseModel):
     pref_key: str
     value: Any
+
+
+class Setting(BaseModel):
+    """app_settings bir satırı. Boş `value` geçerlidir: 'bu metni hiç gösterme'."""
+
+    key: str
+    value: str
+    label: str
+    description: str | None = None
+
+
+class SettingUpdate(BaseModel):
+    value: str = Field(max_length=120)
+
+
+class SettingList(BaseModel):
+    settings: list[Setting]

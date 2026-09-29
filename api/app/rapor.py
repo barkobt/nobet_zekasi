@@ -36,7 +36,9 @@ def kisi_ozeti(veri: dict, bas: date, bitis_dis: date) -> list[dict]:
     satirlar = []
     for k in veri["personel"]:
         m = aylik.get(k["id"])
-        saat = float(m["planned_hours"]) if m else 0.0
+        # NET saat (mola hariç, migration 023). Hedef de net olduğu için ikisi
+        # aynı dilde: "200 sa" karşılaştırması brütle anlamsız olurdu.
+        saat = float(m["net_hours"]) if m else 0.0
         # Aylık hedef kişiye göre değişebiliyor (v_monthly_hours.min_hours);
         # haftalıkta böyle bir kişiselleştirme yok, tek referans değer.
         hedef = donem_hedefi(tur, float(m["min_hours"]) if m and m["min_hours"] else None, haftalik)

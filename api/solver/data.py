@@ -4,11 +4,19 @@ Bu modül YALNIZCA OKUR. Yazmaz, CP-SAT'ı tanımaz, kural uygulamaz. Amacı, mo
 "veri nereden geliyordu" sorusuyla hiç uğraşmaması: `veriyi_oku(draft_id)` çağrılır,
 tek bir donmuş (frozen) nesne döner, model o nesneden okur.
 
-SAAT BİRİMİ — YARIM SAAT (`_yb` son eki)
-    CP-SAT yalnızca tam sayılarla çalışır; gündüz 9,5 ve gece 14,5 saat tam sayı değil.
-    Her süreyi 2 ile çarpıp tam sayıya çeviriyoruz: gündüz 19, gece 29, sorumlunun kısa
-    Cumartesisi 11, aylık 200 saat hedefi 400. Alan adındaki `_yb` bunu hatırlatır;
-    19'u yanlışlıkla "19 saat" okumayı engeller.
+SAAT BİRİMİ — DAKİKA (`_dk` son eki)
+    CP-SAT yalnızca tam sayılarla çalışır. Birim 29.09.2026'ya kadar YARIM SAATTİ
+    (`_yb`); molalar mesaiden çıkarılınca (migration 023) çalışmaz oldu: gündüzün
+    net süresi 9,5 sa − 80 dk = 8 sa 10 dk = 490 dakika, yarım saatin katı DEĞİL.
+    Mola süresi arayüzden düzenlenebildiği için (E-01) ileride 25 dk gibi bir değer
+    de girilebilir — dakikadan büyük her birim er geç kırılır.
+    Bugün: gündüz 490, gece 660, sorumlunun kısa Cumartesisi 330, aylık 200 saat
+    hedefi 12.000. Alan adındaki `_dk` bunu hatırlatır; 490'ı yanlışlıkla
+    "490 saat" okumayı engeller.
+
+    SÜRELER NET OKUNUR (v_shift_types_net): mola mesaiye dahil değil. Dinlenme
+    kuralları (C-002, C-014, C-016) süre aritmetiği yapmaz — gün ve vardiya
+    komşuluğuna bakarlar — o yüzden net'e geçişten etkilenmezler.
 
 YETKİNLİK İKİ AYRI ŞEY (migration 010)
     kind='TASK'          → vardiya içinde atanan GÖREV (TRIYAJ, AMBULANS, GOZLEM).
@@ -30,9 +38,10 @@ from psycopg.rows import dict_row
 
 from app.settings import get_settings
 
-# Kapsama (GENEL mevcut) sayımından hariç tutulan rol. v_daily_coverage ile aynı
-# koşul (migration 009): sorumlu hemşire ve oryantasyondakiler mevcuda sayılmaz.
-KAPSAMA_DISI_ROL = "sorumlu_hemsire"
+# Kapsama (GENEL mevcut) sayımından hariç tutulan roller artık KODDA DEĞİL:
+# roles.counts_toward_coverage bayrağından okunuyor (migration 024), v_daily_coverage
+# ile birebir aynı koşul. Bugün sorumlu hemşire ve eğitim hemşiresi sayılmıyor;
+# değişirse tek satır UPDATE yeter, burası değişmez.
 
 # Bazı vardiya tipleri herkese açık değil. GUNDUZ_CMT, sorumlu hemşirenin kısa
 # Cumartesi vardiyasıdır (C-008) ve ihtiyaç şablonunda hiç satırı yoktur.
@@ -45,13 +54,13 @@ VARDIYA_KISITLARI: Mapping[str, tuple[str, frozenset[int]]] = {
 }
 
 
-def _yb(saat: Decimal | None) -> int:
-    """Saati yarım saat birimine çevirir. Yarım saatin katı değilse hata verir."""
+def _dk(saat: Decimal | None) -> int:
+    """Saati dakikaya çevirir. Tam dakika değilse hata verir."""
     if saat is None:
         raise ValueError("Süre boş olamaz")
-    birim = Decimal(saat) * 2
+    birim = Decimal(saat) * 60
     if birim != birim.to_integral_value():
-        raise ValueError(f"{saat} saat yarım saatin katı değil; modele çevrilemez")
+        raise ValueError(f"{saat} saat tam dakika değil; modele çevrilemez")
     return int(birim)
 
 
@@ -69,7 +78,7 @@ class Personel:
     oryantasyonda: bool
     buddy_id: int | None          # oryantasyondaysa eşleştiği eğitim hemşiresi
     yetkinlikler: frozenset[str]
-    hedef_saat_yb: int            # HAM hedef; izin düşümü UYGULANMAMIŞ
+    hedef_saat_dk: int            # HAM hedef; izin düşümü UYGULANMAMIŞ
     hedef_kaynagi: str            # 'sozlesme' | 'kural_varsayilani'
     kapsamaya_sayilir: bool
     kapsama_disi_nedeni: str | None
@@ -77,6 +86,18 @@ class Personel:
     calisabilir_gunler: frozenset[date]   # sözleşmesinin dönem İÇİNDE kapsadığı günler
     adalete_girer: bool           # saat/gece/hafta sonu adaleti ve 200 saat havuzu
     adalet_disi_nedeni: str | None
+    # Haftalık desen (migration 024). isodow: 1 = Pazartesi … 7 = Pazar.
+    sabit_vardiyalar: Mapping[int, str]   # isodow → vardiya kodu (KATI)
+    sabit_off_gunleri: frozenset[int]     # isodow — o gün kesin boş (KATI)
+    off_olabilir_gunler: frozenset[int]   # boşsa serbest; doluysa haftalık izin
+                                          # günü BU günlerden biri olmak zorunda
+
+    @property
+    def sabit_programli(self) -> bool:
+        """Haftanın her günü bağlanmışsa kişinin seçeneği yok — atama değişkeni
+        açılmaz, planı doğrudan girdi olarak yazılır (eskiden sorumlu hemşireye
+        özel kod vardı, artık veriden geliyor)."""
+        return len(self.sabit_vardiyalar) + len(self.sabit_off_gunleri) == 7
 
 
 @dataclass(frozen=True)
@@ -85,7 +106,7 @@ class Vardiya:
     kod: str
     ad: str
     baslangic: time
-    sure_yb: int
+    sure_dk: int
     gece_mi: bool                          # crosses_midnight
     sadece_rol: str | None = None          # None = herkese açık
     sadece_hafta_gunleri: frozenset[int] | None = None   # None = her gün
@@ -197,7 +218,7 @@ class GecmisAtama:
     gun: date
     vardiya_kodu: str
     gece_mi: bool
-    sure_yb: int
+    sure_dk: int
     kaynak: str                   # 'yayinlandi' | 'onceki_ay'
 
 
@@ -220,7 +241,7 @@ class SolverVerisi:
     kurallar: Mapping[str, Kural]              # constraints.code ile
     uyumsuz_ciftler: tuple[tuple[int, int], ...]
     gecmis: tuple[GecmisAtama, ...]
-    ay_basi_saatler_yb: Mapping[int, int]      # personel_id → dönemden önce, AYNI ayda
+    ay_basi_saatler_dk: Mapping[int, int]      # personel_id → dönemden önce, AYNI ayda
 
     def kisi(self, personel_id: int) -> Personel:
         return next(p for p in self.personel if p.id == personel_id)
@@ -264,7 +285,7 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
                 kurallar=kurallar,
                 uyumsuz_ciftler=_uyumsuz_ciftler(cur),
                 gecmis=_gecmis(cur, draft_id),
-                ay_basi_saatler_yb=_ay_basi_saatler(cur, draft_id),
+                ay_basi_saatler_dk=_ay_basi_saatler(cur, draft_id),
             )
 
 
@@ -332,6 +353,34 @@ def _kurallar(cur) -> dict[str, Kural]:
     }
 
 
+def _haftalik_desenler(cur) -> dict[int, dict[str, object]]:
+    """staff_weekly_patterns → personel_id başına üç sözlük (migration 024).
+
+    Sorumlunun sabit programı ve eğitim hemşiresinin hafta sonu izni buradan
+    gelir; koda gömülü gün ya da isim yok.
+    """
+    cur.execute(
+        """
+        SELECT p.staff_id, p.isodow, p.kind, st.code AS shift_code
+        FROM staff_weekly_patterns p
+        LEFT JOIN shift_types st ON st.id = p.shift_type_id
+        ORDER BY p.staff_id, p.isodow
+        """
+    )
+    desen: dict[int, dict[str, object]] = {}
+    for r in cur.fetchall():
+        d = desen.setdefault(
+            r["staff_id"], {"sabit": {}, "off": set(), "off_olabilir": set()}
+        )
+        if r["kind"] == "SABIT_VARDIYA":
+            d["sabit"][r["isodow"]] = r["shift_code"]
+        elif r["kind"] == "SABIT_OFF":
+            d["off"].add(r["isodow"])
+        else:
+            d["off_olabilir"].add(r["isodow"])
+    return desen
+
+
 def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
               kurallar: Mapping[str, Kural]) -> tuple[Personel, ...]:
     # Sözleşme: monthly_target_hours NULL = "kural varsayılanı geçerli".
@@ -344,7 +393,8 @@ def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
     # çalışabileceğini aktiflik değil SÖZLEŞME söyler — aşağıdaki calisabilir_gunler.
     cur.execute(
         """
-        SELECT s.id, s.full_name, r.code AS role_code, s.shift_eligibility,
+        SELECT s.id, s.full_name, r.code AS role_code, r.name AS role_name,
+               r.counts_toward_coverage, s.shift_eligibility,
                s.is_orientation, s.buddy_staff_id, s.is_active,
                ct.monthly_target_hours
         FROM staff s
@@ -380,12 +430,15 @@ def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
     for r in cur.fetchall():
         yetkinlik.setdefault(r["staff_id"], set()).add(r["code"])
 
+    desenler = _haftalik_desenler(cur)
     kisiler = []
     for r in satirlar:
         if r["is_orientation"]:
             neden = "oryantasyonda"
-        elif r["role_code"] == KAPSAMA_DISI_ROL:
-            neden = "sorumlu hemşire"
+        elif not r["counts_toward_coverage"]:
+            # Rolün adını yazıyoruz, kodunu değil: bu metin E-10 teşhis ekranında
+            # sorumlu hemşireye gösteriliyor.
+            neden = r["role_name"].lower()
         else:
             neden = None
         hedef = r["monthly_target_hours"]
@@ -401,14 +454,29 @@ def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
                 if any(g >= bas and (bit is None or g < bit) for bas, bit in araliklar)
             )
 
-        # ADALET HAVUZU (hastane kararı): ayrılan personel ve ay içinde sonradan
-        # başlayanlar KAPSAMA sayımına girer — o gün sahada gerçekten çalışıyorlar —
-        # ama saat/gece/hafta sonu adaletine ve 200 saate GİRMEZ: ayın tamamını
-        # çalışmadıkları için düşük saatleri adaletsizlik gibi görünür ve solver
-        # bunu telafi etmeye çalışırdı.
+        # ADALET / 200 SAAT HAVUZU — KAPSAMADAN AYRI BİR SORU.
+        #
+        # Eskiden bu havuz kapsamaya bağlıydı ("kapsamaya sayılmıyorsa adalete de
+        # girmez"). Eğitim hemşiresi kapsamadan çıkarılınca (seeds/031) 200 saat
+        # hedefini de kaybetti ve 179,7 saatte kaldı. İkisi farklı sorular:
+        #   kapsama  → bu kişi 5 kişilik ekip kadrosunun yerine geçer mi
+        #   adalet   → bu kişinin saati dengelenebilir mi, 200 saat hedefi var mı
+        # Eğitim hemşiresi ekip yerine geçmez ama normal bir çalışandır: hedefi var.
+        #
+        # Havuz dışı kalanlar:
+        #   · sabit programlı  → çizelgesi veri, solver değiştiremez (C-008)
+        #   · oryantasyonda    → saati eşininkini yansıtır, bağımsız değil
+        #   · dönemin tamamında sözleşmesi olmayan → ayın tamamını çalışmıyor,
+        #     düşük saati adaletsizlik gibi görünür ve solver telafiye çalışırdı
+        sabit_programli = (
+            len(desenler.get(r["id"], {}).get("sabit", {}))
+            + len(desenler.get(r["id"], {}).get("off", ())) == 7
+        )
         adalet_disi = None
-        if neden is not None:
-            adalet_disi = neden
+        if r["is_orientation"]:
+            adalet_disi = "oryantasyonda"
+        elif sabit_programli:
+            adalet_disi = "sabit programlı"
         elif gunler and len(calisabilir) < len(gunler):
             adalet_disi = ("dönemin tamamında sözleşmesi yok "
                            f"({len(calisabilir)}/{len(gunler)} gün)")
@@ -422,7 +490,7 @@ def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
                 oryantasyonda=r["is_orientation"],
                 buddy_id=r["buddy_staff_id"],
                 yetkinlikler=frozenset(yetkinlik.get(r["id"], ())),
-                hedef_saat_yb=_yb(hedef if hedef is not None else varsayilan),
+                hedef_saat_dk=_dk(hedef if hedef is not None else varsayilan),
                 hedef_kaynagi="sozlesme" if hedef is not None else "kural_varsayilani",
                 kapsamaya_sayilir=neden is None,
                 kapsama_disi_nedeni=neden,
@@ -430,6 +498,11 @@ def _personel(cur, donem_bas: date, gunler: tuple[date, ...],
                 calisabilir_gunler=calisabilir,
                 adalete_girer=adalet_disi is None,
                 adalet_disi_nedeni=adalet_disi,
+                sabit_vardiyalar=dict(desenler.get(r["id"], {}).get("sabit", {})),
+                sabit_off_gunleri=frozenset(desenler.get(r["id"], {}).get("off", ())),
+                off_olabilir_gunler=frozenset(
+                    desenler.get(r["id"], {}).get("off_olabilir", ())
+                ),
             )
         )
     return tuple(kisiler)
@@ -439,10 +512,10 @@ def _vardiyalar(cur, unit_id: int) -> tuple[Vardiya, ...]:
     # is_active = FALSE olanlar (24 saatlik vardiyalar, C-018) dışarıda kalır.
     cur.execute(
         """
-        SELECT id, code, name, start_time, duration_hours, crosses_midnight
-        FROM shift_types
+        SELECT id, code, name, start_time, net_minutes, crosses_midnight
+        FROM v_shift_types_net
         WHERE unit_id = %s AND is_active
-        ORDER BY start_time, duration_hours
+        ORDER BY start_time, net_minutes
         """,
         (unit_id,),
     )
@@ -455,7 +528,7 @@ def _vardiyalar(cur, unit_id: int) -> tuple[Vardiya, ...]:
                 kod=r["code"],
                 ad=r["name"],
                 baslangic=r["start_time"],
-                sure_yb=_yb(r["duration_hours"]),
+                sure_dk=r["net_minutes"],
                 gece_mi=r["crosses_midnight"],
                 sadece_rol=rol,
                 sadece_hafta_gunleri=gunler,
@@ -660,9 +733,9 @@ def _gecmis_pencere(cur, draft_id: int) -> list[dict]:
         ham AS (
             -- 1) Aynı taslağın bağlam satırları
             SELECT a.staff_id, a.work_date, st.code AS vardiya_kodu,
-                   st.crosses_midnight, st.duration_hours, 'onceki_ay' AS kaynak
+                   st.crosses_midnight, st.net_minutes, 'onceki_ay' AS kaynak
             FROM assignments a
-            JOIN shift_types st ON st.id = a.shift_type_id
+            JOIN v_shift_types_net st ON st.id = a.shift_type_id
             JOIN d ON d.id = a.draft_id
             JOIN pencere p ON a.work_date >= p.bas AND a.work_date < p.bit
 
@@ -670,17 +743,17 @@ def _gecmis_pencere(cur, draft_id: int) -> list[dict]:
 
             -- 2) Yayınlanmış başka taslakların KENDİ dönemine düşen günleri
             SELECT a.staff_id, a.work_date, st.code,
-                   st.crosses_midnight, st.duration_hours, 'yayinlandi'
+                   st.crosses_midnight, st.net_minutes, 'yayinlandi'
             FROM assignments a
             JOIN schedule_drafts y ON y.id = a.draft_id
                                   AND y.status = 'yayinlandi'
                                   AND y.period @> a.work_date
-            JOIN shift_types st ON st.id = a.shift_type_id
+            JOIN v_shift_types_net st ON st.id = a.shift_type_id
             JOIN d ON y.unit_id = d.unit_id AND y.id <> d.id
             JOIN pencere p ON a.work_date >= p.bas AND a.work_date < p.bit
         )
         SELECT DISTINCT ON (staff_id, work_date)
-               staff_id, work_date, vardiya_kodu, crosses_midnight, duration_hours, kaynak
+               staff_id, work_date, vardiya_kodu, crosses_midnight, net_minutes, kaynak
         FROM ham
         ORDER BY staff_id, work_date,
                  CASE kaynak WHEN 'yayinlandi' THEN 0 ELSE 1 END
@@ -703,7 +776,7 @@ def _gecmis(cur, draft_id: int) -> tuple[GecmisAtama, ...]:
             gun=r["work_date"],
             vardiya_kodu=r["vardiya_kodu"],
             gece_mi=r["crosses_midnight"],
-            sure_yb=_yb(r["duration_hours"]),
+            sure_dk=r["net_minutes"],
             kaynak=r["kaynak"],
         )
         for r in _gecmis_pencere(cur, draft_id)
@@ -712,7 +785,7 @@ def _gecmis(cur, draft_id: int) -> tuple[GecmisAtama, ...]:
 
 
 def _ay_basi_saatler(cur, draft_id: int) -> dict[int, int]:
-    """Dönem ayın ortasından başlıyorsa, aynı ayın önceki günlerinde çalışılmış saat.
+    """Dönem ayın ortasından başlıyorsa, aynı ayın önceki günlerinde çalışılmış NET dakika.
 
     Aylık hedef (C-004) ay bazlıdır; dönem ayın 12'sinde başlıyorsa 1-11 arasında
     çalışılmış saatler hedeften düşülmüş sayılmalı. Dönem ayın 1'inde başlıyorsa boş döner.
@@ -725,5 +798,5 @@ def _ay_basi_saatler(cur, draft_id: int) -> dict[int, int]:
     toplam: dict[int, int] = {}
     for r in _gecmis_pencere(cur, draft_id):
         if r["work_date"] >= ay_basi:
-            toplam[r["staff_id"]] = toplam.get(r["staff_id"], 0) + _yb(r["duration_hours"])
+            toplam[r["staff_id"]] = toplam.get(r["staff_id"], 0) + r["net_minutes"]
     return toplam

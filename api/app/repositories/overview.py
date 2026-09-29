@@ -20,22 +20,24 @@ LIMIT 1
 
 # GEREKEN SAAT — ihtiyaç şablonundan türetilir:
 #   her gün × o gün geçerli şablonun her vardiyası için
-#   GENEL slotunun min_count'u × vardiyanın duration_hours'ı
+#   GENEL slotunun min_count'u × vardiyanın NET süresi (mola hariç, migration 023)
 # GENEL seçilmesinin sebebi: diğer slotlar (triyaj, gözlem, ambulans) aynı kadronun
 # İÇİNDEN atanır, ek kişi değildir (C-019). Onları da toplasaydık aynı kişiyi
 # birkaç kez sayardık.
+# NET olmak ZORUNDA: "atanan saat"in paydası bu. Pay net, payda brüt olursa
+# E-00'daki oran iki farklı birimi karşılaştırır.
 _GEREKEN = """
-SELECT COALESCE(SUM(ntr.min_count * st.duration_hours), 0) AS gereken
+SELECT COALESCE(ROUND(SUM(ntr.min_count * st.net_minutes) / 60.0, 2), 0) AS gereken
 FROM generate_series(%(bas)s::date, %(bitis)s::date - 1, INTERVAL '1 day') gs
 JOIN need_periods np        ON np.valid_period @> gs::date
 JOIN need_template_rows ntr ON ntr.need_template_id = np.need_template_id
                            AND ntr.slot_code = 'GENEL'
-JOIN shift_types st         ON st.id = ntr.shift_type_id AND st.is_active
+JOIN v_shift_types_net st   ON st.id = ntr.shift_type_id AND st.is_active
 """
 
-# ATANAN SAAT — dönemdeki atamaların planlanan saatleri.
+# ATANAN SAAT — dönemdeki atamaların planlanan NET saatleri (mola hariç, 023).
 _ATANAN = """
-SELECT COALESCE(SUM(h.planned_hours), 0) AS atanan
+SELECT COALESCE(ROUND(SUM(h.planned_net_minutes) / 60.0, 2), 0) AS atanan
 FROM v_assignment_hours h
 WHERE h.draft_id = %(draft_id)s
   AND h.work_date >= %(bas)s AND h.work_date < %(bitis)s
@@ -53,11 +55,11 @@ SELECT
     -- ve ay içinde başlayanlar ayın tamamını çalışmıyor. Hepsini katmak farkı
     -- yanlış büyütüyor ve ana sayfa ile çizelge ekranı farklı sayı söylüyordu.
     -- Ölçüt solver/data.py → Personel.adalete_girer ile aynı.
-    COALESCE((SELECT max(m.worked_hours) - min(m.worked_hours)
+    COALESCE((SELECT max(m.net_hours) - min(m.net_hours)
                 FROM v_monthly_hours m
                 JOIN staff s  ON s.id = m.staff_id
                 JOIN roles r  ON r.id = s.role_id
-               WHERE m.draft_id = %(draft_id)s AND m.worked_hours > 0
+               WHERE m.draft_id = %(draft_id)s AND m.net_hours > 0
                  AND NOT s.is_orientation
                  AND r.code <> 'sorumlu_hemsire'
                  AND EXISTS (SELECT 1 FROM contracts ct

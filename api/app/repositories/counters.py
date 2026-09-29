@@ -1,4 +1,10 @@
-"""Görünür sayaç ayarları ve kullanıcı tercihleri (app_preferences)."""
+"""Ayarlar ekranının verisi: görünür sayaçlar, kullanıcı tercihleri, kurum ayarları.
+
+Üçü ayrı tabloda durur ve anlamları farklıdır:
+  * visible_counters → kurum geneli, hangi sayaç hangi görünümde çıkar
+  * app_preferences  → KULLANICI başına arayüz tercihi
+  * app_settings     → kuruma ait tek değerli metin ayarları (örn. kurum adı)
+"""
 
 from typing import Any
 
@@ -52,3 +58,41 @@ async def tercih_yaz(user_key: str, pref_key: str, value: Any) -> None:
                DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP""",
             (user_key, pref_key, Jsonb(value)),
         )
+
+
+# ------------------------------------------------------------ kurum ayarları ---
+
+_AYARLAR = """
+SELECT key, value, label, description
+FROM app_settings
+ORDER BY key
+"""
+
+
+async def ayarlar() -> list[dict]:
+    async with cursor() as cur:
+        await cur.execute(_AYARLAR)
+        return await cur.fetchall()
+
+
+async def ayar(key: str) -> dict | None:
+    async with cursor() as cur:
+        await cur.execute(
+            "SELECT key, value, label, description FROM app_settings WHERE key = %s",
+            (key,),
+        )
+        return await cur.fetchone()
+
+
+async def ayar_yaz(key: str, value: str) -> dict | None:
+    """Var olan ayarı günceller. Anahtar yoksa None döner — yeni ayar arayüzden
+    AÇILMAZ, çünkü her ayarın kodda onu okuyan bir yeri olmalı."""
+    async with cursor() as cur:
+        await cur.execute(
+            """UPDATE app_settings
+                  SET value = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE key = %s
+            RETURNING key, value, label, description""",
+            (value, key),
+        )
+        return await cur.fetchone()

@@ -91,6 +91,18 @@ class PersonRow(BaseModel):
     status_label: str = Field(description="Oryantasyon / Pasif / boş")
 
 
+class WeeklyPattern(BaseModel):
+    """staff_weekly_patterns bir satırı (migration 024). Salt okunur."""
+
+    isodow: int = Field(ge=1, le=7, description="1 = Pazartesi … 7 = Pazar")
+    day_label: str
+    kind: str = Field(description="SABIT_VARDIYA | SABIT_OFF | OFF_OLABILIR")
+    kind_label: str
+    shift_code: str | None = None
+    shift_name: str | None = None
+    note: str | None = None
+
+
 class PersonDetail(PersonRow):
     buddy_staff_id: int | None = None
     assignment_count: int = Field(
@@ -106,6 +118,10 @@ class PersonDetail(PersonRow):
     absences: list[Absence] = Field(default_factory=list)
     availability: list[AvailabilityRule] = Field(default_factory=list)
     conflicts: list[Conflict] = Field(default_factory=list)
+    weekly_pattern: list[WeeklyPattern] = Field(
+        default_factory=list,
+        description='Haftalık sabit desen (migration 024). Salt okunur.',
+    )
 
 
 class PersonCreate(BaseModel):

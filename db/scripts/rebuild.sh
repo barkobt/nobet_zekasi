@@ -111,4 +111,9 @@ for f in seeds/*.sql; do gecerli_mi "$f" || continue; echo "• $f"; "${PSQL[@]}
                         (SELECT count(*) FROM staff) AS personel,
                         (SELECT count(*) FROM assignments) AS atama,
                         (SELECT count(*) FROM v_task_eligibility_violations) AS uygunluk_ihlali;"
-echo "Bitti. Beklenen: 22 tablo, 6 view, 20 personel, 495 atama (91 referans + 404 demo), 1 uygunluk ihlali."
+echo "Bitti. Beklenen: 26 tablo, 7 view, 22 personel (20 aktif), 882 atama, 13 uygunluk ihlali."
+echo "  atama    = 478 referans (91 referans haftası + 387 kağıt Eylül) + 404 solver demo"
+echo "  ihlal    = 1 referans haftası (Güven Göl, 26.09, AMBULANS) + 12 kağıt Eylül"
+echo "             İkisi de GERÇEK: kağıt çizelgenin kendi ihlalleri, kurala uydurulmuyor."
+echo "  Not: migrate.sh ile kurulan veritabanında 26 tablo görünür — aradaki fark"
+echo "       schema_migrations, migrate.sh'in kendi defteri (migration değil)."

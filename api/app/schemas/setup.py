@@ -69,8 +69,15 @@ class ShiftType(BaseModel):
     code: str
     name: str
     start_time: time
-    duration_hours: float
+    duration_hours: float = Field(description="BRÜT süre: gerçek saat aralığı")
+    break_minutes: int = Field(description="Mola (dk). Mesaiye dahil DEĞİL")
+    net_minutes: int = Field(description="Mesaiden sayılan süre = brüt − mola")
+    net_label: str = Field(description="Net süre, insan diliyle: '8 sa 10 dk'")
     end_label: str = Field(description="Bitiş saati, insan diliyle")
     crosses_midnight: bool
     is_active: bool
     unit_name: str
+
+
+class BreakUpdate(BaseModel):
+    break_minutes: int = Field(ge=0, le=1439)

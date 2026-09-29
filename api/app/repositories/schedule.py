@@ -90,8 +90,8 @@ WHERE ar.target_date BETWEEN %(gun_bas)s AND %(gun_son)s
 # v_monthly_hours ayın TAMAMINI sayar — seçili hafta değil. Satır sonu zaten
 # "kişinin aylık toplamı" demek (DESIGN §6), o yüzden doğru olan bu.
 _AYLIK = """
-SELECT mh.staff_id, mh.shift_count, mh.planned_hours, mh.worked_hours,
-       mh.min_hours, mh.overtime_max
+SELECT mh.staff_id, mh.shift_count, mh.net_hours, mh.worked_net_hours,
+       mh.gross_hours, mh.break_hours, mh.min_hours, mh.overtime_max
 FROM v_monthly_hours mh
 WHERE mh.draft_id = %(draft_id)s
 """
@@ -105,8 +105,10 @@ FROM visible_counters ORDER BY sort_order
 
 # Vardiya süreleri: satır sayaçlarının saat toplamı buradan çıkar. Saat kodda
 # gömülü DEĞİL — GECE_0100 gibi sonradan eklenen vardiyalar kendiliğinden doğru sayılır.
+# Mola düşülmüş NET süre için v_shift_types_net okunuyor (migration 023): net
+# aritmetiği tek yerde tanımlı, burada "eksi mola" hesabı tekrarlanmaz.
 _VARDIYA_SURELERI = """
-SELECT code, duration_hours, crosses_midnight FROM shift_types
+SELECT code, duration_hours, net_minutes, crosses_midnight FROM v_shift_types_net
 """
 
 # İSTEK sayacı (İST): görünen aralıkta karşılanamayan "mümkünse" tercihleri.
@@ -435,10 +437,15 @@ def sayac_degerleri(
     """Bir kişinin GÖRÜNEN ARALIKTAKİ sayaçları.
 
     `hucreler`: ISO tarih → {"shift_code", "tasks"}. Aralığın dışı çağırana ait.
-    Saat toplamı vardiya süresinden gelir, hedef farkı dönem hedefinden.
+    Saat toplamı vardiyanın NET süresinden gelir (mola hariç, migration 023),
+    hedef farkı dönem hedefinden — hedef de net olduğu için ikisi aynı dilde.
+
+    Toplam DAKİKA ile birikir, saate en sonda çevrilir: gündüzün neti 8 sa 10 dk,
+    saat cinsinden devirli bir ondalık (8,1666…). Vardiya başına yuvarlansaydı
+    20 vardiyalık bir ayda toplam yarım saate yakın kayardı.
     """
     gunduz = gece = 0
-    saat = 0.0
+    net_dk = 0
     triyaj = gozlem = ambulans = 0
     hafta_sonu = pazar = 0
 
@@ -450,7 +457,7 @@ def sayac_degerleri(
             gece += 1
         else:
             gunduz += 1
-        saat += float(vd["duration_hours"])
+        net_dk += int(vd["net_minutes"])
 
         gorevler = set(h.get("tasks") or ())
         triyaj += "TRIYAJ" in gorevler
@@ -480,7 +487,8 @@ def sayac_degerleri(
                                  vardiyalar)
     )
 
-    saat = round(saat, 1)
+    # Dakika → saat çevrimi TEK yerde, toplama bittikten sonra.
+    saat = round(net_dk / 60.0, 1)
     return {
         "G": gunduz,
         "N": gece,

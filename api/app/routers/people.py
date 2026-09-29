@@ -7,10 +7,18 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.repositories import people as repo
 from app.schemas.people import (
+    WeeklyPattern,
     Absence, AbsenceCreate, AvailabilityCreate, AvailabilityRule, AvailabilityUpdate,
     CompetencyAssignment, StaffCompetency, Conflict, ConflictCreate, Contract, ContractUpsert,
     DeleteResult, PersonCreate, PersonDetail, PersonRow, PersonUpdate, Role,
 )
+
+GUN_ADI = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar")
+DESEN_ADI = {
+    "SABIT_VARDIYA": "Sabit vardiya",
+    "SABIT_OFF": "Kesin izin",
+    "OFF_OLABILIR": "İzin günü olabilir",
+}
 
 router = APIRouter(prefix="/people", tags=["personel"])
 
@@ -137,6 +145,13 @@ async def detay(staff_id: int) -> PersonDetail:
             ) for y in d["yetkinlikler"]
         ],
         conflicts=[Conflict(**u) for u in d["uyumsuzluk"]],
+        weekly_pattern=[
+            WeeklyPattern(
+                isodow=w["isodow"], day_label=GUN_ADI[w["isodow"] - 1],
+                kind=w["kind"], kind_label=DESEN_ADI.get(w["kind"], w["kind"]),
+                shift_code=w["shift_code"], shift_name=w["shift_name"], note=w["note"],
+            ) for w in d["desen"]
+        ],
     )
 
 

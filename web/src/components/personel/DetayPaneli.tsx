@@ -21,7 +21,7 @@ import { Kunye } from "./Kunye";
 import { SilmeBolumu } from "./SilmeBolumu";
 import { Alan, Bos, EkleDugmesi, Hata, Ikili, SatirKart } from "./parcalar";
 
-/** E-04 detay paneli: Yetkinlikler · Sözleşme · Devamsızlık · İstekler · Uyumsuzluk. */
+/** E-04 detay paneli: Yetkinlikler · Sözleşme · Devamsızlık · İstekler · Uyumsuzluk · Haftalık desen. */
 export function DetayPaneli({
   staffId, herkes, onKapat,
 }: { staffId: number | null; herkes: PersonRow[]; onKapat: () => void }) {
@@ -102,6 +102,11 @@ export function DetayPaneli({
               ["yetkinlik", "Yetkinlikler"], ["sozlesme", "Sözleşme"],
               ["devamsizlik", "Devamsızlık"], ["istekler", "İstekler"],
               ["uyumsuzluk", "Uyumsuzluk"],
+              // Desen sekmesi yalnız deseni OLANDA görünür: 20 kişiden 2'sinde
+              // dolu, hepsine boş sekme göstermek gürültü olurdu.
+              ...((data.weekly_pattern ?? []).length > 0
+                ? [["desen", "Haftalık desen"]]
+                : []),
             ].map(([deger, ad]) => (
               <TabsTrigger
                 key={deger}
@@ -127,6 +132,9 @@ export function DetayPaneli({
           </TabsContent>
           <TabsContent value="uyumsuzluk" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
             <Uyumsuzluk kisi={data} herkes={herkes} onKaydet={tazele} />
+          </TabsContent>
+          <TabsContent value="desen" className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <HaftalikDesen kisi={data} />
           </TabsContent>
         </Tabs>
       )}
@@ -585,6 +593,47 @@ function Uyumsuzluk({
       ) : (
         secilebilir.length > 0 && <EkleDugmesi onClick={() => setAc(true)}>Kişi ekle</EkleDugmesi>
       )}
+    </div>
+  );
+}
+
+/**
+ * Kişiye özel haftalık desen (migration 024). SALT OKUNUR.
+ *
+ * NEDEN düzenlenemez: desen değişmek, yayındaki çizelgeyi baştan çözmeyi
+ * gerektirir. Buradan sessizce değiştirilirse ekranda duran çizelge kuralına
+ * uymayan bir hâle düşer. Değişiklik bugün seed ile yapılıyor.
+ */
+function HaftalikDesen({ kisi }: { kisi: PersonDetail }) {
+  const desen = kisi.weekly_pattern ?? [];
+  if (desen.length === 0) return <Bos>Bu kişide haftalık sabit desen yok.</Bos>;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Haftalık sabit program. Solver bu satırları kural olarak uygular; hafta
+        Pazartesi–Pazar takvim haftasıdır.
+      </p>
+      <div className="overflow-hidden rounded-lg border">
+        <table className="w-full" style={{ fontSize: "var(--text-sm)" }}>
+          <thead>
+            <tr className="border-b bg-muted/40 text-left text-muted-foreground">
+              <th className="px-3 py-2 font-medium" style={{ fontSize: "var(--text-xs)" }}>Gün</th>
+              <th className="px-3 py-2 font-medium" style={{ fontSize: "var(--text-xs)" }}>Kural</th>
+              <th className="px-3 py-2 font-medium" style={{ fontSize: "var(--text-xs)" }}>Vardiya</th>
+            </tr>
+          </thead>
+          <tbody>
+            {desen.map((d) => (
+              <tr key={d.isodow} className="border-b last:border-0">
+                <td className="px-3 py-2" style={{ fontWeight: 500 }}>{d.day_label}</td>
+                <td className="px-3 py-2">{d.kind_label}</td>
+                <td className="px-3 py-2 text-muted-foreground">{d.shift_name ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

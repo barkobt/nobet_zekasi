@@ -39,9 +39,14 @@ SLOT_ADI = {
 }
 
 
-def saat(yb: int) -> str:
-    """Yarım saat birimini Türkçe biçimde saate çevirir: 37 → "18,5"."""
-    return f"{yb / 2:.1f}".replace(".", ",").removesuffix(",0")
+def saat(dk: int) -> str:
+    """Dakikayı Türkçe biçimde saate çevirir: 1110 → "18,5".
+
+    Tek ondalık BİLEREK: gündüzün neti 8 sa 10 dk, saat cinsinden 8,1666…
+    Hemşireye "8,17 saat" demek anlamsız; metin zaten yaklaşık değer verir.
+    Hesap hiçbir yerde bu metinden geçmez, dakikayla yapılır.
+    """
+    return f"{dk / 60:.1f}".replace(".", ",").removesuffix(",0")
 
 
 def sayiyla(n: int) -> str:
@@ -197,12 +202,12 @@ def saat_aciklamalari(v: SolverVerisi, cozum, run_id: int) -> list[tuple]:
     izinli = Counter(y.personel_id for y in v.yokluklar)
     ad = {p.id: p.ad for p in v.personel}
     satirlar = []
-    for p_id, eksik_yb in sorted(cozum.saat_eksikleri.items(), key=lambda t: -t[1]):
+    for p_id, eksik_dk in sorted(cozum.saat_eksikleri.items(), key=lambda t: -t[1]):
         bos = sum(1 for g in v.gunler if not c.calisiyor(p_id, g))
         kisi = next(p for p in v.personel if p.id == p_id)
         tip = {"sadece_gunduz": ", yalnız gündüz çalışabiliyor",
                "sadece_gece": ", yalnız gece çalışabiliyor"}.get(kisi.uygunluk, "")
-        mesaj = (f"{ad[p_id]}: aylık hedefin {saat(eksik_yb)} saat altında."
+        mesaj = (f"{ad[p_id]}: aylık hedefin {saat(eksik_dk)} saat altında."
                  f" Dönemde {izinli[p_id]} gün izinli, {bos} gün boş{tip}.")
         satirlar.append((run_id, "ihlal", kural.id if kural else None, None, mesaj,
                          "Kişinin çalışma tipi, yetkinlikleri ya da dinlenme"

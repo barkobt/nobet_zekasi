@@ -123,8 +123,20 @@ async def detay(staff_id: int) -> dict:
         )
         uyumsuzluk = await cur.fetchall()
 
+        # Haftalık desen (migration 024): sorumlunun sabit programı, eğitim
+        # hemşiresinin hafta sonu izni. Salt okunur gösteriliyor — desen
+        # değiştirmek çizelgeyi baştan çözmeyi gerektirir.
+        await cur.execute(
+            """SELECT p.isodow, p.kind, st.code AS shift_code, st.name AS shift_name, p.note
+               FROM staff_weekly_patterns p
+               LEFT JOIN shift_types st ON st.id = p.shift_type_id
+               WHERE p.staff_id = %s ORDER BY p.isodow""",
+            (staff_id,),
+        )
+        desen = await cur.fetchall()
+
     return {"sozlesmeler": sozlesmeler, "izinler": izinler, "yetkinlikler": yetkinlikler,
-            "musaitlik": musaitlik, "uyumsuzluk": uyumsuzluk}
+            "musaitlik": musaitlik, "uyumsuzluk": uyumsuzluk, "desen": desen}
 
 
 async def olustur(full_name: str, role_code: str, shift_eligibility: str,

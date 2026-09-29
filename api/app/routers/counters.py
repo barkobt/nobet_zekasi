@@ -7,7 +7,9 @@ makinesinden ya da başka bir tarayıcıdan aynı görünüm açılır.
 from fastapi import APIRouter, HTTPException
 
 from app.repositories import counters as repo
-from app.schemas.counters import Counter, CounterList, CounterUpdate, Preference
+from app.schemas.counters import (
+    Counter, CounterList, CounterUpdate, Preference, Setting, SettingList, SettingUpdate,
+)
 
 router = APIRouter(tags=["ayarlar"])
 
@@ -51,3 +53,18 @@ async def tercih_oku(pref_key: str) -> Preference:
 async def tercih_yaz(pref_key: str, govde: Preference) -> Preference:
     await repo.tercih_yaz(VARSAYILAN_KULLANICI, pref_key, govde.value)
     return Preference(pref_key=pref_key, value=govde.value)
+
+
+@router.get("/settings", response_model=SettingList, summary="Kurum ayarlarını oku")
+async def ayarlar() -> SettingList:
+    return SettingList(settings=[Setting(**a) for a in await repo.ayarlar()])
+
+
+@router.put("/settings/{key}", response_model=Setting, summary="Kurum ayarını kaydet")
+async def ayar_kaydet(key: str, govde: SettingUpdate) -> Setting:
+    # Baştaki/sondaki boşluk temizlenir: görünmez boşluk "boş mu dolu mu"
+    # kararını bozar, çıktı başlığında da sarkık ayraç bırakırdı.
+    satir = await repo.ayar_yaz(key, govde.value.strip())
+    if satir is None:
+        raise HTTPException(status_code=404, detail=f"Bilinmeyen ayar: {key}")
+    return Setting(**satir)

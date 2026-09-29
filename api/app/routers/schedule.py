@@ -165,7 +165,9 @@ async def cizelge(
 
     # --- Hücreler -----------------------------------------------------------
     donem = veri["donem"]
-    sureler = {k: float(v["duration_hours"]) for k, v in veri["vardiyalar"].items()}
+    # Hücrede gösterilen saat de NET (mola hariç, 023). Brüt bırakılsaydı satır
+    # sonundaki "S" sayacı hücrelerin toplamını tutmazdı: 21 hücre × 9,5 ≠ 205,5.
+    sureler = {k: round(int(v["net_minutes"]) / 60.0, 2) for k, v in veri["vardiyalar"].items()}
 
     hucreler: dict[int, dict[str, Cell]] = {}
     # Dönem dışı satırlar ÖNCE yazılır ki taslağın kendi satırı (varsa) üstüne yazsın.
@@ -235,7 +237,7 @@ async def cizelge(
                 continue
 
             m = aylik.get(k["id"])
-            planlanan = float(m["planned_hours"]) if m else 0.0
+            planlanan = float(m["net_hours"]) if m else 0.0   # NET (mola hariç, 023)
             # Aylık hedeften izin günleri düşülür — solver de aynısını yapıyor.
             hedef = izin_dusumu(
                 donem_hedefi(

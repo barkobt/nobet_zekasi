@@ -3,9 +3,11 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
+from psycopg.errors import CheckViolation
 
 from app.repositories import setup as repo
 from app.schemas.setup import (
+    BreakUpdate,
     Competency, CompetencyMatrix, Constraint, ConstraintParam, ConstraintUpdate,
     MatrixRow, ParamUpdate, ShiftType,
 )
@@ -134,17 +136,46 @@ async def param_guncelle(param_id: int, istek: ParamUpdate) -> list[Constraint]:
     return await kurallar()
 
 
+def _net_etiket(dakika: int) -> str:
+    """490 → '8 sa 10 dk', 660 → '11 sa'. Ondalık saat YAZILMAZ: gündüzün neti
+    8,1666… eder ve "8,2 sa" ekranda yanlış bir kesinlik hissi verir."""
+    sa, dk = divmod(dakika, 60)
+    return f"{sa} sa {dk} dk" if dk else f"{sa} sa"
+
+
 @router.get("/shift-types", response_model=list[ShiftType], summary="Vardiya tanımları")
 async def vardiyalar() -> list[ShiftType]:
     sonuc = []
     for v in await repo.vardiyalar():
         sure = float(v["duration_hours"])
+        # Bitiş saati BRÜT süreden hesaplanır: mola vardiyanın içinde geçer,
+        # kişi yine de 18:00'de çıkar. Net yalnız mesai hesabına girer.
         bitis = (datetime.combine(datetime.today(), v["start_time"])
                  + timedelta(hours=sure)).time()
         sonuc.append(ShiftType(
             id=v["id"], code=v["code"], name=v["name"], start_time=v["start_time"],
-            duration_hours=sure, end_label=bitis.strftime("%H:%M"),
+            duration_hours=sure,
+            break_minutes=v["break_minutes"], net_minutes=v["net_minutes"],
+            net_label=_net_etiket(v["net_minutes"]),
+            end_label=bitis.strftime("%H:%M"),
             crosses_midnight=v["crosses_midnight"], is_active=v["is_active"],
             unit_name=v["unit_name"],
         ))
     return sonuc
+
+
+@router.put("/shift-types/{shift_type_id}/break", response_model=list[ShiftType],
+            summary="Vardiya molasını kaydet")
+async def mola_kaydet(shift_type_id: int, istek: BreakUpdate) -> list[ShiftType]:
+    try:
+        sonuc = await repo.mola_guncelle(shift_type_id, istek.break_minutes)
+    except CheckViolation as hata:
+        # ck_shift_types_break: mola vardiyadan kısa olmalı (migration 023).
+        # Kural veritabanında; burada yalnız Türkçeye çevriliyor (CLAUDE.md).
+        raise HTTPException(
+            status_code=422,
+            detail="Mola, vardiya süresinden kısa olmalı.",
+        ) from hata
+    if sonuc is None:
+        raise HTTPException(status_code=404, detail="Vardiya bulunamadı.")
+    return await vardiyalar()

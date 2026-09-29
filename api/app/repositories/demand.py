@@ -4,15 +4,19 @@ from datetime import date
 
 from app.db import cursor
 
-# Minimum kadro saati: GENEL slotu × vardiya süresi. Diğer slotlar aynı kadronun
-# içinden atanır (C-019), onları toplamak aynı kişiyi birkaç kez saymak olurdu.
+# Minimum kadro saati: GENEL slotu × vardiyanın NET süresi. Diğer slotlar aynı
+# kadronun içinden atanır (C-019), onları toplamak aynı kişiyi birkaç kez saymak olurdu.
+#
+# NET olmak ZORUNDA: bu sayı "atanan saat"in paydası olarak gösteriliyor
+# (E-00 ana sayfa). Pay net, payda brüt olursa aynı satırda iki farklı birim
+# yan yana durur ve oran anlamsızlaşır — 29.09'da canlıda tam böyle çıktı.
 _GEREKEN_SAAT = """
-SELECT COALESCE(SUM(ntr.min_count * st.duration_hours), 0) AS gereken
+SELECT COALESCE(ROUND(SUM(ntr.min_count * st.net_minutes) / 60.0, 2), 0) AS gereken
 FROM generate_series(%(bas)s::date, %(bitis)s::date - 1, INTERVAL '1 day') gs
 JOIN need_periods np        ON np.valid_period @> gs::date
 JOIN need_template_rows ntr ON ntr.need_template_id = np.need_template_id
                            AND ntr.slot_code = 'GENEL'
-JOIN shift_types st         ON st.id = ntr.shift_type_id AND st.is_active
+JOIN v_shift_types_net st   ON st.id = ntr.shift_type_id AND st.is_active
 """
 
 _SABLON = """

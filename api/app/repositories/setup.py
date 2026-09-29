@@ -45,11 +45,23 @@ ORDER BY c.is_hard DESC, c.catalog_code NULLS LAST, c.code
 
 _VARDIYALAR = """
 SELECT st.id, st.code, st.name, st.start_time, st.duration_hours,
+       st.break_minutes, st.net_minutes,
        st.crosses_midnight, st.is_active, u.name AS unit_name
-FROM shift_types st
+FROM v_shift_types_net st
 JOIN units u ON u.id = st.unit_id
 ORDER BY st.is_active DESC, st.start_time, st.duration_hours
 """
+
+
+async def mola_guncelle(shift_type_id: int, break_minutes: int) -> dict | None:
+    """Mola süresini yazar. Süreden uzun mola CHECK ile veritabanında engelleniyor;
+    burada tekrar kontrol edilmez (CLAUDE.md: DB'nin uyguladığı kuralı API'de tekrarlama)."""
+    async with cursor() as cur:
+        await cur.execute(
+            "UPDATE shift_types SET break_minutes = %s WHERE id = %s RETURNING id",
+            (break_minutes, shift_type_id),
+        )
+        return await cur.fetchone()
 
 
 async def yetkinlikler() -> list[dict]:

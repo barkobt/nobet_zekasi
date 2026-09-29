@@ -30,9 +30,9 @@ def kisa_tarih(gun) -> str:
     return f"{gun.day:2d} {AYLAR[gun.month - 1]} {GUNLER[gun.weekday()]}"
 
 
-def saat(yb: int) -> str:
-    """Yarım saat birimini okunur saate çevirir: 7440 → '3.720', 437 → '218,5'."""
-    metin = f"{yb / 2:,.1f}".replace(",", "§").replace(".", ",").replace("§", ".")
+def saat(dk: int) -> str:
+    """Dakikayı okunur saate çevirir: 223.200 → '3.720', 13.110 → '218,5'."""
+    metin = f"{dk / 60:,.1f}".replace(",", "§").replace(".", ",").replace("§", ".")
     return metin.removesuffix(",0")
 
 
@@ -57,8 +57,8 @@ def vardiya_ozeti(v: SolverVerisi) -> None:
     for s in v.vardiyalar:
         etiket = "gece" if s.gece_mi else "gündüz"
         satir = (
-            f"  {s.kod:<11} {s.baslangic.strftime('%H:%M')} · {saat(s.sure_yb):>5} sa"
-            f" ({s.sure_yb} yb) · {etiket}"
+            f"  {s.kod:<11} {s.baslangic.strftime('%H:%M')} · {saat(s.sure_dk):>5} sa"
+            f" ({s.sure_dk} dk) · {etiket}"
         )
         if s.sadece_rol or s.sadece_hafta_gunleri:
             gunler = (
@@ -82,7 +82,7 @@ def personel_ozeti(v: SolverVerisi) -> None:
         yildiz = "" if p.hedef_kaynagi == "sozlesme" else "*"
         print(
             f"  {p.ad:<16} {p.rol_kodu:<16} {UYGUNLUK[p.uygunluk]:<14}"
-            f" {saat(p.hedef_saat_yb) + yildiz:>8}  {kapsama}"
+            f" {saat(p.hedef_saat_dk) + yildiz:>8}  {kapsama}"
         )
     print("  * hedef sözleşmede boş → kural varsayılanı (monthly_min_hours)")
 
@@ -221,37 +221,37 @@ def saat_dengesi(v: SolverVerisi) -> None:
     # C-019: TRIYAJ / AMBULANS / GOZLEM / SAYIM / SHIFT_YETKILISI slotları vardiya
     # mevcudunun İÇİNDEN atanır, ek kadro değildir. O yüzden saat talebine GENEL
     # slotları girer; diğerleri girseydi aynı kişi iki kez sayılırdı.
-    talep_yb = 0
+    talep_dk = 0
     icinden = []
     for i in v.ihtiyaclar:
         if i.slot_kodu == "GENEL":
-            talep_yb += i.min_sayi * v.vardiya(i.vardiya_kodu).sure_yb * len(i.gunler)
+            talep_dk += i.min_sayi * v.vardiya(i.vardiya_kodu).sure_dk * len(i.gunler)
         else:
             icinden.append(f"{i.vardiya_kodu}/{i.slot_kodu}×{i.min_sayi}")
 
     sayilan = [p for p in v.personel if p.kapsamaya_sayilir]
     disi = [p for p in v.personel if not p.kapsamaya_sayilir]
-    hedef_yb = sum(p.hedef_saat_yb for p in sayilan)
-    fark_yb = talep_yb - hedef_yb
+    hedef_dk = sum(p.hedef_saat_dk for p in sayilan)
+    fark_dk = talep_dk - hedef_dk
 
     baslik("SAAT DENGESİ")
-    print(f"  Talep (GENEL mevcut × süre × gün)            {saat(talep_yb):>9} sa")
-    print(f"  Kapsamaya sayılan {len(sayilan)} kişinin hedefi toplamı  {saat(hedef_yb):>9} sa")
+    print(f"  Talep (GENEL mevcut × süre × gün)            {saat(talep_dk):>9} sa")
+    print(f"  Kapsamaya sayılan {len(sayilan)} kişinin hedefi toplamı  {saat(hedef_dk):>9} sa")
     # C-004 bir ASGARİ'dir ("en az 200 saat"), tavan değil. Talep asgarinin üstündeyse
     # bu bir eksiklik değil, O-001'in cezalandıracağı fazla mesaidir. Altındaysa
     # tersi tehlikeli: kimse 200 saate ulaşamaz, C-004 katı olduğu için model çözülemez.
     yorum = (
         "asgarinin ÜSTÜNDE → O-001 fazla mesai olarak cezalandırır"
-        if fark_yb >= 0
+        if fark_dk >= 0
         else "asgarinin ALTINDA → C-004 katı, kimse 200 saate ulaşamaz"
     )
-    isaretli = ("+" if fark_yb >= 0 else "−") + saat(abs(fark_yb))
+    isaretli = ("+" if fark_dk >= 0 else "−") + saat(abs(fark_dk))
     print(f"  Fark (talep − hedef)                         {isaretli:>9} sa  {yorum}")
-    print(f"  Kişi başı gereken ortalama                   {saat(round(talep_yb / len(sayilan))):>9} sa"
-          f"   (hedef {saat(round(hedef_yb / len(sayilan)))} sa)")
-    print(f"\n  Kapsama dışındakilerin hedefi (talebe sayılmadı): {saat(sum(p.hedef_saat_yb for p in disi))} sa")
+    print(f"  Kişi başı gereken ortalama                   {saat(round(talep_dk / len(sayilan))):>9} sa"
+          f"   (hedef {saat(round(hedef_dk / len(sayilan)))} sa)")
+    print(f"\n  Kapsama dışındakilerin hedefi (talebe sayılmadı): {saat(sum(p.hedef_saat_dk for p in disi))} sa")
     for p in disi:
-        print(f"    · {p.ad:<16} {saat(p.hedef_saat_yb):>6} sa — {p.kapsama_disi_nedeni}")
+        print(f"    · {p.ad:<16} {saat(p.hedef_saat_dk):>6} sa — {p.kapsama_disi_nedeni}")
     print(f"\n  Mevcudun içinden atanan slotlar (C-019, talebe eklenmez): {', '.join(icinden)}")
 
 
@@ -269,11 +269,11 @@ def gecmis_ozeti(v: SolverVerisi) -> None:
             print(f"  {v.kisi(g.personel_id).ad:<16} {kisa_tarih(g.gun):<13} {g.vardiya_kodu}{gece}")
 
     baslik("AYNI AYDA, DÖNEMDEN ÖNCE ÇALIŞILMIŞ SAAT")
-    if not v.ay_basi_saatler_yb:
+    if not v.ay_basi_saatler_dk:
         print(f"  Boş: dönem ayın 1'inde başlıyor ({tarih(esik)}), öncesi bu aya ait değil.")
     else:
-        for pid, yb in sorted(v.ay_basi_saatler_yb.items(), key=lambda x: -x[1]):
-            print(f"  {v.kisi(pid).ad:<16} {saat(yb):>6} sa")
+        for pid, dk in sorted(v.ay_basi_saatler_dk.items(), key=lambda x: -x[1]):
+            print(f"  {v.kisi(pid).ad:<16} {saat(dk):>6} sa")
 
 
 def main(argv: list[str]) -> int:

@@ -766,6 +766,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shift-types/{shift_type_id}/break": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Vardiya molasını kaydet */
+        put: operations["mola_kaydet_api_shift_types__shift_type_id__break_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/counters": {
         parameters: {
             query?: never;
@@ -795,6 +812,40 @@ export interface paths {
         get: operations["tercih_oku_api_prefs__pref_key__get"];
         /** Arayüz tercihi yaz */
         put: operations["tercih_yaz_api_prefs__pref_key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kurum ayarlarını oku */
+        get: operations["ayarlar_api_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Kurum ayarını kaydet */
+        put: operations["ayar_kaydet_api_settings__key__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -925,6 +976,11 @@ export interface components {
             strength?: ("KESIN" | "MUMKUNSE") | null;
             /** Note */
             note?: string | null;
+        };
+        /** BreakUpdate */
+        BreakUpdate: {
+            /** Break Minutes */
+            break_minutes: number;
         };
         /**
          * Cell
@@ -1560,6 +1616,16 @@ export interface components {
             /** Db */
             db: boolean;
             /**
+             * Cekirdek
+             * @description Sunucunun gördüğü CPU çekirdeği — çözüm kalitesini belirler
+             */
+            cekirdek?: number | null;
+            /**
+             * Solver Isci
+             * @description SOLVER_WORKERS ayarı; çekirdekten fazlası fayda etmez
+             */
+            solver_isci?: number | null;
+            /**
              * Kullanici
              * @description Veritabanına bağlanan rol — canlıda nobet_app olmalı
              */
@@ -1570,6 +1636,11 @@ export interface components {
             view?: number | null;
             /** Aktif Personel */
             aktif_personel?: number | null;
+            /**
+             * Okunamayan Tablo
+             * @description Bağlanan rolün SELECT yapamadığı tablo sayısı. 0 olmalı; sıfırdan büyükse migration başka bir rolle koştu ve GRANT unutuldu.
+             */
+            okunamayan_tablo?: number | null;
             /**
              * Sema Guncel
              * @description Veritabanı şeması deploy edilen kodun beklediği migration'ları içeriyor mu
@@ -1801,6 +1872,11 @@ export interface components {
             availability?: components["schemas"]["AvailabilityRule"][];
             /** Conflicts */
             conflicts?: components["schemas"]["Conflict"][];
+            /**
+             * Weekly Pattern
+             * @description Haftalık sabit desen (migration 024). Salt okunur.
+             */
+            weekly_pattern?: components["schemas"]["WeeklyPattern"][];
         };
         /**
          * PersonRow
@@ -2092,6 +2168,30 @@ export interface components {
             notes?: string[];
         };
         /**
+         * Setting
+         * @description app_settings bir satırı. Boş `value` geçerlidir: 'bu metni hiç gösterme'.
+         */
+        Setting: {
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** SettingList */
+        SettingList: {
+            /** Settings */
+            settings: components["schemas"]["Setting"][];
+        };
+        /** SettingUpdate */
+        SettingUpdate: {
+            /** Value */
+            value: string;
+        };
+        /**
          * ShiftHeader
          * @description Gün başlığındaki tek vardiya sayacı: DESIGN §6 'G 6/6' ve 'N 5/5'.
          *
@@ -2139,8 +2239,26 @@ export interface components {
              * Format: time
              */
             start_time: string;
-            /** Duration Hours */
+            /**
+             * Duration Hours
+             * @description BRÜT süre: gerçek saat aralığı
+             */
             duration_hours: number;
+            /**
+             * Break Minutes
+             * @description Mola (dk). Mesaiye dahil DEĞİL
+             */
+            break_minutes: number;
+            /**
+             * Net Minutes
+             * @description Mesaiden sayılan süre = brüt − mola
+             */
+            net_minutes: number;
+            /**
+             * Net Label
+             * @description Net süre, insan diliyle: '8 sa 10 dk'
+             */
+            net_label: string;
             /**
              * End Label
              * @description Bitiş saati, insan diliyle
@@ -2419,6 +2537,32 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WeeklyPattern
+         * @description staff_weekly_patterns bir satırı (migration 024). Salt okunur.
+         */
+        WeeklyPattern: {
+            /**
+             * Isodow
+             * @description 1 = Pazartesi … 7 = Pazar
+             */
+            isodow: number;
+            /** Day Label */
+            day_label: string;
+            /**
+             * Kind
+             * @description SABIT_VARDIYA | SABIT_OFF | OFF_OLABILIR
+             */
+            kind: string;
+            /** Kind Label */
+            kind_label: string;
+            /** Shift Code */
+            shift_code?: string | null;
+            /** Shift Name */
+            shift_name?: string | null;
+            /** Note */
+            note?: string | null;
         };
     };
     responses: never;
@@ -4079,6 +4223,41 @@ export interface operations {
             };
         };
     };
+    mola_kaydet_api_shift_types__shift_type_id__break_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shift_type_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreakUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShiftType"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     sayaclar_api_counters_get: {
         parameters: {
             query?: never;
@@ -4185,6 +4364,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Preference"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ayarlar_api_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingList"];
+                };
+            };
+        };
+    };
+    ayar_kaydet_api_settings__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Setting"];
                 };
             };
             /** @description Validation Error */

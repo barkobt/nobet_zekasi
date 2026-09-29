@@ -23,13 +23,14 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 
 from app import rapor
+from app.repositories import counters as ayar_repo
 from app.repositories import schedule as repo
 from app.routers.schedule import AY_ADI, GUN_ADI, VARDIYA_ETIKET
 
 router = APIRouter(tags=["çıktı"])
 
 # DESIGN §2 renkleri — ekranla aynı dil
-BRAND = "1D265F"
+BRAND = "0B1F3A"
 BEYAZ = "FFFFFF"
 ZEMIN = "F5F7FA"
 HAFTASONU = "EEF1F5"
@@ -89,8 +90,16 @@ def _donem_etiketi(bas: date, son: date) -> str:
 
 
 def _dosya_adi(parca: str, bas: date, bitis_dis: date) -> str:
-    return (f"Acibadem_Nobet_{parca}_{bas:%Y%m%d}-"
+    # Dosya adında kurum adı GEÇMEZ: ad e-postayla dolaşır, kuruma göre
+    # değişmemeli ve ayar değişince eski dosyalarla karışmamalı.
+    return (f"Clinorq_Nobet_{parca}_{bas:%Y%m%d}-"
             f"{(bitis_dis - timedelta(days=1)):%Y%m%d}.xlsx")
+
+
+def _kurum_birim(t: dict) -> str:
+    """Başlıktaki 'Kurum · Birim' satırı. Kurum adı ayarı boşsa yalnız birim yazılır
+    (bkz. seeds/029). Sarkık ' · ' bırakmamak için parçalar filtreleniyor."""
+    return " · ".join(x for x in (t.get("kurum", ""), t["unit_name"]) if x)
 
 
 def _yanit(kitap: Workbook, ad: str) -> StreamingResponse:
@@ -108,6 +117,11 @@ def _yanit(kitap: Workbook, ad: str) -> StreamingResponse:
 async def _yukle(draft_id: int) -> tuple[dict, dict, date, date]:
     if (t := await repo.taslak(draft_id)) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
+    # Kurum adı koda gömülü değil, ayar tablosundan gelir (seeds/029).
+    # Satır silinmişse boş kabul edilir: çıktı üretimi tek bir ayar satırı
+    # yüzünden düşmemeli, başlıktan yalnız kurum adı eksilir.
+    kurum = await ayar_repo.ayar("org_name")
+    t["kurum"] = (kurum or {}).get("value", "")
     bas: date = t["period_start"]
     bitis: date = t["period_end"]          # DIŞLAYICI
     veri = await repo.cizelge_verisi(draft_id, bas, bitis - timedelta(days=1))
@@ -131,7 +145,7 @@ def _sayfa_cizelge(ws, t: dict, gunler: list[date], veri: dict) -> None:
     son_sutun = len(gunler) + 4          # A + günler + 3 toplam sütunu
 
     # --- Başlık bloğu: kurum · birim · dönem. Taslak adı GİRMEZ (27.09) -----
-    ws["A1"] = (f"Acıbadem Kent ASG · {t['unit_name']} — "
+    ws["A1"] = (f"{_kurum_birim(t)} — "
                 f"{_donem_etiketi(gunler[0], gunler[-1])} Nöbet Çizelgesi")
     ws["A1"].font = Font(bold=True, size=14, color=BRAND)
     # Oluşturulma = taslağın kendi tarihi, dosyanın indirildiği gün değil.
@@ -344,7 +358,7 @@ async def excel_ozet(draft_id: int) -> StreamingResponse:
           k["diff_hours"] if k["diff_hours"] is not None else "—"] for k in satirlar],
         [26, 22, 12, 8, 12, 10, 10],
         f"Kişi özeti — {_donem_etiketi(bas, bitis - timedelta(days=1))}",
-        " · ".join(x for x in [f"Acıbadem Kent ASG · {t['unit_name']}",
+        " · ".join(x for x in [_kurum_birim(t),
                                rapor.hedef_notu(veri, bas, bitis)] if x),
         kirmizi_kolon=7,
     )
@@ -367,7 +381,7 @@ async def excel_eksikler(draft_id: int) -> StreamingResponse:
         or [["Bu dönemde eksik yok.", "", "", "", "", ""]],
         [16, 14, 18, 10, 10, 10],
         f"Eksikler — {_donem_etiketi(bas, bitis - timedelta(days=1))}",
-        f"Acıbadem Kent ASG · {t['unit_name']}",
+        _kurum_birim(t),
         kirmizi_kolon=6,
     )
     return _yanit(kitap, _dosya_adi("Eksikler", bas, bitis))

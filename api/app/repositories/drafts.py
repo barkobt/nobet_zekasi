@@ -31,18 +31,21 @@ SELECT d.id, d.name, d.status, d.created_at, d.published_at,
                         WHERE a.draft_id = d.id AND a.work_date = c.day))         AS shortfall_count,
        (SELECT min(a.work_date) FROM assignments a WHERE a.draft_id = d.id)       AS ilk_gun,
        (SELECT max(a.work_date) FROM assignments a WHERE a.draft_id = d.id)       AS son_gun,
-       COALESCE((SELECT sum(h.planned_hours) FROM v_assignment_hours h
+       -- NET saat: mola mesaiden sayılmaz (migration 023). Dakika toplanıp
+       -- en sonda saate çevriliyor; vardiya başına yuvarlansaydı kayma birikirdi.
+       COALESCE((SELECT round(sum(h.planned_net_minutes) / 60.0, 2)
+                   FROM v_assignment_hours h
                   WHERE h.draft_id = d.id), 0)                                    AS total_hours,
        COALESCE((SELECT sum(m.overtime_max) FROM v_monthly_hours m
                   WHERE m.draft_id = d.id), 0)                                    AS overtime_hours,
        -- Adalet farkı YALNIZ adalet havuzundan (sorumlu, oryantasyon ve dönemin
        -- tamamında sözleşmesi olmayanlar hariç). Havuz dışını katmak farkı yanlış
        -- büyütüyor; ölçüt solver/data.py → Personel.adalete_girer ile aynı.
-       COALESCE((SELECT max(m.worked_hours) - min(m.worked_hours)
+       COALESCE((SELECT max(m.net_hours) - min(m.net_hours)
                    FROM v_monthly_hours m
                    JOIN staff st ON st.id = m.staff_id
                    JOIN roles rl ON rl.id = st.role_id
-                  WHERE m.draft_id = d.id AND m.worked_hours > 0
+                  WHERE m.draft_id = d.id AND m.net_hours > 0
                     AND NOT st.is_orientation
                     AND rl.code <> 'sorumlu_hemsire'
                     AND EXISTS (SELECT 1 FROM contracts ct
