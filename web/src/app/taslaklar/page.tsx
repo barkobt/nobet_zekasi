@@ -68,7 +68,12 @@ export default function TaslaklarSayfasi() {
 
   const sil = useMutation({
     mutationFn: (id: number) => api<void>(`/drafts/${id}`, { method: "DELETE" }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["drafts"] }); setSilinecek(null); },
+    onSuccess: (_bos, id) => {
+      // Satır beklemeden düşsün; ardından liste sunucudan tazelenir.
+      qc.setQueryData<Draft[]>(["drafts"], (eski) => eski?.filter((t) => t.id !== id));
+      qc.invalidateQueries({ queryKey: ["drafts"] });
+      setSilinecek(null);
+    },
   });
 
   const kopyala = useMutation({

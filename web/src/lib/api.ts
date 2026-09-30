@@ -28,5 +28,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const govde = await res.text().catch(() => "");
     throw new Error(`API ${res.status}: ${govde || res.statusText}`);
   }
-  return res.json() as Promise<T>;
+  // 204 (taslak silme gibi) gövdesizdir. res.json() boş gövdede hata fırlatıyor,
+  // mutasyon başarısız sayılıyor ve onSuccess'teki yenileme hiç çalışmıyordu:
+  // satır sunucuda silinmiş ama ekranda F5'e kadar duruyordu.
+  const metin = await res.text();
+  return (metin ? JSON.parse(metin) : undefined) as T;
 }
