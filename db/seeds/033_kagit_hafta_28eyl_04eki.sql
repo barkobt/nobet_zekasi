@@ -40,7 +40,18 @@ UPDATE schedule_drafts
  WHERE name = 'Eylül 2026 (kağıt)'
    AND period <> daterange('2026-08-31', '2026-09-28', '[)');
 
--- 2) Haftanın taslağı
+-- 2) Bu haftayla çakışan BAŞKA yayınlar arşive (canlıda eski kurallarla çözülüp
+--    yayınlanmış bir Ekim ya da "Eylül 2026 çizelgesi" (28 Eyl–4 Eki) olabilir).
+--    ex_drafts_one_published iki yayının çakışmasına izin vermez; kağıt gerçektir,
+--    eski plan arşive gider (silinmez, açılıp tekrar uygulanabilir). Yeni Ekim
+--    taslağı çözülünce 1–4 Ekim bu haftadan kilitli alınır.
+UPDATE schedule_drafts
+   SET status = 'arsiv'
+ WHERE status = 'yayinlandi'
+   AND name <> 'Hafta 28 Eyl – 4 Eki 2026 (kağıt)'
+   AND period && daterange('2026-09-28', '2026-10-05', '[)');
+
+-- 3) Haftanın taslağı
 INSERT INTO schedule_drafts (unit_id, period, name, status, published_at)
 SELECT id, daterange('2026-09-28', '2026-10-05', '[)'),
        'Hafta 28 Eyl – 4 Eki 2026 (kağıt)', 'yayinlandi', CURRENT_TIMESTAMP
@@ -48,7 +59,7 @@ FROM units WHERE code = 'ACIL_SERVIS'
   AND NOT EXISTS (SELECT 1 FROM schedule_drafts
                    WHERE name = 'Hafta 28 Eyl – 4 Eki 2026 (kağıt)');
 
--- 3) Atamalar
+-- 4) Atamalar
 INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date, source)
 SELECT d.id, s.id, st.id, x.gun::date, 'referans'
 FROM (VALUES
@@ -130,7 +141,7 @@ JOIN staff s           ON s.full_name = x.ad
 JOIN shift_types st    ON st.code = x.vardiya
 ON CONFLICT (draft_id, staff_id, work_date) DO NOTHING;
 
--- 4) Rozetler: yeşil = GOZLEM, pembe = AMBULANS
+-- 5) Rozetler: yeşil = GOZLEM, pembe = AMBULANS
 INSERT INTO assignment_tasks (assignment_id, competency_id)
 SELECT a.id, c.id
 FROM (VALUES
@@ -171,7 +182,7 @@ JOIN assignments a  ON a.draft_id = d.id AND a.staff_id = s.id AND a.work_date =
 JOIN competencies c ON c.code = x.gorev
 ON CONFLICT DO NOTHING;
 
--- 5) Yıllık izin: Serpil Demir 28–30 Eylül. seeds/022 28–29'u yazmıştı; aralık
+-- 6) Yıllık izin: Serpil Demir 28–30 Eylül. seeds/022 28–29'u yazmıştı; aralık
 --    30 Eylül'ü de kapsayacak şekilde tek satıra genişletilir.
 DELETE FROM absences ab
 USING staff s
