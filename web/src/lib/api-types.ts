@@ -1961,11 +1961,23 @@ export interface components {
             weekend_count: number;
             /**
              * Target Hours
-             * @description Tam ay → 200, tam hafta → 50; başka dönemde null (orantı yapılmaz)
+             * @description Tam ay → 200, tam hafta → 45; başka dönemde null (orantı yapılmaz)
              */
             target_hours: number | null;
             /** Diff Hours */
             diff_hours: number | null;
+            /**
+             * Gross Hours
+             * @description Dönemin BRÜT (molalar dahil) saati — net ile aynı kapsam
+             * @default 0
+             */
+            gross_hours: number;
+            /**
+             * Overtime Hours
+             * @description Fazla mesai: haftalık brüt 51 sa üstünün toplamı (O-001)
+             * @default 0
+             */
+            overtime_hours: number;
         };
         /** PersonUpdate */
         PersonUpdate: {
@@ -3105,7 +3117,12 @@ export interface operations {
     };
     excel_api_drafts__draft_id__export_xlsx_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Kapsayıcı başlangıç */
+                from?: string | null;
+                /** @description Kapsayıcı bitiş */
+                to?: string | null;
+            };
             header?: never;
             path: {
                 draft_id: number;

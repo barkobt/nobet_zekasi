@@ -11,20 +11,24 @@ import { Button } from "@/components/ui/button";
  * alır ama istek token'sız gider.
  */
 export function ExcelDugmesi({
-  draftId, dosya = "export.xlsx", etiket = "Excel'e aktar", boyut,
+  draftId, dosya = "export.xlsx", etiket = "Excel'e aktar", boyut, aralik,
 }: {
   draftId: number;
   /** Uç nokta dosya adı: export.xlsx · export-ozet.xlsx · export-eksikler.xlsx */
   dosya?: string;
   etiket?: string;
   boyut?: "sm";
+  /** Ekranda GÖRÜNEN aralık [ilk, son] (ISO, kapsayıcı). Haftalık görünümde
+   *  Excel de o haftayı verir; verilmezse taslağın tüm dönemi. */
+  aralik?: [string, string] | null;
 }) {
   const [indiriliyor, setIndiriliyor] = useState(false);
 
   const indir = async () => {
     setIndiriliyor(true);
     try {
-      const yanit = await fetch(`/api/drafts/${draftId}/${dosya}`, { cache: "no-store" });
+      const sorgu = aralik ? `?from=${aralik[0]}&to=${aralik[1]}` : "";
+      const yanit = await fetch(`/api/drafts/${draftId}/${dosya}${sorgu}`, { cache: "no-store" });
       if (!yanit.ok) throw new Error(String(yanit.status));
 
       // Dosya adı sunucudan geliyor (RFC 5987, Türkçe karakterli)

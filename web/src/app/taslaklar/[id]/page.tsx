@@ -121,7 +121,7 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
             <DonemGezgini olcek={olcek} capa={capa} onCapa={setCapa} onOlcek={setOlcek} />
           )}
 
-          <ExcelDugmesi draftId={draftId} />
+          <ExcelDugmesi draftId={draftId} aralik={bas && son ? [bas, son] : null} />
 
           <Button onClick={() => coz.mutate()} disabled={calisiyor} className="ml-1">
             {calisiyor ? (

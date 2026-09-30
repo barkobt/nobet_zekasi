@@ -139,8 +139,34 @@ GROUP BY ab.staff_id
 _HEDEF_PARAMETRELERI = """
 SELECT p.param_key, p.param_value
 FROM constraint_params p
-WHERE p.param_key IN ('monthly_min_hours', 'weekly_reference_hours',
-                      'absence_daily_reduction_hours')
+WHERE p.param_key IN ('monthly_min_hours', 'weekly_min_net_hours',
+                      'absence_daily_reduction_hours', 'weekly_paid_gross_hours')
+"""
+
+# FAZLA MESAİ (O-001): haftalık BRÜT (molalar dahil) toplam. Hafta Pzt–Paz ve
+# PAZAR gününün düştüğü aya/aralığa yazılır: 28 Eyl–4 Eki haftası Ekim'in,
+# 26 Eki–1 Kas haftası Kasım'ın mesaisidir. Haftanın taslak dönemi dışında kalan
+# günleri YAYINLANMIŞ çizelgeden okunur (ızgaradaki dönem dışı günlerle aynı kaynak).
+_HAFTALIK_BRUT = """
+WITH d AS (SELECT id, unit_id, period FROM schedule_drafts WHERE id = %(draft_id)s),
+satirlar AS (
+    SELECT a.staff_id, a.work_date, st.gross_minutes
+    FROM assignments a
+    JOIN d ON a.draft_id = d.id AND d.period @> a.work_date
+    JOIN v_shift_types_net st ON st.id = a.shift_type_id
+    UNION ALL
+    SELECT a.staff_id, a.work_date, st.gross_minutes
+    FROM assignments a
+    JOIN schedule_drafts y ON y.id = a.draft_id AND y.status = 'yayinlandi'
+                          AND y.period @> a.work_date
+    JOIN d ON y.unit_id = d.unit_id AND y.id <> d.id AND NOT d.period @> a.work_date
+    JOIN v_shift_types_net st ON st.id = a.shift_type_id
+)
+SELECT staff_id, date_trunc('week', work_date)::date AS pzt,
+       sum(gross_minutes)::int AS brut_dk
+FROM satirlar
+WHERE date_trunc('week', work_date)::date + 6 BETWEEN %(gun_bas)s AND %(gun_son)s
+GROUP BY staff_id, date_trunc('week', work_date)
 """
 
 # Ayrılan personel: aktif değil ama bu taslakta ÇALIŞMIŞSA satırı görünmeli — kağıt
@@ -245,6 +271,9 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         await cur.execute(_IZIN_GUNLERI, {"draft_id": draft_id})
         izin_gunleri = {r["staff_id"]: int(r["gun"]) for r in await cur.fetchall()}
 
+        await cur.execute(_HAFTALIK_BRUT, p)
+        haftalik_brut = await cur.fetchall()
+
     return {
         "personel": personel,
         "atamalar": atamalar,
@@ -260,6 +289,7 @@ async def cizelge_verisi(draft_id: int, gun_bas: date, gun_son: date) -> dict:
         "hucre_istekleri": hucre_istekleri,
         "donem": donem,
         "izin_gunleri": izin_gunleri,
+        "haftalik_brut": haftalik_brut,
     }
 
 

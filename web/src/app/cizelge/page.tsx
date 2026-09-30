@@ -74,7 +74,7 @@ function Icerik() {
         </div>
 
         <div className="flex items-center gap-1">
-          {taslakId !== undefined && <ExcelDugmesi draftId={taslakId} />}
+          {taslakId !== undefined && <ExcelDugmesi draftId={taslakId} aralik={[pzt, bitis]} />}
           <DonemGezgini olcek={olcek} capa={capa} onCapa={setCapa} onOlcek={setOlcek} />
         </div>
       </div>

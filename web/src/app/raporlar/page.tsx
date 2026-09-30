@@ -21,6 +21,7 @@ type Kisi = {
   staff_id: number; full_name: string; role_name: string;
   total_hours: number; night_count: number; weekend_count: number;
   target_hours: number | null; diff_hours: number | null;
+  gross_hours: number; overtime_hours: number;
 };
 type Eksik = {
   day: string; shift_name: string; slot_name: string;
@@ -175,6 +176,8 @@ export default function RaporlarSayfasi() {
                   <Basligi<Kisi> alan="weekend_count" etiket="Hafta sonu" sirala={kisiSirala} sag />
                   <Basligi<Kisi> alan="target_hours" etiket="Hedef" sirala={kisiSirala} sag />
                   <Basligi<Kisi> alan="diff_hours" etiket="Fark" sirala={kisiSirala} sag />
+                  <Basligi<Kisi> alan="gross_hours" etiket="Brüt saat" sirala={kisiSirala} sag />
+                  <Basligi<Kisi> alan="overtime_hours" etiket="Mesai" sirala={kisiSirala} sag />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -198,6 +201,11 @@ export default function RaporlarSayfasi() {
                         ? "—"
                         : `${k.diff_hours > 0 ? "+" : ""}${sayi(k.diff_hours)}`}
                     </TableCell>
+                    {/* Brüt = molalar dahil; mesai = haftalık brüt 51 sa üstü (O-001) */}
+                    <TableCell className="text-right text-muted-foreground">
+                      {sayi(k.gross_hours ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right">{sayi(k.overtime_hours ?? 0)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

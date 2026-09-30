@@ -221,7 +221,7 @@ async def cizelge(
     # Hedef saat: orantı YOK (bkz. app/hedef.py). Tam ay → 200, tam hafta → 50,
     # başka uzunlukta hedef gösterilmez.
     tur = donem_turu(bas, bitis)
-    haftalik_ref = veri["hedefler"].get("weekly_reference_hours")
+    haftalik_ref = veri["hedefler"].get("weekly_min_net_hours")
     gunluk_dusum = veri["hedefler"].get("absence_daily_reduction_hours")
     izin_gunleri = veri["izin_gunleri"]
 

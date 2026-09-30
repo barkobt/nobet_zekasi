@@ -13,9 +13,15 @@ class PersonSummary(BaseModel):
     night_count: int
     weekend_count: int
     target_hours: float | None = Field(
-        description="Tam ay → 200, tam hafta → 50; başka dönemde null (orantı yapılmaz)"
+        description="Tam ay → 200, tam hafta → 45; başka dönemde null (orantı yapılmaz)"
     )
     diff_hours: float | None
+    gross_hours: float = Field(
+        0, description="Dönemin BRÜT (molalar dahil) saati — net ile aynı kapsam"
+    )
+    overtime_hours: float = Field(
+        0, description="Fazla mesai: haftalık brüt 51 sa üstünün toplamı (O-001)"
+    )
 
 
 class Shortfall(BaseModel):

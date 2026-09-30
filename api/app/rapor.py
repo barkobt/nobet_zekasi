@@ -19,10 +19,30 @@ SLOT_ADI = {
 }
 
 
+def haftalik_mesai(veri: dict) -> dict[int, dict]:
+    """Kişi başına fazla mesai: haftalık BRÜT 51 saatin üstü (O-001).
+
+    Maaş hesabı böyle (Edem, 30.09): molalar dahil haftalık 51 saat ücret bazı,
+    üstündeki her saat mesai. Aylık mesai = haftalık fazlaların toplamı; hafta
+    Pazar gününün düştüğü aya yazılır (sorgu: repositories/schedule._HAFTALIK_BRUT).
+    Sınır koda gömülü değil: constraint_params.weekly_paid_gross_hours.
+    """
+    sinir = veri["hedefler"].get("weekly_paid_gross_hours")
+    sonuc: dict[int, dict] = {}
+    for r in veri.get("haftalik_brut", []):
+        k = sonuc.setdefault(r["staff_id"], {"brut_dk": 0, "mesai_dk": 0, "hafta": 0})
+        k["brut_dk"] += r["brut_dk"]
+        k["hafta"] += 1
+        if sinir:
+            k["mesai_dk"] += max(0, r["brut_dk"] - int(sinir * 60))
+    return sonuc
+
+
 def kisi_ozeti(veri: dict, bas: date, bitis_dis: date) -> list[dict]:
-    """Personel × (toplam saat · gece · hafta sonu · hedef · fark)."""
+    """Personel × (toplam saat · gece · hafta sonu · hedef · fark · mesai)."""
     tur = donem_turu(bas, bitis_dis)
-    haftalik = veri["hedefler"].get("weekly_reference_hours")
+    mesai = haftalik_mesai(veri)
+    haftalik = veri["hedefler"].get("weekly_min_net_hours")
 
     aylik = {m["staff_id"]: m for m in veri["aylik"]}
     gece: dict[int, int] = {}
@@ -51,6 +71,10 @@ def kisi_ozeti(veri: dict, bas: date, bitis_dis: date) -> list[dict]:
             "weekend_count": haftasonu.get(k["id"], 0),
             "target_hours": hedef,
             "diff_hours": round(saat - hedef, 1) if hedef is not None else None,
+            # Brüt, net ile AYNI dönemden (v_monthly_hours); mesai ise haftalık
+            # hesaplanıp Pazar'ın düştüğü aya yazılır — iki sütunun kapsamı farklı.
+            "gross_hours": round(float(m["gross_hours"]), 1) if m else 0.0,
+            "overtime_hours": round(mesai.get(k["id"], {}).get("mesai_dk", 0) / 60.0, 1),
         })
     return satirlar
 
@@ -79,6 +103,6 @@ def hedef_notu(veri: dict, bas: date, bitis_dis: date) -> str | None:
     hedef = donem_hedefi(
         tur,
         float(ilk["min_hours"]) if ilk else None,
-        veri["hedefler"].get("weekly_reference_hours"),
+        veri["hedefler"].get("weekly_min_net_hours"),
     )
     return hedef_etiketi(tur, hedef)

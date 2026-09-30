@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from io import BytesIO
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
@@ -23,6 +23,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 
 from app import rapor
+from app.hedef import donem_hedefi, donem_turu
 from app.repositories import counters as ayar_repo
 from app.repositories import schedule as repo
 from app.routers.schedule import AY_ADI, GUN_ADI, VARDIYA_ETIKET
@@ -114,7 +115,10 @@ def _yanit(kitap: Workbook, ad: str) -> StreamingResponse:
     )
 
 
-async def _yukle(draft_id: int) -> tuple[dict, dict, date, date]:
+async def _yukle(draft_id: int, gun_bas: date | None = None,
+                 gun_son: date | None = None) -> tuple[dict, dict, date, date]:
+    """gun_bas/gun_son verilirse (KAPSAYICI) çıktı o aralığı kapsar — ekranda
+    haftalık görünüm seçiliyse Excel de o haftayı verir. Verilmezse taslağın dönemi."""
     if (t := await repo.taslak(draft_id)) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
     # Kurum adı koda gömülü değil, ayar tablosundan gelir (seeds/029).
@@ -124,6 +128,10 @@ async def _yukle(draft_id: int) -> tuple[dict, dict, date, date]:
     t["kurum"] = (kurum or {}).get("value", "")
     bas: date = t["period_start"]
     bitis: date = t["period_end"]          # DIŞLAYICI
+    if gun_bas is not None and gun_son is not None:
+        if gun_son < gun_bas or (gun_son - gun_bas).days > 62:
+            raise HTTPException(status_code=422, detail="Geçersiz tarih aralığı.")
+        bas, bitis = gun_bas, gun_son + timedelta(days=1)
     veri = await repo.cizelge_verisi(draft_id, bas, bitis - timedelta(days=1))
     return t, veri, bas, bitis
 
@@ -131,8 +139,12 @@ async def _yukle(draft_id: int) -> tuple[dict, dict, date, date]:
 # ---------------------------------------------------------------- çizelge ---
 
 @router.get("/drafts/{draft_id}/export.xlsx", summary="Çizelgeyi Excel'e aktar")
-async def excel(draft_id: int) -> StreamingResponse:
-    t, veri, bas, bitis = await _yukle(draft_id)
+async def excel(
+    draft_id: int,
+    gun_bas: date | None = Query(None, alias="from", description="Kapsayıcı başlangıç"),
+    gun_son: date | None = Query(None, alias="to", description="Kapsayıcı bitiş"),
+) -> StreamingResponse:
+    t, veri, bas, bitis = await _yukle(draft_id, gun_bas, gun_son)
     gunler = [bas + timedelta(days=i) for i in range((bitis - bas).days)]
 
     kitap = Workbook()
@@ -175,7 +187,12 @@ def _sayfa_cizelge(ws, t: dict, gunler: list[date], veri: dict) -> None:
         h.fill = PatternFill("solid", fgColor=ZEMIN)
         h.border = KENARLIK
 
-    atamalar = {(a["staff_id"], a["work_date"]): a for a in veri["atamalar"]}
+    # Dönem dışı günler (haftalık görünümde ay başı/sonu) YAYINLANMIŞ çizelgeden
+    # gelir — ekrandaki taralı günlerle aynı kaynak.
+    donem = veri["donem"]
+    atamalar = {(a["staff_id"], a["work_date"]): a for a in veri["dis_atamalar"]}
+    atamalar.update({(a["staff_id"], a["work_date"]): a for a in veri["atamalar"]
+                     if donem.lower <= a["work_date"] < donem.upper})
     izinler: dict[tuple[int, date], str] = {}
     for iz in veri["izinler"]:
         g = iz["period"].lower
@@ -183,7 +200,23 @@ def _sayfa_cizelge(ws, t: dict, gunler: list[date], veri: dict) -> None:
             izinler[(iz["staff_id"], g)] = iz["absence_type"]
             g += timedelta(days=1)
 
-    ozet = {k["staff_id"]: k for k in rapor.kisi_ozeti(veri, gunler[0], gunler[-1] + timedelta(days=1))}
+    # Satır sonu toplamları GÖRÜNEN günlerden: haftalık çıktıda o haftanın saati,
+    # aylıkta ayın saati. Hedef dönem türünden (ay → C-004, hafta → C-026).
+    tur = donem_turu(gunler[0], gunler[-1] + timedelta(days=1))
+    aylik_hedef = next((float(m["min_hours"]) for m in veri["aylik"] if m["min_hours"]), None)
+    hedef = donem_hedefi(tur, aylik_hedef, veri["hedefler"].get("weekly_min_net_hours"))
+    gorunen = set(gunler)
+    ozet: dict[int, dict] = {}
+    for (s_id, g), a in atamalar.items():
+        vd = veri["vardiyalar"].get(a["shift_code"])
+        if g not in gorunen or vd is None:
+            continue
+        o = ozet.setdefault(s_id, {"dk": 0, "night_count": 0})
+        o["dk"] += int(vd["net_minutes"])
+        o["night_count"] += int(bool(vd["crosses_midnight"]))
+    for o in ozet.values():
+        o["total_hours"] = round(o["dk"] / 60.0, 1)
+        o["diff_hours"] = round(o["total_hours"] - hedef, 1) if hedef is not None else None
 
     # Rol gruplarıyla — ekrandaki düzenin aynısı
     gruplar = [
@@ -352,11 +385,13 @@ async def excel_ozet(draft_id: int) -> StreamingResponse:
     ws.title = "Kişi özeti"
     _tablo_sayfasi(
         ws,
-        ["Personel", "Rol", "Toplam saat", "Gece", "Hafta sonu", "Hedef", "Fark"],
+        ["Personel", "Rol", "Toplam saat", "Gece", "Hafta sonu", "Hedef", "Fark",
+         "Brüt saat", "Mesai"],
         [[k["full_name"], k["role_name"], k["total_hours"], k["night_count"],
           k["weekend_count"], k["target_hours"] if k["target_hours"] is not None else "—",
-          k["diff_hours"] if k["diff_hours"] is not None else "—"] for k in satirlar],
-        [26, 22, 12, 8, 12, 10, 10],
+          k["diff_hours"] if k["diff_hours"] is not None else "—",
+          k["gross_hours"], k["overtime_hours"]] for k in satirlar],
+        [26, 22, 12, 8, 12, 10, 10, 11, 9],
         f"Kişi özeti — {_donem_etiketi(bas, bitis - timedelta(days=1))}",
         " · ".join(x for x in [_kurum_birim(t),
                                rapor.hedef_notu(veri, bas, bitis)] if x),
