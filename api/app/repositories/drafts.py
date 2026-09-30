@@ -306,6 +306,8 @@ WHERE d.status = 'yayinlandi'
   AND d.id <> %(yeni)s
   AND d.unit_id = (SELECT unit_id FROM schedule_drafts WHERE id = %(yeni)s)
   AND d.period && (SELECT period FROM schedule_drafts WHERE id = %(yeni)s)
+  -- Yeni taslaktan ÖNCE başlayan yayın arşive gitmez, kırpılır (bkz. yayinla).
+  AND lower(d.period) >= (SELECT lower(period) FROM schedule_drafts WHERE id = %(yeni)s)
 ORDER BY lower(d.period)
 """
 
@@ -325,8 +327,23 @@ async def yayinla(draft_id: int) -> dict | None:
     yayınlamak kısıtı ihlal etmiyor.
 
     Silmiyoruz: arşivdeki çizelge açılıp tekrar uygulanabilir — geri dönüş yolu bu.
+
+    KIRPMA (30.09): yeni taslaktan ÖNCE başlayan yayın (ör. kağıt hafta 28.09–04.10,
+    Ekim yayınlanırken) arşive gitmez; dönemi yeni taslağın başlangıcında biter.
+    Böylece 28–30 Eylül yayında kalır. Çakışan 1–4 Ekim zaten Ekim taslağının
+    içindedir (solver her koşuda o günleri yayından kilitli kopyalar).
     """
     async with cursor() as cur:
+        await cur.execute(
+            """UPDATE schedule_drafts d
+                  SET period = daterange(lower(d.period), lower(y.period), '[)')
+                 FROM schedule_drafts y
+                WHERE y.id = %(yeni)s
+                  AND d.status = 'yayinlandi' AND d.id <> y.id AND d.unit_id = y.unit_id
+                  AND d.period && y.period
+                  AND lower(d.period) < lower(y.period)""",
+            {"yeni": draft_id},
+        )
         await cur.execute(
             """UPDATE schedule_drafts d
                   SET status = 'arsiv'

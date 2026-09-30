@@ -106,8 +106,9 @@ class Vardiya:
     kod: str
     ad: str
     baslangic: time
-    sure_dk: int
+    sure_dk: int                           # NET (mola hariç)
     gece_mi: bool                          # crosses_midnight
+    brut_dk: int = 0                       # BRÜT (mola dahil) — fazla mesai hesabı
     sadece_rol: str | None = None          # None = herkese açık
     sadece_hafta_gunleri: frozenset[int] | None = None   # None = her gün
 
@@ -193,6 +194,11 @@ class SabitAtama:
     vardiya_kodu: str
     kaynak: str
     kilitli: bool
+    # Vardiyanın kendi süresi: pasif vardiyalar (GECE_0100) işlenmiş günlerde
+    # kilitli satır olarak gelebilir ve v.vardiyalar'da (yalnız aktifler) yoktur.
+    gece_mi: bool = False
+    sure_dk: int = 0
+    brut_dk: int = 0
 
 
 @dataclass(frozen=True)
@@ -220,6 +226,7 @@ class GecmisAtama:
     gece_mi: bool
     sure_dk: int
     kaynak: str                   # 'yayinlandi' | 'onceki_ay'
+    brut_dk: int = 0
 
 
 @dataclass(frozen=True)
@@ -242,6 +249,15 @@ class SolverVerisi:
     uyumsuz_ciftler: tuple[tuple[int, int], ...]
     gecmis: tuple[GecmisAtama, ...]
     ay_basi_saatler_dk: Mapping[int, int]      # personel_id → dönemden önce, AYNI ayda
+    # İŞLENMİŞ GÜNLER: dönem içinde olup başka bir YAYINLANMIŞ çizelgenin kapsadığı
+    # günler (ör. Ekim taslağında kağıt haftadan gelen 1–4 Ekim). O günler
+    # gerçekleşmiştir: satırları taslağa kilitli kopyalanır, solver değişken açmaz.
+    islenmis_gunler: frozenset[date] = frozenset()
+    # Geçmiş penceresinde (dönemden önceki 7 gün) YAYINLANMIŞ bir çizelgenin
+    # kapsadığı günler. Haftalık kurallar (C-025–C-028) yalnız bunları "bilinen"
+    # sayar: önceki ay yayınlanmamışsa 26–31 Ekim boş değil BİLİNMİYORDUR ve
+    # "6 gün izin" gibi okunmamalı.
+    gecmis_bilinen_gunler: frozenset[date] = frozenset()
 
     def kisi(self, personel_id: int) -> Personel:
         return next(p for p in self.personel if p.id == personel_id)
@@ -267,6 +283,7 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
             taslak = _taslak(cur, draft_id)
             kurallar = _kurallar(cur)
             kesin, tercih = _istekler(cur, draft_id)
+            islenmis = _islenmis_gunler(cur, draft_id)
             return SolverVerisi(
                 draft_id=draft_id,
                 taslak_adi=taslak["name"],
@@ -281,11 +298,13 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
                 mevcut_atamalar=_mevcut_atamalar(cur, draft_id),
                 kesin_istekler=kesin,
                 tercih_istekler=tercih,
-                ihtiyaclar=_ihtiyaclar(cur, draft_id),
+                ihtiyaclar=_ihtiyaclar(cur, draft_id, islenmis),
                 kurallar=kurallar,
                 uyumsuz_ciftler=_uyumsuz_ciftler(cur),
                 gecmis=_gecmis(cur, draft_id),
                 ay_basi_saatler_dk=_ay_basi_saatler(cur, draft_id),
+                islenmis_gunler=islenmis,
+                gecmis_bilinen_gunler=_gecmis_bilinen_gunler(cur, draft_id),
             )
 
 
@@ -302,6 +321,52 @@ def _taslak(cur, draft_id: int) -> dict:
     if (satir := cur.fetchone()) is None:
         raise ValueError(f"{draft_id} numaralı taslak yok")
     return satir
+
+
+def _islenmis_gunler(cur, draft_id: int) -> frozenset[date]:
+    """Dönem içinde, aynı birimin BAŞKA bir yayınlanmış çizelgesinin kapsadığı günler.
+
+    "Yayınlanmış = işlenmiş" (Baran, 30.09): kağıt hafta 28.09–04.10 yayındaysa
+    Ekim taslağı 1–4 Ekim'i yeniden planlamaz, oradan devam eder.
+
+    YALNIZ bu taslaktan ÖNCE BAŞLAYAN yayınlar: onların taşan günleri geçmişin
+    devamıdır. Aynı günde ya da sonra başlayan yayın bu taslağın YERİNE geçeceği
+    şeydir — "yayındakini değiştirmek için kopyala → çöz" akışında kopyanın
+    bütün günleri kilitlenir ve hiçbir şey çözülemezdi.
+    """
+    cur.execute(
+        """
+        SELECT DISTINCT gs::date AS gun
+        FROM schedule_drafts d
+        JOIN schedule_drafts y ON y.unit_id = d.unit_id AND y.id <> d.id
+                              AND y.status = 'yayinlandi' AND y.period && d.period
+                              AND lower(y.period) < lower(d.period)
+        CROSS JOIN LATERAL generate_series(
+                 GREATEST(lower(y.period), lower(d.period)),
+                 LEAST(upper(y.period), upper(d.period)) - 1,
+                 INTERVAL '1 day') gs
+        WHERE d.id = %s
+        """,
+        (draft_id,),
+    )
+    return frozenset(r["gun"] for r in cur.fetchall())
+
+
+def _gecmis_bilinen_gunler(cur, draft_id: int) -> frozenset[date]:
+    """Dönemden önceki 7 günden yayınlanmış bir çizelgenin kapsadıkları."""
+    cur.execute(
+        """
+        SELECT DISTINCT gs::date AS gun
+        FROM schedule_drafts d
+        CROSS JOIN LATERAL generate_series(lower(d.period) - 7, lower(d.period) - 1,
+                                           INTERVAL '1 day') gs
+        JOIN schedule_drafts y ON y.unit_id = d.unit_id AND y.id <> d.id
+                              AND y.status = 'yayinlandi' AND y.period @> gs::date
+        WHERE d.id = %s
+        """,
+        (draft_id,),
+    )
+    return frozenset(r["gun"] for r in cur.fetchall())
 
 
 def _gunler(cur, draft_id: int) -> tuple[date, ...]:
@@ -512,7 +577,7 @@ def _vardiyalar(cur, unit_id: int) -> tuple[Vardiya, ...]:
     # is_active = FALSE olanlar (24 saatlik vardiyalar, C-018) dışarıda kalır.
     cur.execute(
         """
-        SELECT id, code, name, start_time, net_minutes, crosses_midnight
+        SELECT id, code, name, start_time, net_minutes, gross_minutes, crosses_midnight
         FROM v_shift_types_net
         WHERE unit_id = %s AND is_active
         ORDER BY start_time, net_minutes
@@ -530,6 +595,7 @@ def _vardiyalar(cur, unit_id: int) -> tuple[Vardiya, ...]:
                 baslangic=r["start_time"],
                 sure_dk=r["net_minutes"],
                 gece_mi=r["crosses_midnight"],
+                brut_dk=r["gross_minutes"],
                 sadece_rol=rol,
                 sadece_hafta_gunleri=gunler,
             )
@@ -572,10 +638,11 @@ def _sabit_atamalar(cur, draft_id: int) -> tuple[SabitAtama, ...]:
     """Dönem içindeki dokunulmaz satırlar: elle yazılmış ya da kilitlenmiş olanlar."""
     cur.execute(
         """
-        SELECT a.staff_id, a.work_date, st.code AS vardiya_kodu, a.source, a.is_locked
+        SELECT a.staff_id, a.work_date, st.code AS vardiya_kodu, a.source, a.is_locked,
+               st.crosses_midnight, st.net_minutes, st.gross_minutes
         FROM assignments a
-        JOIN schedule_drafts d ON d.id = a.draft_id
-        JOIN shift_types st    ON st.id = a.shift_type_id
+        JOIN schedule_drafts d   ON d.id = a.draft_id
+        JOIN v_shift_types_net st ON st.id = a.shift_type_id
         WHERE a.draft_id = %s
           AND d.period @> a.work_date
           AND (a.source = 'manuel' OR a.is_locked)
@@ -590,6 +657,9 @@ def _sabit_atamalar(cur, draft_id: int) -> tuple[SabitAtama, ...]:
             vardiya_kodu=r["vardiya_kodu"],
             kaynak=r["source"],
             kilitli=r["is_locked"],
+            gece_mi=r["crosses_midnight"],
+            sure_dk=r["net_minutes"],
+            brut_dk=r["gross_minutes"],
         )
         for r in cur.fetchall()
     )
@@ -647,7 +717,8 @@ def _istekler(cur, draft_id: int) -> tuple[tuple[Istek, ...], tuple[Istek, ...]]
     return kesin, tercih
 
 
-def _ihtiyaclar(cur, draft_id: int) -> tuple[IhtiyacSatiri, ...]:
+def _ihtiyaclar(cur, draft_id: int,
+                islenmis: frozenset[date] = frozenset()) -> tuple[IhtiyacSatiri, ...]:
     # Şablon dönem ortasında değişebilir (need_periods). Bu yüzden satırı "hangi
     # günlerde geçerli" listesiyle birlikte okuyoruz: aynı satır, kendi gün kümesiyle.
     cur.execute(
@@ -700,9 +771,12 @@ def _ihtiyaclar(cur, draft_id: int) -> tuple[IhtiyacSatiri, ...]:
             # Kural bağlı değilse hard kabul edilir (sözleşme §5: NULL = hard, ağırlıksız)
             hard_mi=True if r["is_hard"] is None else r["is_hard"],
             agirlik=r["default_weight"],
-            gunler=tuple(r["gunler"]),
+            # İşlenmiş günler kapsama sorusunun DIŞINDA: o günler gerçekleşti,
+            # eksikleri solver'ın kapatabileceği bir açık değil.
+            gunler=tuple(g for g in r["gunler"] if g not in islenmis),
         )
         for r in satirlar
+        if any(g not in islenmis for g in r["gunler"])
     )
 
 
@@ -733,7 +807,7 @@ def _gecmis_pencere(cur, draft_id: int) -> list[dict]:
         ham AS (
             -- 1) Aynı taslağın bağlam satırları
             SELECT a.staff_id, a.work_date, st.code AS vardiya_kodu,
-                   st.crosses_midnight, st.net_minutes, 'onceki_ay' AS kaynak
+                   st.crosses_midnight, st.net_minutes, st.gross_minutes, 'onceki_ay' AS kaynak
             FROM assignments a
             JOIN v_shift_types_net st ON st.id = a.shift_type_id
             JOIN d ON d.id = a.draft_id
@@ -743,7 +817,7 @@ def _gecmis_pencere(cur, draft_id: int) -> list[dict]:
 
             -- 2) Yayınlanmış başka taslakların KENDİ dönemine düşen günleri
             SELECT a.staff_id, a.work_date, st.code,
-                   st.crosses_midnight, st.net_minutes, 'yayinlandi'
+                   st.crosses_midnight, st.net_minutes, st.gross_minutes, 'yayinlandi'
             FROM assignments a
             JOIN schedule_drafts y ON y.id = a.draft_id
                                   AND y.status = 'yayinlandi'
@@ -753,7 +827,8 @@ def _gecmis_pencere(cur, draft_id: int) -> list[dict]:
             JOIN pencere p ON a.work_date >= p.bas AND a.work_date < p.bit
         )
         SELECT DISTINCT ON (staff_id, work_date)
-               staff_id, work_date, vardiya_kodu, crosses_midnight, net_minutes, kaynak
+               staff_id, work_date, vardiya_kodu, crosses_midnight, net_minutes,
+               gross_minutes, kaynak
         FROM ham
         ORDER BY staff_id, work_date,
                  CASE kaynak WHEN 'yayinlandi' THEN 0 ELSE 1 END
@@ -778,6 +853,7 @@ def _gecmis(cur, draft_id: int) -> tuple[GecmisAtama, ...]:
             gece_mi=r["crosses_midnight"],
             sure_dk=r["net_minutes"],
             kaynak=r["kaynak"],
+            brut_dk=r["gross_minutes"],
         )
         for r in _gecmis_pencere(cur, draft_id)
         if r["work_date"] >= esik

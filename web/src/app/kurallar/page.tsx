@@ -186,9 +186,9 @@ function Satir({ kural }: { kural: Constraint }) {
               key={p.id}
               etiket={p.description ?? p.param_key}
               deger={p.param_value}
-              // Kural kilitliyse parametresi de kilitli: sunucu 403 döndürüyor,
-              // arayüz de düzenlenebilir göstermemeli.
-              kilitli={kural.locked}
+              // Yasal kural esnek yapılamaz ama sayısı düzenlenebilir (30.09):
+              // başka bir kurum başka bir yasal süreyle çalışabilir.
+              kilitli={false}
               onKaydet={(d) => paramGuncelle.mutate({ id: p.id, deger: d })}
             />
           ))}

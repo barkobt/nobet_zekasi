@@ -38,6 +38,7 @@ SORUMLU_ROL = "sorumlu_hemsire"
 KATI_KURALLAR = frozenset({
     "A-1", "A-2", "A-3", "A-4", "A-5", "A-6", "A-7",
     "C-002", "C-014", "C-021", "C-016", "C-020", "C-023", "C-024",
+    "C-025", "C-026", "C-027", "C-028",
     "D-3", "D-8", "D-9", "D-11",
 })
 
@@ -113,7 +114,10 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
 
     ilk = v.donem_bas - timedelta(days=GECMIS_GUN)
     tum_gunler = [ilk + timedelta(days=i) for i in range((v.gunler[-1] - ilk).days + 1)]
-    donem = set(v.gunler)
+    # İşlenmiş günler (başka yayından kilitli gelen) yargılanmaz: gerçekleşmiş
+    # çizelgedir, solver'ın ürünü değil. Pencere korumaları yalnız KARAR verilen
+    # günlere bakar — model.py'deki serbest_donem ile aynı tanım.
+    donem = set(v.gunler) - v.islenmis_gunler
     ihlaller: list[Ihlal] = []
 
     # Merve kuralı: sadece gündüz çalışan birinin O GÜNE ait SADECE_GECE isteği
@@ -206,7 +210,7 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
             haftalar[pzt] = [pzt + timedelta(days=i) for i in range(7)
                              if (pzt + timedelta(days=i)) in bilinen]
     for pzt, gunler in sorted(haftalar.items()):
-        if len(gunler) < C016_ASGARI_BILINEN_GUN:
+        if len(gunler) < C016_ASGARI_BILINEN_GUN or not any(g in donem for g in gunler):
             continue
         tam_hafta = len(gunler) == 7
         for p in v.personel:
@@ -238,8 +242,149 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
                                           f"{kod} vardiyasında eşi ({ad[o.buddy_id]}) yok"))
 
     ihlaller += _izin_deseni_kontrolleri(v, calisiyor, donem_plan, ihlal_disi_gunler(v))
+    ihlaller += _calisma_suresi_kontrolleri(v, tam_plan, tum_gunler, donem)
     ihlaller += _gorev_kontrolleri(v, atamalar, kisi, ad)
 
+    # İşlenmiş günlerin bulguları düşer; haftalık bulgular zaten yalnız karar
+    # verilen günü olan haftalarda üretiliyor.
+    ihlaller = [i for i in ihlaller if i.gun is None or i.gun not in v.islenmis_gunler]
+
+    # E-03'te ESNEK yapılmış bir kuralın ihlali model hatası değildir: ceza
+    # ödenerek bilerek bozulmuştur. Seviyesi kuralın o anki ayarından gelir.
+    esnek = {k.katalog_kodu for k in v.kurallar.values() if k.katalog_kodu and not k.hard_mi}
+    return [
+        Ihlal(i.kod, i.kural, i.personel, i.gun, i.aciklama, seviye_ustu="gevsek")
+        if i.kod in esnek and i.seviye_ustu is None else i
+        for i in ihlaller
+    ]
+
+
+def _calisma_suresi_kontrolleri(v: SolverVerisi, tam_plan, tum_gunler: list[date],
+                                donem: set[date]) -> list[Ihlal]:
+    """C-025 karma hafta · C-026 haftalık 45 sa · C-027 aylık 180 sa · C-028 çalışma günü.
+
+    model.py ile KOD PAYLAŞMAZ (bkz. modül başı): hafta, kişi ve orantı kuralları
+    burada yeniden yazıldı. Sayılar veritabanından (seeds/034).
+    """
+    ihlaller: list[Ihlal] = []
+    vardiya = {s.kod: s for s in v.vardiyalar}
+    sure: dict[tuple[int, date], int] = {}
+    gece_mi: dict[tuple[int, date], bool] = {}
+    for a in v.gecmis:
+        sure[a.personel_id, a.gun] = a.sure_dk
+        gece_mi[a.personel_id, a.gun] = a.gece_mi
+    for sa in v.sabit_atamalar:
+        sure[sa.personel_id, sa.gun] = sa.sure_dk
+        gece_mi[sa.personel_id, sa.gun] = sa.gece_mi
+    for (p_id, g), kodlar in tam_plan.items():
+        if (p_id, g) not in sure and kodlar and kodlar[0] in vardiya:
+            sure[p_id, g] = vardiya[kodlar[0]].sure_dk
+            gece_mi[p_id, g] = vardiya[kodlar[0]].gece_mi
+
+    yok = {(y.personel_id, y.gun) for y in v.yokluklar}
+    bos = {(i.personel_id, i.gun) for i in v.kesin_istekler if i.tur == "BOS_GUN"}
+    kisiler = [p for p in v.personel if not p.sabit_programli and not p.oryantasyonda]
+    bilinen = set(v.gunler) | v.gecmis_bilinen_gunler
+
+    haftalar: dict[date, list[date]] = {}
+    for g in v.gunler:
+        pzt = g - timedelta(days=g.weekday())
+        haftalar.setdefault(pzt, [pzt + timedelta(days=i) for i in range(7)
+                                  if pzt + timedelta(days=i) in bilinen])
+    haftalar = {pzt: gs for pzt, gs in haftalar.items()
+                if len(gs) >= C016_ASGARI_BILINEN_GUN and any(g in donem for g in gs)}
+
+    def sozlesmeli(p, gunler) -> bool:
+        return all(g in p.calisabilir_gunler for g in gunler if g in v.gunler)
+
+    son_gun = v.gunler[-1]
+    c14 = v.kural("C-014")
+    n14 = int(c14.parametreler["rest_trigger_nights"]) if c14 else 0
+
+    def bilinmeyen(gunler) -> tuple[int, int]:
+        pzt = gunler[0] - timedelta(days=gunler[0].weekday())
+        sonra = sum(1 for i in range(7) if pzt + timedelta(days=i) > son_gun)
+        return 7 - len(gunler) - sonra, sonra
+
+    def ertesi_bos(p_id: int) -> int:
+        """Ay son n günü gece → gelecek ayın ilk günü C-014 gereği boş."""
+        if n14 <= 0:
+            return 0
+        return int(all(gece_mi.get((p_id, son_gun - timedelta(days=i)), False)
+                       for i in range(n14)))
+
+    def etiket(gunler) -> str:
+        return f"{gunler[0]:%d.%m}–{gunler[-1]:%d.%m} haftası"
+
+    k25, k26, k27, k28 = (v.kural(c) for c in ("C-025", "C-026", "C-027", "C-028"))
+    for pzt, gunler in sorted(haftalar.items()):
+        for p in kisiler:
+            if not sozlesmeli(p, gunler):
+                continue
+            calisilan = [g for g in gunler if (p.id, g) in sure]
+
+            if k25 and p.uygunluk == "gunduz_gece" and not any((p.id, g) in yok for g in gunler):
+                g_var = any(not gece_mi[p.id, g] for g in calisilan)
+                n_var = any(gece_mi[p.id, g] for g in calisilan)
+                if calisilan and not (g_var and n_var):
+                    ihlaller.append(Ihlal(
+                        "C-025", "Karma hafta", p.ad, pzt,
+                        f"{etiket(gunler)} {'yalnız gece' if n_var else 'yalnız gündüz'}"
+                        f" ({len(calisilan)} vardiya)"))
+
+            once, sonra = bilinmeyen(gunler)
+            if k26:
+                hedef = int(k26.parametreler["weekly_min_net_hours"] * 60)
+                kredi = int(k26.parametreler.get("absence_daily_credit_hours", 0) * 60)
+                gun_dk = min((vd.sure_dk for vd in v.vardiyalar if vd.sadece_rol is None),
+                             default=0)
+                izinli = sum(1 for g in gunler if (p.id, g) in yok)
+                # Ay sonu: tam hedef, gelecek günler birer gündüz sayılır (model.py).
+                gerek = hedef * (7 - once) // 7 - izinli * kredi - sonra * gun_dk
+                net = sum(sure[p.id, g] for g in calisilan)
+                if sonra:
+                    net -= gun_dk * ertesi_bos(p.id)
+                if gerek > 0 and net < gerek:
+                    # Kesin izin istekleri haftayı imkânsız kıldıysa solver kuralı
+                    # kurmaz (model.py); bu durumda bulgu uyarıdır, model hatası değil.
+                    kesinli = any((p.id, g) in bos for g in gunler)
+                    ihlaller.append(Ihlal(
+                        "C-026", "Haftalık yasal asgari saat", p.ad, pzt,
+                        f"{etiket(gunler)}: net {net // 60} sa {net % 60} dk"
+                        f" (gereken {gerek // 60} sa {gerek % 60} dk)",
+                        seviye_ustu="uyari" if kesinli else None))
+
+            if k28:
+                en_az_is = int(k28.parametreler.get("min_weekly_work_days", 0))
+                en_fazla_izin = int(k28.parametreler.get("max_weekly_off_days", 7))
+                serbest = [g for g in gunler if (p.id, g) not in yok and (p.id, g) not in bos]
+                disi = len(gunler) - len(serbest)
+                is_gunu = sum(1 for g in serbest if (p.id, g) in sure)
+                if sonra:
+                    is_gunu -= ertesi_bos(p.id)
+                gerek = max(len(serbest) - en_fazla_izin, en_az_is - disi - once - sonra)
+                if is_gunu < gerek:
+                    ihlaller.append(Ihlal(
+                        "C-028", "Haftalık çalışma günü", p.ad, pzt,
+                        f"{etiket(gunler)}: {is_gunu} gün çalışma,"
+                        f" {len(serbest) - is_gunu} gün izin"))
+
+    bas, son = v.gunler[0], v.gunler[-1]
+    if k27 and bas.day == 1 and (son + timedelta(days=1)).day == 1:
+        asgari = int(k27.parametreler["monthly_legal_min_net_hours"] * 60)
+        c4 = v.kural("C-004")
+        dusum = int(c4.parametreler.get("absence_daily_reduction_hours", 0) * 60) if c4 else 0
+        for p in v.personel:
+            if not p.adalete_girer:
+                continue
+            izinli = sum(1 for y in v.yokluklar if y.personel_id == p.id)
+            gerek = asgari - izinli * dusum
+            net = (sum(sure.get((p.id, g), 0) for g in v.gunler)
+                   + v.ay_basi_saatler_dk.get(p.id, 0))
+            if net < gerek:
+                ihlaller.append(Ihlal(
+                    "C-027", "Aylık yasal asgari saat", p.ad, None,
+                    f"net {net // 60} sa {net % 60} dk (gereken {gerek // 60} sa)"))
     return ihlaller
 
 
@@ -306,25 +451,6 @@ def _izin_deseni_kontrolleri(v: SolverVerisi, calisiyor, donem_plan,
                         "C-024", "Ardışık izin sınırı", p.ad, g,
                         f"{sinir + 1} gün üst üste boş ({g - timedelta(days=sinir):%d.%m}"
                         f"–{g:%d.%m})"))
-
-    # ---- C-025: karma hafta (yumuşak — uyarı seviyesinde sayılır) ----
-    if v.kural("C-025") is not None:
-        gece_kod = {vd.kod for vd in v.vardiyalar if vd.gece_mi}
-        for gunler in tam_haftalar:
-            for p in v.personel:
-                if p.uygunluk != "gunduz_gece":
-                    continue
-                kodlar = [k for g in gunler for k in donem_plan.get((p.id, g), [])]
-                if not kodlar:
-                    continue
-                g_var = any(k not in gece_kod for k in kodlar)
-                n_var = any(k in gece_kod for k in kodlar)
-                if not (g_var and n_var):
-                    tip = "yalnız gece" if n_var else "yalnız gündüz"
-                    ihlaller.append(Ihlal(
-                        "C-025", "Karma hafta", p.ad, gunler[0],
-                        f"{gunler[0]:%d.%m}–{gunler[-1]:%d.%m} haftası {tip}"
-                        f" ({len(kodlar)} vardiya, {7 - len(kodlar)} boş gün)"))
 
     # ---- A-6: izin günü penceresi (OFF_OLABILIR) ----
     # Yarım haftalar DAHİL (model.py ile aynı kapsam): "hafta içi izin yapma"
@@ -532,7 +658,8 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
 
 
 KURAL_SIRASI = ["A-1", "A-2", "A-3", "A-4", "A-5", "A-6", "A-7",
-                "C-002", "C-014", "C-021", "C-016", "C-023", "C-024", "C-025", "C-020",
+                "C-002", "C-014", "C-021", "C-016", "C-023", "C-024", "C-025",
+                "C-026", "C-027", "C-028", "C-020",
                 "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9", "D-11"]
 KURAL_ADI = {
     "A-1": "Günde en fazla 1 vardiya",
@@ -549,6 +676,9 @@ KURAL_ADI = {
     "C-023": "Gündüzcü haftada TAM 1 gün izin",
     "C-024": "Üst üste en fazla 2 izinsiz boş gün",
     "C-025": "Karma hafta (gündüz+gece personelde tek tip hafta)",
+    "C-026": "Haftalık yasal asgari NET saat (45)",
+    "C-027": "Aylık yasal asgari NET saat (180)",
+    "C-028": "Haftada en az 5 gün çalışma, en fazla 2 izin",
     "C-020": "Oryantasyon eşiyle aynı gün aynı vardiyada",
     "D-1": "C-011 · triyajda en az 3 kişi",
     "D-2": "C-010 · gözlemde en az 2 kişi",

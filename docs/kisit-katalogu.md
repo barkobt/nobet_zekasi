@@ -139,7 +139,7 @@ fazlasıyla kapanıyor. **Karar hastanede.**
 |---|---|---|---|
 | C-023 | Hard | Hafta | Sadece gündüz çalışan personel haftada **tam 1 gün** izin yapar (6 gün çalışır). 2 ya da 3 değil. |
 | C-024 | Hard | Kişi | Üst üste en fazla **2** izinsiz boş gün. 3+ gün blok kullanılmaz. |
-| C-025 | **Soft** (800) | Hafta | Gündüz+gece çalışabilen personelin her tam haftasında en az 1 gündüz **ve** en az 1 gece bulunur. |
+| C-025 | **Hard** (30.09'dan beri; önce soft 800) | Hafta | Gündüz+gece çalışabilen personelin her haftasında en az 1 gündüz **ve** en az 1 gece bulunur. İzinli/raporlu hafta ve oryantasyondakiler muaf. |
 
 Hafta **Pazartesi–Pazar takvim haftası** (Edem teyidi), kayan 7 gün değil. İkisi de
 yalnız dönemin içinde TAMAMEN kalan haftalara uygulanır: ay başı/sonundaki yarım
@@ -147,6 +147,51 @@ haftada "tam 1 izin" kaçınılmaz bir ihlal üretirdi.
 
 **İstisna:** yıllık izin, rapor ve planlayıcının girdiği KESIN boş gün istekleri
 her iki kuralın da dışındadır — bloğu uzatabilirler (Edem).
+
+### Çalışma süresi ve mesai (30.09, `seeds/034`)
+
+Edem + Baran kararları. Sayıların hepsi E-03'ten düzenlenir.
+
+| Kod | Tip | Kapsam | Kural |
+|---|---|---|---|
+| C-026 | Hard · **yasal** | Hafta | Haftalık NET (mola hariç) çalışma **en az 45 sa**. İzin/rapor günü 7,5 sa sayılır. Ay sonu yarım haftada orantılı (45 × gün/7). |
+| C-027 | Hard · **yasal** | Ay | Aylık NET çalışma **en az 180 sa** (tam takvim ayı). C-004'ün 200 sa'lik **hedefi** ayrı kalır. |
+| C-028 | Hard | Hafta | Haftada **en az 5 gün** çalışma, **en fazla 2 gün** izin. İzin/rapor/kesin istek günleri sayılmaz. 2 gün üst üste izin serbest. |
+| O-001 | Soft (200) | Hafta | **Fazla mesai = haftalık BRÜT 51 sa üstü** (51 × 4 = aylık 204). Hafta Pazar'ın düştüğü aya yazılır. Raporlar ekranında "Mesai" sütunu. |
+| O-009 | Soft (2.000) | Gün | Asgarinin üstündeki fazla kadro günlere eşit dağılır (en kalabalık − en seyrek gün). |
+| ~~C-003~~ | kaldırıldı | — | Haftalık 50 sa referansı; yerini C-026 ve O-001 aldı. |
+
+- **Yasal kural esnek yapılamaz ama sayısı düzenlenebilir** (başka kurum, başka yasal süre).
+- **Zorunlu/esnek düğmesi artık her kuralda işler** (`solver/model.py → _KuralUygulayici`).
+  Önceden esnek bir kuralı zorunlu yapmak ağırlığını boşaltıp kuralı sessizce devre dışı
+  bırakıyordu; zorunlu kuralları esnek yapmak ise hiçbir şey değiştirmiyordu.
+- C-025–C-028 geçmişe ve işlenmiş günlere baktığı için **acil gevşemeli** katıdır: geçmiş
+  kuralı zaten bozmuşsa ya da kesin istekler haftayı imkânsız kılıyorsa model çözümsüz
+  kalmaz, çok yüksek cezayla (ACIL_CEZA) gevşer ve kontrolcü bunu `hata` olarak yazar.
+- **Bilinen gün:** dönem içi ya da yayınlanmış bir çizelgenin kapsadığı geçmiş gün.
+  Önceki ay yayınlanmamışsa o günler "boş" değil **bilinmiyor** sayılır.
+
+Gündüz+gece hafta kombinasyonları (gündüz net 8 sa 10 dk / brüt 9,5 · gece net 11 / brüt 14,5):
+
+| Hafta | Net | 45 sa | Brüt | Mesai |
+|---|---|---|---|---|
+| 1N + 4G | 43,7 | ✗ | — | — |
+| 2N + 3G | 46,5 | ✓ | 57,5 | 6,5 |
+| 3N + 2G | 49,3 | ✓ | 62,5 | 11,5 |
+| Gündüzcü 6G | 49,0 | ✓ | 57,0 | 6 |
+
+### İşlenmiş günler (30.09)
+
+Yayınlanmış çizelge **işlenmiştir**. Bir taslağın dönemi başka bir yayınla çakışıyorsa
+(ör. Ekim taslağı ↔ kağıt hafta 28.09–04.10) çakışan günler her çözümde yayından taslağa
+**kilitli** kopyalanır (`source='referans'`, `is_locked`), solver o günlerde değişken
+açmaz, haftalık kurallar o günleri sabit sayıp haftanın kalanını kurar. Kontrolcü işlenmiş
+günleri yargılamaz. Taslak yayınlanınca eski yayın arşive gider; günler taslağın içinde
+olduğu için hiçbiri kaybolmaz. Hafta hafta ya da ay ay çalışmak aynı sonucu verir.
+
+**C-020 değişikliği:** oryantasyondakinin eşini "gölgelemesi" artık cezalı (100.000),
+katı değil. Oryantasyondaki dinlenme kuralı yüzünden çalışamadığı gün eşi tek başına
+çalışabilir; "eşsiz çalışmaz" yönü katı kalır.
 
 #### C-025 neden gerekti (29.09)
 

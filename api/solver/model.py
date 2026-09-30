@@ -11,7 +11,7 @@ Adım 3'ün eklediği KATI kurallar — parametreleri veritabanından okunur:
   C-016  her Pzt–Paz haftasında en az 1 boş gün
   C-023  gündüzcü haftada TAM 1 gün izin yapar
   C-024  üst üste en fazla 2 izinsiz boş gün
-  C-025  karma hafta: gündüz+gece personelde haftada en az 1 gündüz + 1 gece (yumuşak)
+  C-025  karma hafta: gündüz+gece personelde haftada en az 1 gündüz + 1 gece
   C-020  oryantasyondaki kişi eşiyle (buddy) aynı gün aynı vardiyada
 
 Geçmiş 7 gün dört zaman kuralının da penceresine girer: dönem öncesi günlerde
@@ -30,7 +30,19 @@ Adım 5'in eklediği YUMUŞAK kurallar — ağırlıkları VERİTABANINDAN gelir
 (constraints.default_weight), kodda gizli çarpan yoktur:
   C-004  aylık en az 200 saat (izin günü başına düşülerek) — çok yüksek cezalı
   O-002  saat adaleti · O-003 gece · O-004 hafta sonu · O-005 ambulans
-  O-001  fazla mesai · C-003 haftalık 50 saat referansı
+  O-001  fazla mesai (haftalık BRÜT 51 sa üstü) · O-009 günlük mevcut dengesi
+
+30.09 eklenenleri (seeds/034) — çalışma süresi:
+  C-026  haftalık yasal asgari NET 45 sa · C-027 aylık yasal asgari NET 180 sa
+  C-028  haftada en az 5 gün çalışma, en fazla 2 gün izin
+
+ZORUNLU / ESNEK DÜĞMESİ (E-03) HER KURALDA İŞLER: kural `is_hard` ise kısıt,
+değilse ağırlığıyla cezalı tercih (bkz. _KuralUygulayici). Eskiden zorunlu yapılan
+esnek kural ağırlığı boşaldığı için SESSİZCE devre dışı kalıyordu.
+
+İŞLENMİŞ GÜNLER: dönem içinde başka bir yayınlanmış çizelgenin kapsadığı günler
+(ör. kağıt haftadan gelen 1–4 Ekim) taslağa kilitli kopyalanır, değişken açılmaz;
+haftalık kurallar o günleri sabit değer olarak görür ve kalan günleri ona göre kurar.
 
 BİRİM ÖLÇEĞİ burada, veritabanında değil: ağırlıklar "yarım saat başına ceza"
 anlamındadır, gece/hafta sonu sayıları vardiya süresiyle çarpılarak yarım saate
@@ -132,10 +144,26 @@ C016_ASGARI_BILINEN_GUN = 4
 # Geçmişe bakış penceresi (gün). En uzun geri bakış C-016'nın haftasıdır.
 GECMIS_GUN = 7
 
+# KATI kuralın ACİL gevşemesi. Yeni haftalık kurallar (C-025–C-028) geçmişe ve
+# işlenmiş günlere bakıyor; geçmiş zaten kuralı bozmuşsa ya da kesin izin
+# istekleri haftayı imkânsız kılıyorsa düz kısıt modeli ÇÖZÜMSÜZ bırakır ve
+# hiç çizelge çıkmaz. Bunun yerine bu cezayla gevşer: kapsama eksiğinden
+# (2.000.000 × 30) bile pahalı, yani solver ancak gerçekten imkânsızsa kullanır.
+# Kullanıldığında kontrolcü 'hata' olarak raporlar — sessiz kalmaz.
+ACIL_CEZA = 1_000_000_000
+
+# Eğitim hemşiresi oryantasyondaki eşi OLMADAN çalıştığında (eşi dinleniyor)
+# gün başına ceza. Kapsama eksiğinin (2.000.000) altında, istek cezasının
+# (22.000) üstünde: gerektiğinde olur, keyfî olmaz.
+GOLGE_CEZASI = 100_000
+
 
 def run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult:
     baslangic = time.monotonic()
     settings = get_settings()
+    # İşlenmiş günler (başka yayından gelen) okuma ÖNCESİ taslağa kilitli yazılır:
+    # veri okuyucu onları sabit atama olarak görür.
+    _islenmis_gunleri_esitle(draft_id)
     veri = veriyi_oku(draft_id)
 
     with psycopg.connect(settings.database_url, row_factory=dict_row) as conn:
@@ -285,6 +313,11 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     }
     sabit_gun = {(s.personel_id, s.gun) for s in v.sabit_atamalar}
     engelli = yok | bos | sabit_gun
+    islenmis = v.islenmis_gunler
+    # Solver'ın KARAR verebildiği dönem günleri. Zaman kurallarının "pencerede
+    # dönem günü var mı" korumaları buna bakar: tamamen işlenmiş bir pencere
+    # geçmiş gibidir, değiştirilemez.
+    serbest_donem = set(v.gunler) - islenmis
 
     # Haftanın 7 günü de deseninde bağlı olan kişinin seçeneği yok (bugün yalnız
     # sorumlu hemşire, C-008) → değişkeni açılmaz, planı girdi olarak yazılır.
@@ -301,7 +334,7 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
         for g in v.gunler:
             if g not in p.calisabilir_gunler:
                 continue          # sözleşmesi o günü kapsamıyor (ayrılmış / henüz başlamamış)
-            if (p.id, g) in engelli:
+            if (p.id, g) in engelli or g in islenmis:
                 continue
             for s in v.vardiyalar:
                 if not s.secenek_mi(p.rol_kodu, g.isoweekday()):
@@ -316,11 +349,12 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
                 x[p.id, g, s.kod] = model.new_bool_var(f"x_{p.id}_{g}_{s.kod}")
     sonuc.degisken_sayisi = len(x)
 
-    sabit_plan = _sabit_desen_plani(v, engelli)
+    sabit_plan = _sabit_desen_plani(v, engelli | {(p.id, g) for p in v.personel for g in islenmis})
+    uygulayici = _KuralUygulayici(model)
 
     # ----- Zaman çizgisi: geçmiş + dönem -----
-    gece, gunduz, calisiyor, tum_gunler = _zaman_cizgisi(v, x, sabit_plan)
-    donem = set(v.gunler)
+    gece, gunduz, calisiyor, tum_gunler, net, brut = _zaman_cizgisi(v, x, sabit_plan)
+    donem = serbest_donem
 
     # ----- Kısıt 1: günde en fazla 1 vardiya -----
     gunun_vardiyalari: dict[tuple[int, date], list] = defaultdict(list)
@@ -378,14 +412,22 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
 
     # ----- Kısıt 3–6: zaman kuralları (geçmiş dahil) -----
     kisiler = atanabilirler + [p for p in v.personel if p.sabit_programli]
-    _ardisik_gece(model, v, kisiler, gece, tum_gunler, donem)              # C-002
-    _iki_gece_sonrasi_bos(model, v, kisiler, gece, calisiyor, tum_gunler, donem)  # C-014
-    _gece_sonrasi_gunduz_yok(model, kisiler, gece, gunduz, tum_gunler, donem)     # C-021
-    _haftalik_bos_gun(model, v, kisiler, calisiyor, tum_gunler, donem)     # C-016
-    _gunduzcu_haftalik_off(model, v, atanabilirler, calisiyor, engelli)    # C-023
-    _ardisik_off_siniri(model, v, atanabilirler, calisiyor, engelli, tum_gunler, donem)  # C-024
-    _off_penceresi(model, v, atanabilirler, calisiyor, engelli)           # OFF_OLABILIR
-    _oryantasyon_esi(model, v, x, takviye, engelli)                       # C-020
+    _ardisik_gece(uygulayici, v, kisiler, gece, tum_gunler, donem)              # C-002
+    _iki_gece_sonrasi_bos(uygulayici, v, kisiler, gece, calisiyor, tum_gunler, donem)  # C-014
+    _gece_sonrasi_gunduz_yok(uygulayici, v, kisiler, gece, gunduz, tum_gunler, donem)  # C-021
+    _haftalik_bos_gun(uygulayici, v, kisiler, calisiyor, tum_gunler, donem)     # C-016
+    _gunduzcu_haftalik_off(uygulayici, v, atanabilirler, calisiyor, engelli, donem)  # C-023
+    _ardisik_off_siniri(uygulayici, v, atanabilirler, calisiyor, engelli, tum_gunler, donem)  # C-024
+    _off_penceresi(model, v, atanabilirler, calisiyor, engelli, donem)    # OFF_OLABILIR
+    golge_cezalari = _oryantasyon_esi(model, v, x, takviye, engelli)      # C-020
+
+    # ----- Çalışma süresi (seeds/034) -----
+    haftalik = _HaftaBaglami(v, x, tum_gunler, donem, yok, bos,
+                             calisiyor, gece, gunduz, net, brut, model)
+    _karma_hafta(uygulayici, v, haftalik)                                       # C-025
+    _haftalik_yasal_saat(uygulayici, v, haftalik)                               # C-026
+    _haftalik_calisma_gunu(uygulayici, v, haftalik)                             # C-028
+    fazla_mesai = _fazla_mesai(model, v, haftalik)                         # O-001
 
     # ----- Görevler (Adım 4) -----
     t = _gorev_degiskenleri(model, v, x, kapsama_sayilan)
@@ -417,7 +459,11 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     # sahada mevcuda sayılır ama ayın tamamını çalışmadığı için saat/gece/hafta sonu
     # adaletine ve 200 saate girmez (hastane kararı). Bkz. Personel.adalete_girer.
     adalet_havuzu = {p.id for p in v.personel if p.adalete_girer}
-    adalet_terimleri, olcumler = _adalet_ve_saat(model, v, x, t, adalet_havuzu)
+    adalet_terimleri, olcumler = _adalet_ve_saat(model, v, x, t, adalet_havuzu, uygulayici)
+    adalet_terimleri += fazla_mesai
+    adalet_terimleri += _gunluk_denge(model, v, x, kapsama_sayilan, sabit_kapsama, donem)  # O-009
+    adalet_terimleri += uygulayici.cezalar
+    adalet_terimleri += golge_cezalari
     adalet_terimleri += _tercihler(model, v, x, t, kapsama_sayilan, olcumler)
     sonuc.hedefler = olcumler["hedefler"]
 
@@ -497,34 +543,48 @@ def _zaman_cizgisi(v: SolverVerisi, x: dict, sorumlu_plani: list[tuple[int, date
     satırlarda düz sayı (0/1). Aynı kısıt yazımı iki tarafta da çalışsın diye:
     sınırda ayrı kod yok, ifade ile sabit yan yana toplanabiliyor.
     """
-    gece_kodlari = {s.kod for s in v.vardiyalar if s.gece_mi}
+    vardiya = {s.kod: s for s in v.vardiyalar}
     gece_p: dict[tuple[int, date], list] = defaultdict(list)
     gunduz_p: dict[tuple[int, date], list] = defaultdict(list)
+    net_p: dict[tuple[int, date], list] = defaultdict(list)
+    brut_p: dict[tuple[int, date], list] = defaultdict(list)
 
-    def ekle(p_id: int, g: date, kod: str, deger) -> None:
-        (gece_p if kod in gece_kodlari else gunduz_p)[p_id, g].append(deger)
+    # Gece mi, kaç dakika: SATIRIN KENDİ vardiyasından. Pasif vardiyalar (GECE_0100)
+    # v.vardiyalar'da yok ama işlenmiş günlerde ve geçmişte bulunabilir; koda
+    # bakarak karar verseydik 01:00 çıkışlı gece "gündüz" sayılırdı.
+    def ekle(p_id: int, g: date, gece_mi: bool, net_dk: int, brut_dk: int, deger) -> None:
+        (gece_p if gece_mi else gunduz_p)[p_id, g].append(deger)
+        net_p[p_id, g].append(deger * net_dk)
+        brut_p[p_id, g].append(deger * brut_dk)
 
     for (p_id, g, kod), degisken in x.items():
-        ekle(p_id, g, kod, degisken)
+        s = vardiya[kod]
+        ekle(p_id, g, s.gece_mi, s.sure_dk, s.brut_dk, degisken)
     for p_id, g, kod in sorumlu_plani:
-        ekle(p_id, g, kod, 1)
+        s = vardiya[kod]
+        ekle(p_id, g, s.gece_mi, s.sure_dk, s.brut_dk, 1)
     for s in v.sabit_atamalar:
-        ekle(s.personel_id, s.gun, s.vardiya_kodu, 1)
+        ekle(s.personel_id, s.gun, s.gece_mi, s.sure_dk, s.brut_dk, 1)
     for a in v.gecmis:                                   # değiştirilemez geçmiş
-        ekle(a.personel_id, a.gun, a.vardiya_kodu, 1)
+        ekle(a.personel_id, a.gun, a.gece_mi, a.sure_dk, a.brut_dk, 1)
 
     gece = lambda p_id, g: sum(gece_p.get((p_id, g), []))        # noqa: E731
     gunduz = lambda p_id, g: sum(gunduz_p.get((p_id, g), []))    # noqa: E731
     calisiyor = lambda p_id, g: gece(p_id, g) + gunduz(p_id, g)  # noqa: E731
+    net = lambda p_id, g: sum(net_p.get((p_id, g), []))          # noqa: E731
+    brut = lambda p_id, g: sum(brut_p.get((p_id, g), []))        # noqa: E731
 
     ilk = v.donem_bas - timedelta(days=GECMIS_GUN)
     tum_gunler = [ilk + timedelta(days=i) for i in range((v.gunler[-1] - ilk).days + 1)]
-    return gece, gunduz, calisiyor, tum_gunler
+    return gece, gunduz, calisiyor, tum_gunler, net, brut
 
 
-def _ardisik_gece(model, v: SolverVerisi, kisiler, gece, tum_gunler, donem) -> None:
+def _ardisik_gece(kural, v: SolverVerisi, kisiler, gece, tum_gunler, donem) -> None:
     """C-002: n+1 günlük her pencerede en fazla n gece."""
-    n = int(v.kural("C-002").parametreler["max_consecutive_nights"])
+    k = v.kural("C-002")
+    if k is None:
+        return
+    n = int(k.parametreler["max_consecutive_nights"])
     for p in kisiler:
         for i in range(len(tum_gunler) - n):
             pencere = tum_gunler[i:i + n + 1]
@@ -532,10 +592,10 @@ def _ardisik_gece(model, v: SolverVerisi, kisiler, gece, tum_gunler, donem) -> N
             # geçmişteki bir ihlal yüzünden çözümsüz yapardı.
             if not any(g in donem for g in pencere):
                 continue
-            model.add(sum(gece(p.id, g) for g in pencere) <= n)
+            kural.en_fazla(k, sum(gece(p.id, g) for g in pencere), n)
 
 
-def _iki_gece_sonrasi_bos(model, v: SolverVerisi, kisiler, gece, calisiyor, tum_gunler, donem) -> None:
+def _iki_gece_sonrasi_bos(kural, v: SolverVerisi, kisiler, gece, calisiyor, tum_gunler, donem) -> None:
     """C-014: n gece arka arkaya çalışıldıysa ertesi gün hiç çalışılmaz.
 
     'n gece + o gün çalışma ≤ n' okunuşu: geceler doluysa toplam zaten n'dir,
@@ -543,27 +603,34 @@ def _iki_gece_sonrasi_bos(model, v: SolverVerisi, kisiler, gece, calisiyor, tum_
     rest_gap_hours=24 ile birebir: ikinci gece d+2'de 08:30'da biter, 24 saat
     sonrası d+3'ün 08:30'u — yani d+2 tamamen boş, d+3 gündüzü serbest.
     """
-    n = int(v.kural("C-014").parametreler["rest_trigger_nights"])
+    k = v.kural("C-014")
+    if k is None:
+        return
+    n = int(k.parametreler["rest_trigger_nights"])
     for p in kisiler:
         for i in range(len(tum_gunler) - n):
             geceler = tum_gunler[i:i + n]
             ertesi = tum_gunler[i + n]
             if ertesi not in donem:          # sonuç günü dönem dışındaysa yapacak bir şey yok
                 continue
-            model.add(sum(gece(p.id, g) for g in geceler) + calisiyor(p.id, ertesi) <= n)
+            kural.en_fazla(k, sum(gece(p.id, g) for g in geceler) + calisiyor(p.id, ertesi), n)
 
 
-def _gece_sonrasi_gunduz_yok(model, kisiler, gece, gunduz, tum_gunler, donem) -> None:
+def _gece_sonrasi_gunduz_yok(kural, v: SolverVerisi, kisiler, gece, gunduz, tum_gunler,
+                             donem) -> None:
     """C-021: gece 08:30'da biter, gündüz 08:30'da başlar — ikisi arka arkaya olamaz."""
+    k = v.kural("C-021")
+    if k is None:
+        return
     for p in kisiler:
         for i in range(len(tum_gunler) - 1):
             g, ertesi = tum_gunler[i], tum_gunler[i + 1]
             if ertesi not in donem:
                 continue
-            model.add(gece(p.id, g) + gunduz(p.id, ertesi) <= 1)
+            kural.en_fazla(k, gece(p.id, g) + gunduz(p.id, ertesi), 1)
 
 
-def _haftalik_bos_gun(model, v: SolverVerisi, kisiler, calisiyor, tum_gunler, donem) -> None:
+def _haftalik_bos_gun(kural, v: SolverVerisi, kisiler, calisiyor, tum_gunler, donem) -> None:
     """C-016: her Pzt–Paz haftasında en az 1 boş gün (o gün başlayan vardiya yok).
 
     BİLİNEN gün = dönem içi ya da geçmiş penceresinde. Bunun dışındaki günler
@@ -575,7 +642,10 @@ def _haftalik_bos_gun(model, v: SolverVerisi, kisiler, calisiyor, tum_gunler, do
     pencereye sıkıştırmak sabit programı yapay olarak bozardı. Kimin sabit
     olduğu desenden gelir, rolden değil (migration 024).
     """
-    en_az = int(v.kural("C-016").parametreler["weekly_min_rest_events"])
+    k = v.kural("C-016")
+    if k is None:
+        return
+    en_az = int(k.parametreler["weekly_min_rest_events"])
     bilinen_gunler = set(tum_gunler)
     haftalar: dict[date, list[date]] = {}
     for g in v.gunler:
@@ -589,11 +659,13 @@ def _haftalik_bos_gun(model, v: SolverVerisi, kisiler, calisiyor, tum_gunler, do
     for pzt, gunler in haftalar.items():
         if len(gunler) < C016_ASGARI_BILINEN_GUN:
             continue
+        if not any(g in donem for g in gunler):
+            continue                                       # hafta tamamen işlenmiş
         tam_hafta = len(gunler) == 7
         for p in kisiler:
             if not tam_hafta and p.sabit_programli:
                 continue                                   # muafiyet
-            model.add(sum(calisiyor(p.id, g) for g in gunler) <= len(gunler) - en_az)
+            kural.en_fazla(k, sum(calisiyor(p.id, g) for g in gunler), len(gunler) - en_az)
 
 
 def _tam_haftalar(v: SolverVerisi) -> list[list[date]]:
@@ -621,8 +693,8 @@ def _serbest_gun_mu(p, g: date, engelli: set[tuple[int, date]]) -> bool:
     return (p.id, g) not in engelli and g in p.calisabilir_gunler
 
 
-def _gunduzcu_haftalik_off(model, v: SolverVerisi, kisiler, calisiyor,
-                           engelli: set[tuple[int, date]]) -> None:
+def _gunduzcu_haftalik_off(kural, v: SolverVerisi, kisiler, calisiyor,
+                           engelli: set[tuple[int, date]], donem) -> None:
     """C-023: sadece gündüz çalışan personel haftada TAM 1 gün izin yapar.
 
     "En az 1" değil TAM: Edem'in kuralı "haftada 1 off, 2 ya da 3 değil".
@@ -634,12 +706,14 @@ def _gunduzcu_haftalik_off(model, v: SolverVerisi, kisiler, calisiyor,
     Yalnız SERBEST günler sayılır: izinli/raporlu gün zaten boş, onu "haftalık
     izin" saymak kişiyi o hafta 6 gün çalışmaya zorlardı.
     """
-    kural = v.kural("C-023")
-    if kural is None:
+    k = v.kural("C-023")
+    if k is None:
         return
-    adet = int(kural.parametreler["day_only_weekly_off"])
+    adet = int(k.parametreler["day_only_weekly_off"])
 
     for gunler in _tam_haftalar(v):
+        if not any(g in donem for g in gunler):
+            continue                                       # hafta tamamen işlenmiş
         for p in kisiler:
             if p.uygunluk != "sadece_gunduz":
                 continue
@@ -647,10 +721,10 @@ def _gunduzcu_haftalik_off(model, v: SolverVerisi, kisiler, calisiyor,
             # Hafta izinle doluysa kural konmaz: kişi zaten çalışmıyor.
             if len(serbest) < len(gunler):
                 continue
-            model.add(sum(calisiyor(p.id, g) for g in serbest) == len(serbest) - adet)
+            kural.esit(k, sum(calisiyor(p.id, g) for g in serbest), len(serbest) - adet)
 
 
-def _ardisik_off_siniri(model, v: SolverVerisi, kisiler, calisiyor,
+def _ardisik_off_siniri(kural, v: SolverVerisi, kisiler, calisiyor,
                         engelli: set[tuple[int, date]], tum_gunler, donem) -> None:
     """C-024: üst üste en fazla 2 izinsiz boş gün.
 
@@ -661,10 +735,10 @@ def _ardisik_off_siniri(model, v: SolverVerisi, kisiler, calisiyor,
     "istisna: yıllık izin, rapor, kesin off istekleri bloğu uzatabilir" (Edem).
     Penceresinde böyle bir gün varsa kısıt konmaz; o blok meşrudur.
     """
-    kural = v.kural("C-024")
-    if kural is None:
+    k = v.kural("C-024")
+    if k is None:
         return
-    sinir = int(kural.parametreler["max_consecutive_off"])
+    sinir = int(k.parametreler["max_consecutive_off"])
     pencere = sinir + 1
 
     for p in kisiler:
@@ -676,11 +750,11 @@ def _ardisik_off_siniri(model, v: SolverVerisi, kisiler, calisiyor,
             if not all(_serbest_gun_mu(p, g, engelli) or g not in donem for g in dilim):
                 continue
             # Geçmiş günler sabit; onlarda çalışılmışsa kısıt kendiliğinden sağlanır.
-            model.add(sum(calisiyor(p.id, g) for g in dilim) >= 1)
+            kural.en_az(k, sum(calisiyor(p.id, g) for g in dilim), 1)
 
 
 def _off_penceresi(model, v: SolverVerisi, kisiler, calisiyor,
-                   engelli: set[tuple[int, date]]) -> None:
+                   engelli: set[tuple[int, date]], donem) -> None:
     """OFF_OLABILIR: kişinin haftalık izni yalnız belirli günlere düşebilir.
 
     Bugün tek örnek Şükran Ünlü: eğitim hemşiresi olduğu için izni Cumartesi ya
@@ -711,13 +785,346 @@ def _off_penceresi(model, v: SolverVerisi, kisiler, calisiyor,
             if not pencere_gunu_var:
                 continue
             for g in gunler:
-                if g.isoweekday() in p.off_olabilir_gunler:
-                    continue
+                if g.isoweekday() in p.off_olabilir_gunler or g not in donem:
+                    continue                                # işlenmiş gün değiştirilemez
                 if _serbest_gun_mu(p, g, engelli):
                     model.add(calisiyor(p.id, g) == 1)
 
 
-def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict, engelli: set) -> None:
+# ---------------------------------------------------------------------------
+# Zorunlu / esnek düğmesi — TEK yerde
+# ---------------------------------------------------------------------------
+
+
+class _KuralUygulayici:
+    """Bir kuralın E-03'teki zorunlu/esnek ayarını modele uygular.
+
+    NEDEN: kurallar tek tek elle yazılıyordu. Katı kurallar (C-002, C-014 …)
+    `model.add` ile her zaman katıydı — E-03'te "esnek" yapmak hiçbir şey
+    değiştirmiyordu. Esnek kurallar ise yalnız ağırlıkla kuruluyordu; "zorunlu"
+    yapılınca ağırlık boşalıyor ve kural SESSİZCE devre dışı kalıyordu
+    (30.09 ölçümü: C-025 zorunlu → tek tip hafta 3'ten 4'e çıktı).
+
+    Artık her kural buradan geçer:
+      is_hard            → kısıt (acil=True ise ACIL_CEZA'lı son çare gevşemesiyle)
+      esnek              → ihlal başına kural ağırlığı × ölçek ceza
+    Tamamen SABİT bir ifade (geçmiş, işlenmiş gün) kısıt yazılmadan atlanır:
+    değiştirilemez, kısıt yazmak yalnız modeli çözümsüz yapabilir.
+    """
+
+    def __init__(self, model: cp_model.CpModel) -> None:
+        self.model = model
+        self.cezalar: list[tuple[int, object]] = []
+        self.acil_gevsemeler: list[tuple[str, object]] = []
+        self._sayac = 0
+
+    def _gevseme(self, k, ust: int, olcek: int, acil: bool):
+        self._sayac += 1
+        s = self.model.new_int_var(0, max(1, int(ust)), f"gevseme_{k.kod}_{self._sayac}")
+        if k.hard_mi:
+            self.cezalar.append((ACIL_CEZA, s))
+            self.acil_gevsemeler.append((k.katalog_kodu or k.kod, s))
+        else:
+            self.cezalar.append((int(k.agirlik or 1) * olcek, s))
+        return s
+
+    def _uygula(self, k, ifade, yon: str, sinir: int, olcek: int, ust: int, acil: bool) -> None:
+        if isinstance(ifade, int):
+            return
+        if k.hard_mi and not acil:
+            if yon == "<=":
+                self.model.add(ifade <= sinir)
+            elif yon == ">=":
+                self.model.add(ifade >= sinir)
+            else:
+                self.model.add(ifade == sinir)
+            return
+        if yon == "<=":
+            self.model.add(ifade - self._gevseme(k, ust, olcek, acil) <= sinir)
+        elif yon == ">=":
+            self.model.add(ifade + self._gevseme(k, ust, olcek, acil) >= sinir)
+        else:
+            self.model.add(ifade + self._gevseme(k, ust, olcek, acil)
+                           - self._gevseme(k, ust, olcek, acil) == sinir)
+
+    def en_fazla(self, k, ifade, sinir, *, olcek: int = YB_DK, ust: int = 31,
+                 acil: bool = False) -> None:
+        self._uygula(k, ifade, "<=", sinir, olcek, ust, acil)
+
+    def en_az(self, k, ifade, sinir, *, olcek: int = YB_DK, ust: int = 31,
+              acil: bool = False) -> None:
+        self._uygula(k, ifade, ">=", sinir, olcek, ust, acil)
+
+    def esit(self, k, ifade, sinir, *, olcek: int = YB_DK, ust: int = 31,
+             acil: bool = False) -> None:
+        self._uygula(k, ifade, "==", sinir, olcek, ust, acil)
+
+
+# ---------------------------------------------------------------------------
+# Çalışma süresi kuralları (seeds/034)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _HaftaBaglami:
+    """Haftalık kuralların ortak girdisi: hangi haftalar, kimler, hangi günler sabit.
+
+    HAFTA = Pzt–Paz takvim haftası. BİLİNEN gün = dönem içi ya da geçmiş
+    penceresinde YAYINLANMIŞ bir çizelgenin kapsadığı gün. Ay başındaki yarım hafta geçmişle (yayınlanmış önceki çizelge)
+    tamamlanır; ay sonundaki yarım haftada kurallar bilinen gün sayısıyla
+    orantılanır. Tamamen işlenmiş hafta atlanır — değiştirilecek gün yok.
+    """
+
+    v: SolverVerisi
+    x: dict
+    tum_gunler: list
+    donem: set
+    yok: set          # izin / rapor (kişi, gün)
+    bos: set          # KESIN boş gün isteği (kişi, gün)
+    calisiyor: object
+    gece: object
+    gunduz: object
+    net: object
+    brut: object
+    model: object = None
+
+    def __post_init__(self) -> None:
+        self.secenek: dict[tuple[int, date], list[str]] = defaultdict(list)
+        for (p_id, g, kod) in self.x:
+            self.secenek[p_id, g].append(kod)
+        self.sure = {vd.kod: vd.sure_dk for vd in self.v.vardiyalar}
+
+    def haftalar(self) -> list[list[date]]:
+        bilinen = set(self.v.gunler) | self.v.gecmis_bilinen_gunler
+        sonuc: dict[date, list[date]] = {}
+        for g in self.v.gunler:
+            pzt = g - timedelta(days=g.weekday())
+            if pzt not in sonuc:
+                sonuc[pzt] = [pzt + timedelta(days=i) for i in range(7)
+                              if (pzt + timedelta(days=i)) in bilinen]
+        return [gunler for gunler in sonuc.values()
+                if len(gunler) >= C016_ASGARI_BILINEN_GUN
+                and any(g in self.donem for g in gunler)]
+
+    def kisiler(self, v: SolverVerisi):
+        """Haftalık kurallara girenler. Sabit programlı kişinin haftası veridir
+        (C-008); oryantasyondaki eşini izler (C-020) — ikisi de kendi haftasını
+        seçemez."""
+        return [p for p in v.personel if not p.sabit_programli and not p.oryantasyonda]
+
+    def sozlesmeli(self, p, gunler: list[date]) -> bool:
+        """Haftanın dönem içindeki her gününde sözleşmesi var mı (ay içinde
+        başlayan / ayrılan personelin yarım haftası kurala girmez)."""
+        return all(g in p.calisabilir_gunler for g in gunler if g in self.v.gunler)
+
+    def bilinmeyen(self, gunler: list[date]) -> tuple[int, int]:
+        """(önce, sonra): haftanın dönem ÖNCESİNDE ve SONRASINDA bilinmeyen gün sayısı."""
+        pzt = gunler[0] - timedelta(days=gunler[0].weekday())
+        hafta = [pzt + timedelta(days=i) for i in range(7)]
+        sonra = sum(1 for g in hafta if g > self.v.gunler[-1])
+        return 7 - len(gunler) - sonra, sonra
+
+    def ertesi_zorunlu_bos(self, p_id: int):
+        """Dönemin son iki günü gece ise ertesi gün (gelecek ayın ilk günü) C-014
+        gereği ZORUNLU boştur. 0/1 ifade: ay sonu yarım haftasında gelecek günleri
+        'çalışılabilir' sayarken bu gün düşülür. Aksi halde ay 2 geceyle bitip
+        gelecek ayın ilk haftası 45 saate tamamlanamıyordu (Kasım ölçümü, 30.09)."""
+        c14 = self.v.kural("C-014")
+        n = int(c14.parametreler["rest_trigger_nights"]) if c14 else 0
+        if n <= 0:
+            return 0
+        son = [self.v.gunler[-1] - timedelta(days=i) for i in range(n)]
+        geceler = sum(self.gece(p_id, g) for g in son)
+        if isinstance(geceler, int):
+            return int(geceler >= n)
+        b = self.model.new_bool_var(f"ertesi_bos_{p_id}")
+        self.model.add(b >= geceler - (n - 1))
+        return b
+
+    def tavan(self, p_id: int, gunler: list[date], ifade_fn, deger_fn) -> int:
+        """İfadenin ulaşabileceği kaba üst sınır: sabit günlerin değeri + her
+        değişkenli günün en büyük seçeneği. Dinlenme kurallarını hesaba katmaz;
+        yalnız AÇIKÇA imkânsız haftayı (ör. 3 kesin izin) ayıklamak için."""
+        toplam = 0
+        for g in gunler:
+            e = ifade_fn(p_id, g)
+            if isinstance(e, int):
+                toplam += e
+            elif self.secenek.get((p_id, g)):
+                toplam += max(deger_fn(kod) for kod in self.secenek[p_id, g])
+        return toplam
+
+
+def _karma_hafta(kural, v: SolverVerisi, h: _HaftaBaglami) -> None:
+    """C-025: gündüz+gece personelin her haftasında en az 1 gündüz ve 1 gece.
+
+    Tek tip hafta dengesizlik üretiyordu: gece 11 saat olduğu için tam gece
+    haftası az vardiyada doluyor, geriye 3-4 boş gün kalıyor; aynı hafta başka
+    birine tamamen gündüz düşüyor. İzin/raporlu günü olan hafta muaf.
+    """
+    k = v.kural("C-025")
+    if k is None:
+        return
+    for gunler in h.haftalar():
+        for p in h.kisiler(v):
+            if p.uygunluk != "gunduz_gece" or not h.sozlesmeli(p, gunler):
+                continue
+            if any((p.id, g) in h.yok for g in gunler):
+                continue
+            kural.en_az(k, sum(h.gunduz(p.id, g) for g in gunler), 1, acil=True)
+            kural.en_az(k, sum(h.gece(p.id, g) for g in gunler), 1, acil=True)
+
+
+def _haftalik_yasal_saat(kural, v: SolverVerisi, h: _HaftaBaglami) -> None:
+    """C-026: haftalık NET çalışma en az 45 saat (yasal).
+
+    İzin/rapor günü 7,5 saat sayılır.
+    AY SONU yarım haftası ORANTILANMAZ: tam 45 saat istenir, dönem sonrasındaki
+    her gün gelecek ay en az bir gündüz (8 sa 10 dk) katabilir sayılır — ay 2
+    geceyle bitiyorsa ertesi gün C-014 gereği boş olduğundan o gün sayılmaz.
+    Orantı (45 × 6/7) ayı "yeterli" bırakıp gelecek ayın ilk haftasını
+    imkânsız kılıyordu.
+    AY BAŞI yarım haftası (önceki ay yayınlanmamışsa) bilinen günlerle orantılıdır:
+    geçmiş değiştirilemez.
+    Kesin izin istekleri haftayı açıkça imkânsız kılıyorsa (4 gün × 11 sa = 44)
+    kural o hafta kurulmaz; kontrolcü bunu uyarı olarak gösterir.
+    """
+    k = v.kural("C-026")
+    if k is None:
+        return
+    hedef_dk = int(Decimal(k.parametreler["weekly_min_net_hours"]) * 60)
+    kredi_dk = int(Decimal(k.parametreler.get("absence_daily_credit_hours", 0)) * 60)
+    gun_dk = min((vd.sure_dk for vd in v.vardiyalar if vd.sadece_rol is None), default=0)
+    for gunler in h.haftalar():
+        once, sonra = h.bilinmeyen(gunler)
+        for p in h.kisiler(v):
+            if not h.sozlesmeli(p, gunler):
+                continue
+            izinli = sum(1 for g in gunler if (p.id, g) in h.yok)
+            gerek = hedef_dk * (7 - once) // 7 - izinli * kredi_dk - sonra * gun_dk
+            if gerek <= 0:
+                continue
+            if h.tavan(p.id, gunler, h.net, lambda kod: h.sure[kod]) < gerek:
+                continue
+            ifade = sum(h.net(p.id, g) for g in gunler)
+            if sonra:
+                ifade = ifade - gun_dk * h.ertesi_zorunlu_bos(p.id)
+            kural.en_az(k, ifade, gerek, olcek=1, ust=gerek + gun_dk, acil=True)
+
+
+def _haftalik_calisma_gunu(kural, v: SolverVerisi, h: _HaftaBaglami) -> None:
+    """C-028: haftada en az 5 gün çalışma, en fazla 2 gün izin.
+
+    İzin/rapor ve kesin izin isteği günleri sayıma girmez (izin sayılmaz, çalışma
+    beklenmez). 2 gün ÜST ÜSTE izin serbesttir — sınır haftanın TOPLAMIdır.
+    Ay başı yarım haftasında (önceki ay yayınlanmamış) bilinmeyen günler
+    çalışılmış varsayılır. Ay SONU yarım haftasında gelecek günler çalışılabilir
+    sayılır, ay 2 geceyle bitiyorsa ertesi gün hariç (bkz. C-026).
+    """
+    k = v.kural("C-028")
+    if k is None:
+        return
+    en_az_is = int(k.parametreler.get("min_weekly_work_days", 0))
+    en_fazla_izin = int(k.parametreler.get("max_weekly_off_days", 7))
+    for gunler in h.haftalar():
+        once, sonra = h.bilinmeyen(gunler)
+        for p in h.kisiler(v):
+            if not h.sozlesmeli(p, gunler):
+                continue
+            serbest = [g for g in gunler if (p.id, g) not in h.yok and (p.id, g) not in h.bos]
+            disi = len(gunler) - len(serbest)
+            if h.tavan(p.id, serbest, h.calisiyor, lambda _kod: 1) + sonra < en_az_is - disi - once:
+                continue
+            calisma = sum(h.calisiyor(p.id, g) for g in serbest)
+            zorunlu_bos = h.ertesi_zorunlu_bos(p.id) if sonra else 0
+            # En fazla izin: bilinen izinler + ay sonunun zorunlu boş günü.
+            kural.en_az(k, calisma - zorunlu_bos, len(serbest) - en_fazla_izin, acil=True)
+            # En az çalışma: bilinen çalışma + gelecekte çalışılabilir günler.
+            kural.en_az(k, calisma - zorunlu_bos, en_az_is - disi - once - sonra, acil=True)
+
+
+def _fazla_mesai(model, v: SolverVerisi, h: _HaftaBaglami) -> list[tuple[int, object]]:
+    """O-001: haftalık BRÜT 51 saatin üstü fazla mesaidir; solver azaltmaya çalışır.
+
+    BRÜT = molalar dahil vardiya süresi (gündüz 9,5 sa, gece 14,5 sa) — maaş
+    hesabı böyle (Edem, 30.09). Gündüzcünün 6 günü 57 sa → 6 sa mesai: kaçınılmaz,
+    ceza yalnız fazlasını azaltmaya iter. Yarım haftada sınır orantılıdır.
+    Zorunlu yapılırsa haftalık brüt sınırın üstüne çıkılmaz (acil gevşemeyle).
+    """
+    k = v.kural("O-001")
+    if k is None or "weekly_paid_gross_hours" not in k.parametreler:
+        return []
+    sinir_dk = int(Decimal(k.parametreler["weekly_paid_gross_hours"]) * 60)
+    terimler: list[tuple[int, object]] = []
+    for gunler in h.haftalar():
+        sinir = sinir_dk * len(gunler) // 7
+        for p in h.kisiler(v):
+            if not h.sozlesmeli(p, gunler):
+                continue
+            hafta = sum(h.brut(p.id, g) for g in gunler)
+            if isinstance(hafta, int):
+                continue
+            f = model.new_int_var(0, 7 * 24 * 60, f"mesai_{p.id}_{gunler[0]}")
+            model.add(f >= hafta - sinir)
+            if k.hard_mi:
+                terimler.append((ACIL_CEZA, f))
+            elif k.agirlik:
+                terimler.append((int(k.agirlik), f))
+    return terimler
+
+
+def _gunluk_denge(model, v: SolverVerisi, x: dict, kapsama_sayilan: set[int],
+                  sabit_kapsama, donem: set) -> list[tuple[int, object]]:
+    """O-009: asgarinin üstündeki fazla kadro günlere eşit dağılsın.
+
+    Aylık 200 saat hedefi ihtiyaçtan fazla vardiya yazdırıyor; fazlanın nereye
+    gideceğini söyleyen bir kural yoktu ve solver gündüzleri 5 ile 8 arasında
+    rastgele dolduruyordu (30.09 ölçümü, Ekim). Her vardiya türü için
+    (en kalabalık gün fazlası − en seyrek gün fazlası) cezalandırılır.
+    Zorunlu yapılırsa fark en fazla 1 kişi olur (acil gevşemeyle).
+    """
+    k = v.kural("O-009")
+    if k is None or (not k.hard_mi and not k.agirlik):
+        return []
+    gunun: dict[tuple[date, str], list] = defaultdict(list)
+    for (p_id, g, kod), d in x.items():
+        if p_id in kapsama_sayilan:
+            gunun[g, kod].append(d)
+
+    fazlalar: dict[str, list] = defaultdict(list)
+    for satir in v.ihtiyaclar:
+        if satir.slot_kodu != "GENEL":
+            continue
+        for g in satir.gunler:
+            if g not in donem:
+                continue
+            ekip = sum(gunun.get((g, satir.vardiya_kodu), [])) + sabit_kapsama.get(
+                (g, satir.vardiya_kodu), 0)
+            if isinstance(ekip, int):
+                continue
+            fazlalar[satir.vardiya_kodu].append(ekip - satir.min_sayi)
+
+    terimler: list[tuple[int, object]] = []
+    for kod, degerler in fazlalar.items():
+        if len(degerler) < 2:
+            continue
+        en_cok = model.new_int_var(-50, 50, f"denge_encok_{kod}")
+        en_az = model.new_int_var(-50, 50, f"denge_enaz_{kod}")
+        for d in degerler:
+            model.add(en_cok >= d)
+            model.add(en_az <= d)
+        if k.hard_mi:
+            s = model.new_int_var(0, 50, f"denge_acil_{kod}")
+            model.add(en_cok - en_az - s <= 1)
+            terimler.append((ACIL_CEZA, s))
+        else:
+            terimler.append((_sayi(k.agirlik), en_cok - en_az))
+    return terimler
+
+
+
+def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict,
+                     engelli: set) -> list[tuple[int, object]]:
     """C-020: oryantasyondaki kişi eşiyle aynı gün aynı vardiyada.
 
     EŞİTLİK: eğitim hemşiresi hangi vardiyada çalışıyorsa oryantasyondaki de
@@ -737,7 +1144,16 @@ def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict, engelli: se
         x[oryantasyon] >= x[eş]              eş çalışıyorsa yanındadır (gölgeleme)
         x[oryantasyon] <= x[eş] + takviye    eşsiz çalışması YALNIZ takviyeyle olur
     İkisi birlikte, takviye 0 iken eski eşitliğin aynısıdır.
+
+    DİNLENEN ORYANTASYON (30.09): gölgeleme (x[oryantasyon] >= x[eş]) artık
+    KATI değil, cezalı. Oryantasyondaki kişi dinlenme kuralı yüzünden o gün
+    çalışamıyorsa (ör. işlenmiş haftada 4 Ekim gecesi → 5 Ekim gündüz yasak)
+    katı eşitlik EŞİNİ de çalışamaz yapıyordu; eşin haftalık izin deseni o günü
+    zorunlu kıldığında model çözümsüz kalıyordu. Kural oryantasyondakini eşine
+    bağlar, eşi oryantasyondakine değil: eş tek başına çalışabilir, bedeli
+    GOLGE_CEZASI. "Eşsiz çalışmaz" yönü (<=) KATI kalır.
     """
+    cezalar: list[tuple[int, object]] = []
     for o in v.personel:
         if not o.oryantasyonda or o.buddy_id is None:
             continue
@@ -753,16 +1169,17 @@ def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict, engelli: se
                 if es is None:
                     # Eş o vardiyayı hiç alamıyor: yalnız acil takviyeyle çalışabilir.
                     model.add(oryantasyon <= (tak if tak is not None else 0))
-                elif tak is None:
-                    model.add(oryantasyon == es)
-                else:
-                    model.add(oryantasyon >= es)
-                    model.add(oryantasyon <= es + tak)
+                    continue
+                golge = model.new_bool_var(f"golge_{o.id}_{g}_{s.kod}")
+                model.add(oryantasyon + golge >= es)
+                cezalar.append((_sayi(GOLGE_CEZASI), golge))
+                model.add(oryantasyon <= es + (tak if tak is not None else 0))
+    return cezalar
 
 
 def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
-                    adalet_havuzu: set[int]) -> tuple[list[tuple[int, object]], dict]:
-    """C-004, O-001…O-005 ve C-003.
+                    adalet_havuzu: set[int], kural) -> tuple[list[tuple[int, object]], dict]:
+    """C-004, C-027, O-002…O-005.
 
     Ağırlıklar VERİTABANINDAN (constraints.default_weight), kodda gizli çarpan yok.
     BİRİM ÖLÇEĞİ burada: gece ve hafta sonu sayıları adet cinsinden olduğu için
@@ -789,12 +1206,24 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     for (p_id, g, kod), d in x.items():
         kisi_gunleri[p_id].append((g, kod, d))
 
+    # Dönem içindeki SABİT satırlar (elle yazılmış, kilitli, işlenmiş günler)
+    # da kişinin ayına sayılır. Eskiden yalnız değişkenler toplanıyordu: işlenmiş
+    # 1–4 Ekim'i çalışan biri 200 saate o günler hiç yokmuş gibi zorlanırdı.
+    sabit_dk: Counter[int] = Counter()
+    sabit_gece: Counter[int] = Counter()
+    sabit_hs: Counter[int] = Counter()
+    for sa in v.sabit_atamalar:
+        sabit_dk[sa.personel_id] += sa.sure_dk
+        sabit_gece[sa.personel_id] += int(sa.gece_mi)
+        sabit_hs[sa.personel_id] += int(sa.gun.isoweekday() >= 6)
+
     saat, gece, hafta_sonu, ambulans = {}, {}, {}, {}
     for p in kisiler:
         kendi = kisi_gunleri[p.id]
-        saat[p.id] = sum(d * sure[kod] for _g, kod, d in kendi)
-        gece[p.id] = sum(d for _g, kod, d in kendi if kod in gece_kodlari)
-        hafta_sonu[p.id] = sum(d for g, _k, d in kendi if g.isoweekday() >= 6)
+        saat[p.id] = sum(d * sure[kod] for _g, kod, d in kendi) + sabit_dk[p.id]
+        gece[p.id] = sum(d for _g, kod, d in kendi if kod in gece_kodlari) + sabit_gece[p.id]
+        hafta_sonu[p.id] = (sum(d for g, _k, d in kendi if g.isoweekday() >= 6)
+                            + sabit_hs[p.id])
     for p in kisiler:
         ambulans[p.id] = sum(
             d for (p_id, _g, _v, gorev), d in t.items()
@@ -832,15 +1261,19 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
         # Kişi SAYAR (adet), zaman taşımaz → model ölçeğine _sayi() ile taşınır.
         terimler.append((_sayi(int(tam_hedef)), sum(ulasamayanlar)))
 
-    # ---- O-001: 200 saat üstü fazla mesai ----
-    fazlalar = []
-    for p in kisiler:
-        # Üst sınır dakika cinsinden: 60.000 dk = 1.000 saat, ulaşılamaz ama
-        # değişkeni sınırlı tutar (CP-SAT sınırsız tam sayı sevmez).
-        f = model.new_int_var(0, 60_000, f"fazla_{p.id}")
-        model.add(f >= saat[p.id] - hedef_saat[p.id])
-        fazlalar.append(f)
-    terimler.append((agirlik("O-001"), sum(fazlalar)))
+    # ---- C-027: aylık YASAL asgari (net 180 sa) ----
+    # C-004'ten farkı: 200 bir HEDEF (cezalı), 180 yasal ALT SINIR (katı).
+    # Yalnız tam takvim ayı olan taslakta anlamlı; izin/rapor günü C-004'ün
+    # düşümüyle aynı kredi (7,5 sa) sayılır.
+    yasal = v.kural("C-027")
+    bas, son = v.gunler[0], v.gunler[-1]
+    tam_ay = bas.day == 1 and (son + timedelta(days=1)).day == 1
+    if yasal and tam_ay:
+        asgari_dk = int(Decimal(yasal.parametreler["monthly_legal_min_net_hours"]) * 60)
+        for p in kisiler:
+            gerek = max(0, asgari_dk - izin[p.id] * dusum_dk)
+            kural.en_az(yasal, saat[p.id] + v.ay_basi_saatler_dk.get(p.id, 0), gerek,
+                        olcek=1, ust=gerek, acil=True)
 
     # ---- O-002…O-005: adalet ----
     # Her biri İKİ parça: uçlar arası fark + herkesin hedefe uzaklığı. Sadece
@@ -892,6 +1325,21 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
             terimler.append((w * olcek, en_cok - en_az))
 
         sapmalar = []
+        if ad == "hafta_sonu":
+            # HAFTA SONU: sapma şablon hedefinden değil GERÇEK ORTALAMADAN ölçülür.
+            # Şablon hedefi asgari kadrodan geliyor; 200 saat hedefinin yazdırdığı
+            # fazla vardiyaları görmüyor. Herkes "hedefin üstünde" sayılınca solver
+            # fazlayı hafta içine yığıyordu (30.09 ölçümü: hafta sonu gündüz 5,
+            # hafta içi 8). Bölme yapmadan ortalamadan sapma: |n·xᵢ − Σx|, ağırlık /n.
+            n = len(havuz)
+            toplam = sum(degerler)
+            for p in havuz:
+                sp = model.new_int_var(0, ust * n, f"sapma_{ad}_{p.id}")
+                model.add(sp >= n * deger[p.id] - toplam)
+                model.add(sp >= toplam - n * deger[p.id])
+                sapmalar.append(sp)
+            terimler.append((max(1, w * olcek // n), sum(sapmalar)))
+            continue
         for p in havuz:
             sp = model.new_int_var(0, ust, f"sapma_{ad}_{p.id}")
             model.add(sp >= deger[p.id] - hedef_ort)
@@ -899,73 +1347,7 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
             sapmalar.append(sp)
         terimler.append((w * olcek, sum(sapmalar)))
 
-    # ---- C-025: karma hafta ----
-    # Gündüz+gece çalışabilen personelin her TAM haftasında en az 1 gündüz ve
-    # en az 1 gece olsun. Tek tip hafta dengesizlik üretiyordu: gece 11 saat
-    # olduğu için tam gece haftası 3-4 vardiyada doluyor, geriye 3-4 boş gün
-    # kalıyor ve aynı hafta başka birine tamamen gündüz düşüyor.
-    # (Ölçüm, Ekim 2026: 60 kişi-haftanın 4'ü yalnız gece, 17'si yalnız gündüz.)
-    #
-    # YUMUŞAK: gerçekten gerekiyorsa tek tip hafta kurulabilir. Sadece-gündüz ve
-    # sadece-gece personele uygulanmaz — onlarda "karma" imkânsız.
-    karma_kural = v.kural("C-025")
-    if karma_kural and karma_kural.agirlik:
-        gece_kod = {vd.kod for vd in v.vardiyalar if vd.gece_mi}
-        tek_tipler = []
-        for gunler in _tam_haftalar(v):
-            for p in kisiler:
-                if p.uygunluk != "gunduz_gece":
-                    continue
-                g_vars = [d for g in gunler for (pid, gg, kod), d in x.items()
-                          if pid == p.id and gg == g and kod not in gece_kod]
-                n_vars = [d for g in gunler for (pid, gg, kod), d in x.items()
-                          if pid == p.id and gg == g and kod in gece_kod]
-                if not g_vars or not n_vars:
-                    continue          # o hafta biri zaten imkânsız, ceza yazmayız
-                var_g = model.new_bool_var(f"hafta_g_{p.id}_{gunler[0]}")
-                var_n = model.new_bool_var(f"hafta_n_{p.id}_{gunler[0]}")
-                model.add(sum(g_vars) >= 1).only_enforce_if(var_g)
-                model.add(sum(g_vars) == 0).only_enforce_if(var_g.Not())
-                model.add(sum(n_vars) >= 1).only_enforce_if(var_n)
-                model.add(sum(n_vars) == 0).only_enforce_if(var_n.Not())
-                karma = model.new_bool_var(f"hafta_karma_{p.id}_{gunler[0]}")
-                model.add_bool_and([var_g, var_n]).only_enforce_if(karma)
-                model.add_bool_or([var_g.Not(), var_n.Not()]).only_enforce_if(karma.Not())
-                tek_tipler.append(karma.Not())
-        if tek_tipler:
-            # Hafta SAYAR (adet) → model ölçeğine _sayi() ile taşınır.
-            terimler.append((_sayi(karma_kural.agirlik), sum(tek_tipler)))
-
-    # ---- C-003: haftalık 50 saat referansı ----
-    # YALNIZ dönemin içinde kalan TAM haftalar. Ay başı/sonu yarım haftasında
-    # 50 saat zaten imkânsız; uygulamak kaçınılmaz bir ceza üretirdi.
-    haftalik = v.kural("C-003")
-    if haftalik and haftalik.agirlik:
-        # 50 saat haftalık referans da NET ölçülür (Edem teyidi, 29.09) → 3.000 dk.
-        referans_dk = int(Decimal(haftalik.parametreler["weekly_reference_hours"]) * 60)
-        donem = set(v.gunler)
-        haftalar: dict[date, list[date]] = {}
-        for g in v.gunler:
-            pzt = g - timedelta(days=g.weekday())
-            haftalar.setdefault(pzt, [pzt + timedelta(days=i) for i in range(7)])
-        tam_haftalar = [gunler for gunler in haftalar.values() if set(gunler) <= donem]
-        sapmalar = []
-        for p in kisiler:
-            gunluk = {g: (kod, d) for g, kod, d in kisi_gunleri[p.id]}
-            for gunler in tam_haftalar:
-                hafta_dk = sum(
-                    d * sure[kod] for g in gunler if g in gunluk
-                    for kod, d in [gunluk[g]]
-                )
-                sp = model.new_int_var(0, 12_000, f"hafta_{p.id}_{gunler[0]}")
-                model.add(sp >= hafta_dk - referans_dk)
-                model.add(sp >= referans_dk - hafta_dk)
-                sapmalar.append(sp)
-        if sapmalar:
-            terimler.append((int(haftalik.agirlik), sum(sapmalar)))
-
-    olcumler = {"hedefler": hedefler, "hedef_saat": hedef_saat, "eksik_saat": eksik_saat,
-                "tam_hafta_sayisi": len(tam_haftalar) if haftalik else 0}
+    olcumler = {"hedefler": hedefler, "hedef_saat": hedef_saat, "eksik_saat": eksik_saat}
     return terimler, olcumler
 
 
@@ -1340,6 +1722,73 @@ def _kosuyu_bul_veya_ac(cur, draft_id: int, time_limit_s: int) -> int:
     return cur.fetchone()["id"]
 
 
+def _islenmis_gunleri_esitle(draft_id: int) -> int:
+    """İşlenmiş günleri yayınlanmış çizelgeden taslağa KİLİTLİ kopyalar.
+
+    "Yayınlanmış = işlenmiş" (Baran, 30.09). Kağıt hafta 28.09–04.10 yayındayken
+    Ekim taslağı 1–4 Ekim'i yeniden planlamaz: o günlerin satırları taslağa
+    source='referans', is_locked=TRUE olarak yazılır (rozetleriyle). Solver o
+    günlerde değişken açmaz; haftalık kurallar bu satırları sabit değer olarak
+    görür ve haftanın kalanını ona göre kurar.
+
+    Her koşuda yeniden yazılır: yayındaki hafta sonradan düzeltilirse taslak
+    kendiliğinden güncel kalır. Taslak yayınlanınca eski yayın arşive gider ama
+    bu günler taslağın içinde olduğu için hiçbir gün kaybolmaz.
+    """
+    with psycopg.connect(get_settings().database_url, row_factory=dict_row) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TEMP TABLE _islenmis ON COMMIT DROP AS
+                SELECT a.id AS kaynak_id, a.staff_id, a.shift_type_id, a.work_date
+                FROM schedule_drafts d
+                JOIN schedule_drafts y ON y.unit_id = d.unit_id AND y.id <> d.id
+                                      AND y.status = 'yayinlandi' AND y.period && d.period
+                                      AND lower(y.period) < lower(d.period)
+                JOIN assignments a     ON a.draft_id = y.id
+                                      AND y.period @> a.work_date
+                                      AND d.period @> a.work_date
+                WHERE d.id = %(d)s
+                """,
+                {"d": draft_id},
+            )
+            cur.execute(
+                """
+                DELETE FROM assignments a
+                USING schedule_drafts d, schedule_drafts y
+                WHERE a.draft_id = %(d)s AND d.id = a.draft_id
+                  AND y.unit_id = d.unit_id AND y.id <> d.id AND y.status = 'yayinlandi'
+                  AND lower(y.period) < lower(d.period)
+                  AND y.period @> a.work_date AND d.period @> a.work_date
+                """,
+                {"d": draft_id},
+            )
+            cur.execute(
+                """
+                INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date,
+                                         source, is_locked)
+                SELECT %(d)s, staff_id, shift_type_id, work_date, 'referans', TRUE
+                FROM _islenmis
+                """,
+                {"d": draft_id},
+            )
+            adet = cur.rowcount
+            cur.execute(
+                """
+                INSERT INTO assignment_tasks (assignment_id, competency_id)
+                SELECT y.id, t.competency_id
+                FROM _islenmis i
+                JOIN assignments y      ON y.draft_id = %(d)s AND y.staff_id = i.staff_id
+                                       AND y.work_date = i.work_date
+                JOIN assignment_tasks t ON t.assignment_id = i.kaynak_id
+                ON CONFLICT DO NOTHING
+                """,
+                {"d": draft_id},
+            )
+        conn.commit()
+    return adet
+
+
 def _atamalari_yaz(cur, draft_id: int, v: SolverVerisi, cozum: Cozum) -> int:
     """Dönem içinde YALNIZ source='manuel' ya da is_locked satırlar sabittir.
 
@@ -1496,10 +1945,12 @@ def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
     return {
         "solver": "cpsat",
         "adim": 5,
-        "kapsanan_kurallar": ["C-002", "C-003", "C-004", "C-005", "C-006", "C-007",
+        "islenmis_gunler": [g.isoformat() for g in sorted(v.islenmis_gunler)],
+        "kapsanan_kurallar": ["C-002", "C-004", "C-005", "C-006", "C-007",
                               "C-008", "C-009", "C-010", "C-011", "C-014", "C-016",
                               "C-017", "C-019", "C-020", "C-021", "C-023", "C-024", "C-025",
-                              "O-001", "O-002", "O-003", "O-004", "O-005",
+                              "C-026", "C-027", "C-028",
+                              "O-001", "O-002", "O-003", "O-004", "O-005", "O-009",
                               "all_crew_triage_or_observation",
                               "count_authority_required"],
         "kapsam_disi": ["C-013"],

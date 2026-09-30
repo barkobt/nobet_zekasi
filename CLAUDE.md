@@ -27,8 +27,9 @@ Hedef: 1 Ekim 2026, hastane yöneticilerine canlı link üzerinden demo.
 - Sıfırdan kurulum: `./db/scripts/rebuild.sh` (yerel) veya
   `DATABASE_URL="postgres://..." ./db/scripts/rebuild.sh --yes` (Neon).
 - Sıfırdan kurulumda beklenen: **26 tablo** (migrate.sh ile 27 — fark `schema_migrations`,
-  aracın kendi defteri), **7 view**, 22 personel (20 aktif), 882 atama, 13 uygunluk ihlali.
-  İhlallerin 1'i referans haftasından, 12'si kağıt Eylül'den gelir; ikisi de gerçektir.
+  aracın kendi defteri), **7 view**, 22 personel (20 aktif), 944 atama, 16 uygunluk ihlali.
+  İhlallerin 1'i referans haftasından, 10'u kağıt Eylül'den, 5'i kağıt haftadan
+  (28.09–04.10, `seeds/033`) gelir; hepsi gerçektir.
 - `db/seeds/009` kağıt çizelgenin birebir aktarımıdır; **gerçeği kurala uydurmak için
   değiştirilmez.** İçindeki bilinen ihlal `v_task_eligibility_violations`'ta görünür.
 

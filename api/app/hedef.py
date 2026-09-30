@@ -5,7 +5,7 @@ sayısına bölünüyordu ve bir haftalık taslakta "46,7 saat" gibi kimsenin
 tanımadığı bir sayı çıkıyordu. Artık yalnız iki tanınan dönem var:
 
   * tam takvim ayı  → C-004 aylık asgari (constraint_params: monthly_min_hours)
-  * tam 7 gün       → C-003 haftalık referans (constraint_params: weekly_reference_hours)
+  * tam 7 gün       → C-026 haftalık yasal asgari (constraint_params: weekly_min_net_hours)
 
 Başka uzunluktaki bir dönemde hedef **gösterilmez** (None) — uydurulmuş bir
 sayı göstermektense boş bırakmak doğru (DESIGN §7).
@@ -39,7 +39,7 @@ def izin_dusumu(hedef: float | None, izin_gunu: int, gunluk_dusum: float | None)
 
     Solver aynı hesabı yapıyor (solver/model.py, absence_daily_reduction_hours):
     ekranın 200 deyip çözücünün 125 istemesi, izinli birini eksik çalışmış gibi
-    gösterirdi. Haftalık referansta (C-003) düşüm YOK — o kural izni tanımıyor.
+    gösterirdi. Haftalık hedefte (C-026) düşüm burada uygulanmıyor; solver izin gününü 7,5 sa sayar.
     """
     if hedef is None or not gunluk_dusum or izin_gunu <= 0:
         return hedef

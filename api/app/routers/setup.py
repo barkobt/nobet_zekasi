@@ -122,15 +122,11 @@ async def kural_guncelle(constraint_id: int, istek: ConstraintUpdate) -> Constra
 @router.patch("/constraint-params/{param_id}", response_model=list[Constraint],
               summary="Kural parametresini düzenle")
 async def param_guncelle(param_id: int, istek: ParamUpdate) -> list[Constraint]:
-    # Kuralın kendisi kilitliyse PARAMETRESİ de kilitli olmalı. Aksi halde
-    # "haftada en az 1 dinlenme" kuralı 99'a çekilerek kilit anlamsızlaşıyordu.
-    if (k := await repo.param_kurali(param_id)) is None:
+    # Yasal kural ESNEK YAPILAMAZ (kural_guncelle 403 döner) ama SAYISI
+    # düzenlenebilir (Baran, 30.09): başka bir kurum başka bir yasal haftalık
+    # süreyle çalışabilir. Kilit "gevşetme" kilididir, "ayar" kilidi değil.
+    if await repo.param_kurali(param_id) is None:
         raise HTTPException(status_code=404, detail="Parametre bulunamadı.")
-    if k["source"] == "yasal":
-        raise HTTPException(
-            status_code=403,
-            detail=f"{k['name']} yasal bir kural; parametresi değiştirilemez.",
-        )
     if await repo.param_guncelle(param_id, istek.param_value) is None:
         raise HTTPException(status_code=404, detail="Parametre bulunamadı.")
     return await kurallar()

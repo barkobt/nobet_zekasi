@@ -71,7 +71,7 @@ export function Izgara({
   const haftaBasi = (iso: string) =>
     aylik && new Date(iso + "T00:00:00Z").getUTCDay() === 1;
   const ayrac = "border-l-2 border-l-border";
-  // Hedef saat orantılanmaz (27.09): tam ay → 200 (C-004), tam hafta → 50 (C-003),
+  // Hedef saat orantılanmaz (27.09): tam ay → 200 (C-004), tam hafta → 45 (C-026),
   // başka uzunlukta hedef yok ve fark sütunu "—" gösterir. Kırmızı yalnız hedef
   // varken ve altında kalınmışken.
   const [kapali, setKapali] = useState<Set<string>>(new Set());
