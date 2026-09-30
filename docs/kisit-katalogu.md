@@ -159,6 +159,7 @@ Edem + Baran kararları. Sayıların hepsi E-03'ten düzenlenir.
 | C-028 | Hard | Hafta | Haftada **en az 5 gün** çalışma, **en fazla 2 gün** izin. İzin/rapor/kesin istek günleri sayılmaz. 2 gün üst üste izin serbest. |
 | O-001 | Soft (200) | Hafta | **Fazla mesai = haftalık BRÜT 51 sa üstü** (51 × 4 = aylık 204). Hafta Pazar'ın düştüğü aya yazılır. Raporlar ekranında "Mesai" sütunu. |
 | O-009 | Soft (2.000) | Gün | Asgarinin üstündeki fazla kadro günlere eşit dağılır (en kalabalık − en seyrek gün). |
+| O-010 | Soft (200) | Ay | **Mesai dengesi:** mesai oluyorsa kişiler arasında eşit dağılır. Denge çalışma tipi İÇİNDE kurulur (gündüzcünün 6 sa/hafta mesaisi yapısal). İşlenmiş haftanın mesaisi sabit olarak sayılır. |
 | ~~C-003~~ | kaldırıldı | — | Haftalık 50 sa referansı; yerini C-026 ve O-001 aldı. |
 
 - **Yasal kural esnek yapılamaz ama sayısı düzenlenebilir** (başka kurum, başka yasal süre).

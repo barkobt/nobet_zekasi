@@ -427,7 +427,7 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     _karma_hafta(uygulayici, v, haftalik)                                       # C-025
     _haftalik_yasal_saat(uygulayici, v, haftalik)                               # C-026
     _haftalik_calisma_gunu(uygulayici, v, haftalik)                             # C-028
-    fazla_mesai = _fazla_mesai(model, v, haftalik)                         # O-001
+    fazla_mesai = _fazla_mesai(model, v, haftalik)                         # O-001, O-010
 
     # ----- Görevler (Adım 4) -----
     t = _gorev_degiskenleri(model, v, x, kapsama_sayilan)
@@ -1044,20 +1044,28 @@ def _haftalik_calisma_gunu(kural, v: SolverVerisi, h: _HaftaBaglami) -> None:
 
 
 def _fazla_mesai(model, v: SolverVerisi, h: _HaftaBaglami) -> list[tuple[int, object]]:
-    """O-001: haftalık BRÜT 51 saatin üstü fazla mesaidir; solver azaltmaya çalışır.
+    """O-001 fazla mesai (en aza indir) + O-010 mesai dengesi (eşit dağıt).
 
-    BRÜT = molalar dahil vardiya süresi (gündüz 9,5 sa, gece 14,5 sa) — maaş
-    hesabı böyle (Edem, 30.09). Gündüzcünün 6 günü 57 sa → 6 sa mesai: kaçınılmaz,
-    ceza yalnız fazlasını azaltmaya iter. Yarım haftada sınır orantılıdır.
-    Zorunlu yapılırsa haftalık brüt sınırın üstüne çıkılmaz (acil gevşemeyle).
+    O-001: haftalık BRÜT 51 saatin üstü fazla mesaidir. BRÜT = molalar dahil
+    vardiya süresi (gündüz 9,5 sa, gece 14,5 sa) — maaş hesabı böyle (Edem, 30.09).
+    Gündüzcünün 6 günü 57 sa → 6 sa mesai: kaçınılmaz, ceza yalnız fazlasını
+    azaltmaya iter. Yarım haftada sınır orantılıdır. Zorunlu yapılırsa haftalık
+    brüt sınırın üstüne çıkılmaz (acil gevşemeyle).
+
+    O-010: "oluyorsa eşit dağıtılsın" (Baran, 30.09). Kişinin AYLIK mesaisi =
+    Pazar'ı döneme düşen haftaların fazlası (raporla aynı tanım). Kağıttan gelen
+    işlenmiş haftanın mesaisi SABİT olarak girer; solver kalan haftalarda telafi
+    eder. Sapma gerçek ortalamadan ölçülür (|n·mᵢ − Σm|, bölmesiz) + en çok − en az.
     """
     k = v.kural("O-001")
     if k is None or "weekly_paid_gross_hours" not in k.parametreler:
         return []
     sinir_dk = int(Decimal(k.parametreler["weekly_paid_gross_hours"]) * 60)
     terimler: list[tuple[int, object]] = []
+    mesai: dict[tuple[int, date], object] = {}      # (kişi, Pazartesi) → dakika
     for gunler in h.haftalar():
         sinir = sinir_dk * len(gunler) // 7
+        pzt = gunler[0] - timedelta(days=gunler[0].weekday())
         for p in h.kisiler(v):
             if not h.sozlesmeli(p, gunler):
                 continue
@@ -1066,10 +1074,70 @@ def _fazla_mesai(model, v: SolverVerisi, h: _HaftaBaglami) -> list[tuple[int, ob
                 continue
             f = model.new_int_var(0, 7 * 24 * 60, f"mesai_{p.id}_{gunler[0]}")
             model.add(f >= hafta - sinir)
+            mesai[p.id, pzt] = f
             if k.hard_mi:
                 terimler.append((ACIL_CEZA, f))
             elif k.agirlik:
                 terimler.append((int(k.agirlik), f))
+
+    denge = v.kural("O-010")
+    if denge is None or (not denge.hard_mi and not denge.agirlik):
+        return terimler
+    havuz = [p for p in h.kisiler(v) if p.adalete_girer]
+    if len(havuz) < 2:
+        return terimler
+    bilinen = set(v.gunler) | v.gecmis_bilinen_gunler
+    pazartesiler = [g - timedelta(days=6) for g in v.gunler if g.isoweekday() == 7]
+    aylik: dict[int, object] = {}
+    for p in havuz:
+        toplam = 0
+        for pzt in pazartesiler:
+            if (p.id, pzt) in mesai:
+                toplam += mesai[p.id, pzt]
+                continue
+            # Tamamen işlenmiş (ya da geçmişte kalan) hafta: mesaisi sabit.
+            gunler = [pzt + timedelta(days=i) for i in range(7)
+                      if pzt + timedelta(days=i) in bilinen]
+            hafta = sum(h.brut(p.id, g) for g in gunler)
+            if isinstance(hafta, int):
+                toplam += max(0, hafta - sinir_dk * len(gunler) // 7)
+        aylik[p.id] = toplam
+    if all(isinstance(m, int) for m in aylik.values()):
+        return terimler
+
+    # Denge ÇALIŞMA TİPİ İÇİNDE kurulur: sadece gündüzcünün mesaisi yapısal olarak
+    # sabit (her hafta 6 gün × 9,5 = 57 → 6 sa). Tek havuzda gündüz+gece
+    # çalışanlar da imkânsız bir 18 saate çekiliyordu (ölçüm 30.09: fark 32,5 → 28).
+    ust = 31 * 24 * 60
+    gruplar: dict[str, list[int]] = defaultdict(list)
+    for p in havuz:
+        gruplar[p.uygunluk].append(p.id)
+    fark_dk = int(Decimal(denge.parametreler.get("max_monthly_gap_hours", 10)) * 60)
+    for tip, kimler in gruplar.items():
+        degerler = [aylik[i] for i in kimler]
+        if len(kimler) < 2 or all(isinstance(m, int) for m in degerler):
+            continue
+        en_cok = model.new_int_var(0, ust, f"mesai_encok_{tip}")
+        en_az = model.new_int_var(0, ust, f"mesai_enaz_{tip}")
+        for m in degerler:
+            model.add(en_cok >= m)
+            model.add(en_az <= m)
+        if denge.hard_mi:
+            s = model.new_int_var(0, ust, f"mesai_denge_acil_{tip}")
+            model.add(en_cok - en_az - s <= fark_dk)
+            terimler.append((ACIL_CEZA, s))
+            continue
+        w = int(denge.agirlik)
+        terimler.append((w, en_cok - en_az))
+        n = len(kimler)
+        toplam = sum(degerler)
+        sapmalar = []
+        for p_id in kimler:
+            sp = model.new_int_var(0, ust * n, f"mesai_sapma_{p_id}")
+            model.add(sp >= n * aylik[p_id] - toplam)
+            model.add(sp >= toplam - n * aylik[p_id])
+            sapmalar.append(sp)
+        terimler.append((max(1, w // n), sum(sapmalar)))
     return terimler
 
 
@@ -1950,7 +2018,7 @@ def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
                               "C-008", "C-009", "C-010", "C-011", "C-014", "C-016",
                               "C-017", "C-019", "C-020", "C-021", "C-023", "C-024", "C-025",
                               "C-026", "C-027", "C-028",
-                              "O-001", "O-002", "O-003", "O-004", "O-005", "O-009",
+                              "O-001", "O-002", "O-003", "O-004", "O-005", "O-009", "O-010",
                               "all_crew_triage_or_observation",
                               "count_authority_required"],
         "kapsam_disi": ["C-013"],
