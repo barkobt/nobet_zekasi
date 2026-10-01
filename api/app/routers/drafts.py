@@ -113,7 +113,10 @@ async def olustur(istek: DraftCreate) -> Draft:
         raise HTTPException(status_code=404, detail="Birim bulunamadı.")
 
     # Başlangıç verisi: istenirse mevcut bir çizelgeden doldur.
-    if istek.seed_from != "bos":
+    if istek.seed_from == "yayinlanmis":
+        # Aynı tarihler, aralıkla çakışan tüm yayınlardan (bkz. repo.yayindan_kopyala).
+        await repo.yayindan_kopyala(yeni["id"], istek.lock_seeded)
+    elif istek.seed_from != "bos":
         kaynak = await repo.kaynak_taslak_bul(
             istek.seed_from, istek.period_start, istek.period_end + timedelta(days=1)
         )

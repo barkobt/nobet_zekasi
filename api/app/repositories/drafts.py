@@ -243,6 +243,48 @@ ON CONFLICT DO NOTHING
 """
 
 
+# "Yayınlanmış atamalardan yükle": AYNI TARİHLER kopyalanır, hafta günüyle
+# döşenmez (30.09 hatası). Döşeme yalnız 1 haftalık referans için anlamlıydı;
+# Ekim'le çakışan tek yayın 1 haftalık kağıt olunca o hafta bütün aya kopyalanıyor,
+# "kilitle" seçiliyse solver hiçbir şeyi değiştiremiyordu. Aralıkla çakışan TÜM
+# yayınlanmış çizelgelerden, her birinin kendi dönemine düşen günler alınır.
+_YAYINDAN_KOPYALA = """
+WITH hedef AS (
+    SELECT id AS draft_id, unit_id, period FROM schedule_drafts WHERE id = %(draft_id)s
+)
+INSERT INTO assignments (draft_id, staff_id, shift_type_id, work_date, source, is_locked)
+SELECT h.draft_id, a.staff_id, a.shift_type_id, a.work_date, 'referans', %(kilitle)s
+FROM hedef h
+JOIN schedule_drafts y ON y.unit_id = h.unit_id AND y.id <> h.draft_id
+                      AND y.status = 'yayinlandi' AND y.period && h.period
+JOIN assignments a     ON a.draft_id = y.id
+                      AND y.period @> a.work_date AND h.period @> a.work_date
+ON CONFLICT (draft_id, staff_id, work_date) DO NOTHING
+"""
+
+_YAYINDAN_ROZET_KOPYALA = """
+INSERT INTO assignment_tasks (assignment_id, competency_id)
+SELECT n.id, t.competency_id
+FROM assignments n
+JOIN schedule_drafts h ON h.id = n.draft_id
+JOIN schedule_drafts y ON y.unit_id = h.unit_id AND y.id <> h.id
+                      AND y.status = 'yayinlandi' AND y.period @> n.work_date
+JOIN assignments a     ON a.draft_id = y.id AND a.staff_id = n.staff_id
+                      AND a.work_date = n.work_date
+JOIN assignment_tasks t ON t.assignment_id = a.id
+WHERE n.draft_id = %(draft_id)s
+ON CONFLICT DO NOTHING
+"""
+
+
+async def yayindan_kopyala(draft_id: int, kilitle: bool) -> int:
+    async with cursor() as cur:
+        await cur.execute(_YAYINDAN_KOPYALA, {"draft_id": draft_id, "kilitle": kilitle})
+        sayi = cur.rowcount
+        await cur.execute(_YAYINDAN_ROZET_KOPYALA, {"draft_id": draft_id})
+    return sayi
+
+
 async def kaynak_taslak_bul(tur: str, period_start: date, period_end: date) -> int | None:
     """Hangi taslaktan kopyalanacak?
 
