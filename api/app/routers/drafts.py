@@ -87,7 +87,8 @@ def _taslak(satir: dict, son_kosu: dict | None) -> Draft:
 @router.get("/drafts", response_model=list[Draft], summary="Taslak listesi")
 async def listele() -> list[Draft]:
     satirlar = await repo.listele()
-    return [_taslak(s, await repo.son_kosu(s["id"])) for s in satirlar]
+    kosular = await repo.son_kosular()
+    return [_taslak(s, kosular.get(s["id"])) for s in satirlar]
 
 
 @router.post("/drafts", response_model=Draft, status_code=201, summary="Yeni taslak")

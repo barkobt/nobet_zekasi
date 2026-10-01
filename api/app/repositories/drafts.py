@@ -169,6 +169,19 @@ async def kosular(draft_id: int) -> list[dict]:
         return await cur.fetchall()
 
 
+async def son_kosular() -> dict[int, dict]:
+    """Her taslağın son koşusu TEK sorguda. Liste eskiden taslak başına ayrı sorgu
+    atıyordu (N+1); Neon'da her biri ayrı gidiş-dönüş ve liste 2 sn'de bir
+    yenilenirken bu birikiyordu."""
+    async with cursor() as cur:
+        await cur.execute(
+            "SELECT DISTINCT ON (k.draft_id) k.* FROM ("
+            + _KOSU
+            + ") k ORDER BY k.draft_id, k.started_at DESC"
+        )
+        return {r["draft_id"]: r for r in await cur.fetchall()}
+
+
 async def son_kosu(draft_id: int) -> dict | None:
     async with cursor() as cur:
         await cur.execute(

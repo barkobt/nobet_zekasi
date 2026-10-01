@@ -1347,8 +1347,13 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
             # ayın kalan günlerine eşit dağıtarak kapatır. 5–11 Ekim kalan 27
             # günün 7'si → açığın 7/27'si bu hafta. Eskiden açığın tamamı ilk
             # haftaya biniyor, Engin 60 saate çıkıyordu.
+            # Bilinmeyen (yayınlanmamış) ara günler de kendi payını taşır: açık
+            # İLK BİLİNMEYEN günden ay sonuna bölünür. 5–11 yayınlanmadan 12–18
+            # çözülürse açığın 7/27'si istenir, 7/20'si değil (01.10).
             onceki = v.ay_basi_saatler_dk.get(p.id, 0)
-            kalan_gun = (date(son.year, son.month, ay_son_gunu) - v.gunler[0]).days + 1
+            bilinmeyen = (v.gunler[0] - date(son.year, son.month, 1)).days - v.ay_basi_bilinen_gun
+            kalan_gun = ((date(son.year, son.month, ay_son_gunu) - v.gunler[0]).days + 1
+                         + max(0, bilinmeyen))
             hedef = onceki + max(0, ay_hedefi - onceki) * len(v.gunler) // kalan_gun
         hedef_saat[p.id] = hedef
         e = model.new_int_var(0, hedef, f"saat_eksik_{p.id}")
@@ -1998,7 +2003,8 @@ def _teshisleri_yaz(cur, run_id: int, v: SolverVerisi, cozum: Cozum) -> int:
     sade Türkçe açıklamayla. Cümleleri solver/aciklama.py kuruyor."""
     cur.execute("DELETE FROM solver_diagnostics WHERE solver_run_id = %s", (run_id,))
     satirlar = (
-        aciklama.eksik_aciklamalari(v, cozum, run_id)
+        _eksik_gecmis_uyarisi(v, run_id)
+        + aciklama.eksik_aciklamalari(v, cozum, run_id)
         + aciklama.saat_aciklamalari(v, cozum, run_id)
         + aciklama.istek_aciklamalari(v, cozum, run_id)
         + aciklama.takviye_aciklamalari(v, cozum, run_id)
@@ -2013,6 +2019,28 @@ def _teshisleri_yaz(cur, run_id: int, v: SolverVerisi, cozum: Cozum) -> int:
             satirlar,
         )
     return len(satirlar)
+
+
+def _eksik_gecmis_uyarisi(v: SolverVerisi, run_id: int) -> list[tuple]:
+    """Dönemden önceki günler yayınlanmamışsa uyarı (01.10).
+
+    Hafta hafta üretimde önceki hafta yayınlanmadan sonraki çözülürse o günler
+    BİLİNMİYOR: dinlenme kuralları (gece → gündüz, 2 gece sonrası boş) dönemin
+    ilk günlerini kısıtlayamaz ve aylık devir eksik kalır. Ölçüm: 5–11 Ekim
+    yayınlanmadan 12–18 çözülünce Pazartesi gündüz 11 kişi (yayınlıyken 6).
+    Tahminle doldurmuyoruz; kullanıcıya söylüyoruz.
+    """
+    bas = v.gunler[0]
+    onceki_hafta = {bas - timedelta(days=i) for i in range(1, 8)}
+    eksik = sorted(onceki_hafta - set(v.gecmis_bilinen_gunler))
+    if not eksik:
+        return []
+    return [(
+        run_id, "uyari", None, None,
+        f"Dönemden önceki {len(eksik)} gün ({eksik[0]:%d.%m}–{eksik[-1]:%d.%m}) yayınlanmamış: "
+        "dinlenme kuralları dönemin ilk günlerine uygulanamadı, aylık devir eksik.",
+        "Önceki haftayı/ayı yayınlayıp bu taslağı yeniden çözün.",
+    )]
 
 
 def _kontrolcuyu_calistir(cur, run_id: int, draft_id: int, v: SolverVerisi) -> int:

@@ -26,9 +26,11 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
   const [panel, setPanel] = useState(false);
   const [runId, setRunId] = useState<number | null>(null);
 
+  // staleTime 0: sayfaya her girişte taslağın SON koşusu sunucudan okunur.
   const { data: taslak } = useQuery({
     queryKey: ["draft", draftId],
     queryFn: () => api<Draft>(`/drafts/${draftId}`),
+    staleTime: 0,
   });
 
   // Görünen aralık DÖNEME KIRPILMAZ: hafta her zaman Pazartesi–Pazar, ay her zaman
@@ -47,10 +49,17 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
 
   const { acik: detaylar } = useDetaylar();
 
+  // ÖNBELLEK ANAHTARINDA KOŞU VAR (01.10): yeni bir koşu bitince anahtar değişir
+  // ve önceki koşunun ızgarası ASLA gösterilmez — yenisi gelene kadar "yükleniyor".
+  // Eskiden önbellekteki eski çizelge görünüyor, yenisi arkadan geliyordu:
+  // "çözüldü" yazarken tablo hâlâ eskiydi.
+  const kosuAnahtari = taslak
+    ? `${taslak.last_run?.id ?? 0}:${taslak.last_run?.status ?? ""}`
+    : null;
   const { data: cizelge, isLoading, error: hata } = useQuery({
-    queryKey: ["schedule", draftId, bas, son],
+    queryKey: ["schedule", draftId, bas, son, kosuAnahtari],
     queryFn: () => api<Schedule>(`/drafts/${draftId}/schedule?from=${bas}&to=${son}`),
-    enabled: !!bas && !!son,
+    enabled: !!bas && !!son && kosuAnahtari !== null,
   });
 
   // Çözüm bittiğinde TÜM önbellek eskir: rapor, taslak listesi, teşhis, ana sayfa
@@ -60,39 +69,50 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     qc.invalidateQueries();
   };
 
-  // Süre limiti sunucudan gelir (SOLVER_TIME_LIMIT_S, demo: 25 sn);
-  // arayüz geri sayımı ona göre gösterir.
-  const [limit, setLimit] = useState(25);
-  const [gecen, setGecen] = useState(0);
-
   const coz = useMutation({
     mutationFn: () =>
       api<SolveAccepted>(`/drafts/${draftId}/solve`, {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({}),
       }),
-    onSuccess: (d) => { setLimit(d.time_limit_s); setGecen(0); setRunId(d.run_id); },
+    onSuccess: (d) => setRunId(d.run_id),
   });
 
-  // Geri sayım: yalnız koşu sürerken işler.
-  useEffect(() => {
-    if (runId === null) return;
-    const t = setInterval(() => setGecen((g) => g + 1), 1000);
-    return () => clearInterval(t);
-  }, [runId]);
+  // KOŞU TAKİBİ SUNUCUDAN (01.10): hangi koşunun sürdüğü tarayıcının hafızasında
+  // değil, taslağın son koşusunda (last_run) durur. Sayfadan çıkıp dönünce ya da
+  // başka bir sekmeden açınca süren koşu yakalanır ve takip kaldığı yerden sürer.
+  const [bitenler] = useState(() => new Set<number>());
+  const sunucudaSuren =
+    taslak?.last_run?.status === "CALISIYOR" && !bitenler.has(taslak.last_run.id)
+      ? taslak.last_run.id
+      : null;
+  const aktifId = runId ?? sunucudaSuren;
 
   const { data: kosu } = useQuery({
-    queryKey: ["solver-run", runId],
-    queryFn: () => api<SolverRun>(`/solver-runs/${runId}`),
-    enabled: runId !== null,
+    queryKey: ["solver-run", aktifId],
+    queryFn: () => api<SolverRun>(`/solver-runs/${aktifId}`),
+    enabled: aktifId !== null,
     refetchInterval: (q) => (q.state.data?.status === "CALISIYOR" ? 1000 : false),
   });
 
-  // Koşu bitince ÖNCE ızgara yeniden yüklenir, buton ancak o zaman serbest kalır.
-  // Eskiden durum "çözüldü"ye dönüp vardiyalar birkaç saniye sonra geliyordu:
-  // ızgara isteği ağır ve ayrı (01.10).
+  // Geri sayım koşunun BAŞLAMA saatinden hesaplanır: sayfaya sonradan girilse de
+  // doğru süreyi gösterir. Saat yalnız koşu sürerken ilerler.
+  const [simdi, setSimdi] = useState(() => Date.now());
+  useEffect(() => {
+    if (aktifId === null) return;
+    const t = setInterval(() => setSimdi(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [aktifId]);
+  const limit = kosu?.time_limit_seconds ?? 0;
+  const gecen = kosu ? Math.max(0, Math.floor((simdi - +new Date(kosu.started_at)) / 1000)) : 0;
+
+  // Koşu bitince ÖNCE ızgara yeniden yüklenir, "çözüldü" ancak ondan sonra görünür
+  // (sunucu da durumu kontrolcü bittikten sonra yazıyor). Bitmiş koşu bir daha
+  // takibe alınmasın diye `bitenler`e yazılır: önbellekteki last_run birkaç
+  // yüz milisaniye daha "çalışıyor" görünebilir.
   const [yukleniyor, setYukleniyor] = useState(false);
-  if (kosu && kosu.status !== "CALISIYOR" && runId !== null) {
+  if (kosu && kosu.status !== "CALISIYOR" && aktifId !== null && !bitenler.has(aktifId)) {
+    bitenler.add(aktifId);
     setRunId(null);
     setYukleniyor(true);
     qc.refetchQueries({ queryKey: ["schedule", draftId] }).finally(() => {
@@ -101,7 +121,7 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     });
   }
 
-  const calisiyor = coz.isPending || runId !== null || yukleniyor;
+  const calisiyor = coz.isPending || (aktifId !== null && !bitenler.has(aktifId)) || yukleniyor;
 
   return (
     <AppShell>
@@ -139,7 +159,9 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
                 <Loader2 size={16} strokeWidth={1.75} className="animate-spin" />
                 {yukleniyor
                   ? "Sonuçlar yükleniyor…"
-                  : `Çözülüyor… ${Math.max(0, limit - gecen)} sn`}
+                  : limit
+                    ? `Çözülüyor… ${Math.max(0, limit - gecen)} sn`
+                    : "Çözülüyor…"}
               </>
             ) : (
               <><Play size={16} strokeWidth={1.75} />Çöz</>

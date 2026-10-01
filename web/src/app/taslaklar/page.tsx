@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, Copy, Trash2 } from "lucide-react";
+import { CalendarCheck, Copy, Loader2, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { HataKutusu } from "@/components/HataKutusu";
@@ -24,7 +24,8 @@ import { aralikEtiketi, type Draft } from "@/lib/taslak";
 import { AY_KISA } from "@/lib/donem";
 
 /** Durum rozeti: taslağın gerçekte ne olduğunu tek kelimeyle söyler. */
-function durumRozeti(t: Draft): { ad: string; vurgu?: boolean } {
+function durumRozeti(t: Draft): { ad: string; vurgu?: boolean; suruyor?: boolean } {
+  if (t.last_run?.status === "CALISIYOR") return { ad: "Çözülüyor", suruyor: true };
   if (t.status === "yayinlandi") return { ad: "Yayınlandı" };
   if (t.status === "arsiv") return { ad: "Arşiv" };
   if (t.last_run?.is_reference_copy) return { ad: "Referans kopya" };
@@ -62,9 +63,28 @@ export default function TaslaklarSayfasi() {
   const [sekme, setSekme] = useState<string>("7");
   const [sayfa, setSayfa] = useState(0);
 
+  // Süren bir çözüm varsa liste kendini yeniler: rozet "Çözülüyor"dan sonuca
+  // kendiliğinden geçer, sayfayı yenilemek gerekmez (01.10).
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["drafts"], queryFn: () => api<Draft[]>("/drafts"),
+    refetchInterval: (q) =>
+      q.state.data?.some((t) => t.last_run?.status === "CALISIYOR") ? 2000 : false,
   });
+
+  // Bir koşu bittiğinde o taslağa ait öteki ekranlar (ızgara, rapor, teşhis) da
+  // eskir; liste sonucu gösterdiği anda onlar da tazelenir.
+  const [surenler, setSurenler] = useState<string>("");
+  const simdiSurenler = (data ?? [])
+    .filter((t) => t.last_run?.status === "CALISIYOR")
+    .map((t) => t.id)
+    .join(",");
+  if (simdiSurenler !== surenler) {
+    if (surenler) {
+      const biten = surenler.split(",").filter((id) => !simdiSurenler.split(",").includes(id));
+      if (biten.length) qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "drafts" });
+    }
+    setSurenler(simdiSurenler);
+  }
 
   const sil = useMutation({
     mutationFn: (id: number) => api<void>(`/drafts/${id}`, { method: "DELETE" }),
@@ -186,9 +206,12 @@ export default function TaslaklarSayfasi() {
                     <TableCell>
                       <Badge
                         variant="secondary"
-                        className={"h-5 rounded-sm px-1.5 font-normal " + (rozet.vurgu ? "text-danger" : "")}
+                        className={"h-5 gap-1 rounded-sm px-1.5 font-normal " + (rozet.vurgu ? "text-danger" : "")}
                         style={{ fontSize: "var(--text-xs)" }}
                       >
+                        {rozet.suruyor && (
+                          <Loader2 size={12} strokeWidth={1.75} className="animate-spin" />
+                        )}
                         {rozet.ad}
                       </Badge>
                     </TableCell>

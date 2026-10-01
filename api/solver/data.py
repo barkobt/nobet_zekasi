@@ -265,6 +265,10 @@ class SolverVerisi:
     ay_basi_hafta_sonu: Mapping[int, int] = None      # type: ignore[assignment]
     # Pazar'ı ay içinde, dönemden ÖNCE kalan her haftanın BRÜT dakikası (O-010)
     ay_basi_hafta_brut: Mapping[int, tuple[int, ...]] = None   # type: ignore[assignment]
+    # Ay başından dönem başına kadar YAYINLANMIŞ çizelgenin kapsadığı gün sayısı.
+    # Aradaki yayınlanmamış günler BİLİNMİYOR: "0 saat çalışıldı" sayılmaz
+    # (01.10: 5–11 yayınlanmadan 12–18 çözülünce açığın tamamı o haftaya biniyordu).
+    ay_basi_bilinen_gun: int = 0
 
     def kisi(self, personel_id: int) -> Personel:
         return next(p for p in self.personel if p.id == personel_id)
@@ -313,6 +317,7 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
                 ay_basi_gece=ay_basi["gece"],
                 ay_basi_hafta_sonu=ay_basi["hafta_sonu"],
                 ay_basi_hafta_brut=ay_basi["hafta_brut"],
+                ay_basi_bilinen_gun=_ay_basi_bilinen_gun(cur, draft_id),
                 islenmis_gunler=islenmis,
                 gecmis_bilinen_gunler=_gecmis_bilinen_gunler(cur, draft_id),
             )
@@ -872,6 +877,24 @@ def _gecmis(cur, draft_id: int) -> tuple[GecmisAtama, ...]:
         for r in _gecmis_pencere(cur, draft_id)
         if r["work_date"] >= esik
     )
+
+
+def _ay_basi_bilinen_gun(cur, draft_id: int) -> int:
+    """Ayın 1'inden dönem başına kadar, aynı birimin yayınlanmış bir çizelgesinin
+    kapsadığı gün sayısı. Dönem ayın 1'inde başlıyorsa 0."""
+    cur.execute(
+        """
+        SELECT count(DISTINCT gs::date) AS adet
+        FROM schedule_drafts d
+        CROSS JOIN LATERAL generate_series(date_trunc('month', lower(d.period)),
+                                           lower(d.period) - 1, INTERVAL '1 day') gs
+        JOIN schedule_drafts y ON y.unit_id = d.unit_id AND y.id <> d.id
+                              AND y.status = 'yayinlandi' AND y.period @> gs::date
+        WHERE d.id = %s
+        """,
+        (draft_id,),
+    )
+    return int(cur.fetchone()["adet"])
 
 
 def _ay_basi_ozeti(cur, draft_id: int) -> dict[str, dict]:
