@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, Copy, Loader2, Trash2 } from "lucide-react";
+import { CalendarCheck, Copy, Loader2, RefreshCw, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { HataKutusu } from "@/components/HataKutusu";
@@ -65,8 +65,12 @@ export default function TaslaklarSayfasi() {
 
   // Süren bir çözüm varsa liste kendini yeniler: rozet "Çözülüyor"dan sonuca
   // kendiliğinden geçer, sayfayı yenilemek gerekmez (01.10).
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["drafts"], queryFn: () => api<Draft[]>("/drafts"),
+    // Her açılışta sunucudan: önbellekteki "Taslak" durumu, az önce başlatılmış bir
+    // çözümü ~30 sn gizliyordu ve otomatik yenileme de hiç başlamıyordu (01.10).
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchInterval: (q) =>
       q.state.data?.some((t) => t.last_run?.status === "CALISIYOR") ? 2000 : false,
   });
@@ -135,7 +139,29 @@ export default function TaslaklarSayfasi() {
     <AppShell>
       <div className="mb-4 flex items-center justify-between">
         <h1 style={{ fontSize: "var(--text-lg)", fontWeight: 600 }}>Taslaklar</h1>
-        <YeniTaslak />
+        <div className="flex items-center gap-2">
+          {/* Elle yenileme: durum sunucudan yeniden okunur (01.10). Liste süren
+              bir çözüm varken kendini de yeniliyor; düğme kullanıcının kontrolü. */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Yenile"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw
+                  size={16}
+                  strokeWidth={1.75}
+                  className={isFetching ? "animate-spin" : ""}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Yenile</TooltipContent>
+          </Tooltip>
+          <YeniTaslak />
+        </div>
       </div>
 
       <div className="mb-1 flex items-center gap-1 border-b">
@@ -143,7 +169,8 @@ export default function TaslaklarSayfasi() {
           <button
             key={x.anahtar}
             type="button"
-            onClick={() => { setSekme(x.anahtar); setSayfa(0); }}
+            // Sekmeye basmak listeyi de sunucudan yeniler.
+            onClick={() => { setSekme(x.anahtar); setSayfa(0); refetch(); }}
             className={
               "-mb-px border-b-2 px-3 pb-2 pt-1 " +
               (sekme === x.anahtar
@@ -188,13 +215,20 @@ export default function TaslaklarSayfasi() {
             <TableBody>
               {gorunen.map((t) => {
                 const rozet = durumRozeti(t);
+                // Çözülürken taslak AÇILMAZ ve üzerinde işlem yapılmaz: yarım
+                // sonuç görülmesin, kopyalanmasın, yayınlanmasın, silinmesin.
+                // Çözüm bittiği an (liste yenilenince) her şey yüklü açılır.
+                const suruyor = !!rozet.suruyor;
+                const ac = () => !suruyor && router.push(`/taslaklar/${t.id}`);
                 return (
                   <TableRow
                     key={t.id}
-                    className="h-11 cursor-pointer"
-                    onClick={() => router.push(`/taslaklar/${t.id}`)}
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && router.push(`/taslaklar/${t.id}`)}
+                    className={"h-11 " + (suruyor ? "cursor-wait opacity-60" : "cursor-pointer")}
+                    onClick={ac}
+                    tabIndex={suruyor ? -1 : 0}
+                    aria-disabled={suruyor}
+                    title={suruyor ? "Çözülüyor — bitince açılır" : undefined}
+                    onKeyDown={(e) => e.key === "Enter" && ac()}
                   >
                     <TableCell className="font-medium">{t.name}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -226,6 +260,7 @@ export default function TaslaklarSayfasi() {
                           etiket="Kopyala"
                           onTikla={() => kopyala.mutate(t)}
                           bekliyor={kopyala.isPending}
+                          pasif={suruyor}
                         >
                           <Copy size={16} strokeWidth={1.75} />
                         </IkonDugme>
@@ -233,7 +268,7 @@ export default function TaslaklarSayfasi() {
                         <IkonDugme
                           etiket={t.status === "yayinlandi" ? "Zaten yayında" : "Yayınla"}
                           onTikla={() => setUygulanacak(t)}
-                          pasif={t.status === "yayinlandi"}
+                          pasif={t.status === "yayinlandi" || suruyor}
                         >
                           <CalendarCheck size={16} strokeWidth={1.75} />
                         </IkonDugme>
@@ -245,7 +280,7 @@ export default function TaslaklarSayfasi() {
                               : "Sil"
                           }
                           onTikla={() => setSilinecek(t)}
-                          pasif={t.status === "yayinlandi"}
+                          pasif={t.status === "yayinlandi" || suruyor}
                           tehlike
                         >
                           <Trash2 size={16} strokeWidth={1.75} />

@@ -75,7 +75,12 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({}),
       }),
-    onSuccess: (d) => setRunId(d.run_id),
+    onSuccess: (d) => {
+      setRunId(d.run_id);
+      // Koşu sunucuda başladı: liste ve taslak özeti "Çözülüyor"u hemen görsün.
+      qc.invalidateQueries({ queryKey: ["drafts"] });
+      qc.invalidateQueries({ queryKey: ["draft", draftId] });
+    },
   });
 
   // KOŞU TAKİBİ SUNUCUDAN (01.10): hangi koşunun sürdüğü tarayıcının hafızasında
