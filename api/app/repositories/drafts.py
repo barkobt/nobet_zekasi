@@ -110,18 +110,21 @@ async def kosu_ac(draft_id: int, time_limit_s: int) -> int:
         return (await cur.fetchone())["id"]
 
 
-# Bir koşu, süre limitinin bu katı kadar zamandır 'CALISIYOR' duruyorsa ÖLMÜŞ
-# sayılır. Sebep: arka plan görevi süreçle birlikte ölür (deploy, çökme, yeniden
-# başlatma) ama satır 'CALISIYOR' kalır — ve çift tıklama koruması o ölü satırı
-# bulup döndürdüğü için taslak bir daha HİÇ çözülemezdi.
-OLU_KOSU_KATSAYISI = 3
+# Bir koşu, süre limiti + bu kadar saniyedir 'CALISIYOR' duruyorsa ÖLMÜŞ sayılır.
+# Sebep: arka plan görevi süreçle birlikte ölür (deploy, bellek, yeniden başlatma)
+# ama satır 'CALISIYOR' kalır. Eskiden süre limitinin 3 katı bekleniyordu (120 sn
+# limitle 6 dk) ve kontrol yalnız yeni bir "Çöz"de yapılıyordu; liste ölü koşuyu
+# "Çözülüyor" gösterip taslağı kilitli tutuyordu (01.10). Pay: veri okuma, model
+# kurma, yazma ve kontrolcü — yerelde hepsi birlikte < 15 sn.
+OLU_KOSU_PAYI_S = 180
 
 
-async def olu_kosulari_kapat() -> int:
-    """Süresini fazlasıyla aşmış 'CALISIYOR' satırları HATA'ya çeker.
+async def olu_kosulari_kapat(hepsi: bool = False) -> int:
+    """Ölmüş 'CALISIYOR' satırları HATA'ya çeker ve teşhise sebebini yazar.
 
-    Zaman aşımı koşunun kendi time_limit_seconds'ından türer: 60 sn limitli bir
-    koşu 3 dakikadır sürüyorsa süreç ölmüş demektir.
+    hepsi=True: API AÇILIRKEN çağrılır. Süreç yeni başladıysa elinde süren bir
+    çözüm olamaz (çözüm aynı süreçte, arka plan görevinde koşuyor); 'CALISIYOR'
+    görünen her koşu yarıda kalmıştır.
     """
     async with cursor() as cur:
         await cur.execute(
@@ -129,13 +132,21 @@ async def olu_kosulari_kapat() -> int:
             UPDATE solver_runs
                SET status = 'HATA', finished_at = CURRENT_TIMESTAMP
              WHERE status = 'CALISIYOR'
-               AND started_at < CURRENT_TIMESTAMP
-                   - (COALESCE(time_limit_seconds, 60) * %s) * INTERVAL '1 second'
+               AND (%(hepsi)s OR started_at < CURRENT_TIMESTAMP
+                   - (COALESCE(time_limit_seconds, 60) + %(pay)s) * INTERVAL '1 second')
             RETURNING id
             """,
-            (OLU_KOSU_KATSAYISI,),
+            {"hepsi": hepsi, "pay": OLU_KOSU_PAYI_S},
         )
-        return len(await cur.fetchall())
+        olenler = [r["id"] for r in await cur.fetchall()]
+        if olenler:
+            await cur.executemany(
+                """INSERT INTO solver_diagnostics (solver_run_id, severity, message, suggestion)
+                   VALUES (%s, 'hata', %s, %s)""",
+                [(i, "Çözüm yarıda kaldı: sunucu yeniden başladı ya da süre aşıldı.",
+                  "Taslağı yeniden çözün.") for i in olenler],
+            )
+        return len(olenler)
 
 
 async def calisan_kosu(draft_id: int) -> dict | None:

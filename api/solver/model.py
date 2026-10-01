@@ -1292,11 +1292,18 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     # Dönem içindeki SABİT satırlar (elle yazılmış, kilitli, işlenmiş günler)
     # da kişinin ayına sayılır. Eskiden yalnız değişkenler toplanıyordu: işlenmiş
     # 1–4 Ekim'i çalışan biri 200 saate o günler hiç yokmuş gibi zorlanırdı.
+    # AY = dönemin BAŞLADIĞI ay. Ay sınırını geçen haftada (26 Eki – 1 Kas)
+    # Kasım'a düşen günler Ekim'in saatine sayılmaz (01.10).
+    ilk = v.gunler[0]
+    ay_son_gunu = calendar.monthrange(ilk.year, ilk.month)[1]
+    ay_sonu = date(ilk.year, ilk.month, ay_son_gunu)
+
     sabit_dk: Counter[int] = Counter()
     sabit_gece: Counter[int] = Counter()
     sabit_hs: Counter[int] = Counter()
     for sa in v.sabit_atamalar:
-        sabit_dk[sa.personel_id] += sa.sure_dk
+        if sa.gun <= ay_sonu:
+            sabit_dk[sa.personel_id] += sa.sure_dk
         sabit_gece[sa.personel_id] += int(sa.gece_mi)
         sabit_hs[sa.personel_id] += int(sa.gun.isoweekday() >= 6)
 
@@ -1305,8 +1312,8 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
         kendi = kisi_gunleri[p.id]
         # AY BAŞINDAN İTİBAREN toplam (01.10): hafta hafta üretilen taslak, ayın
         # önceki yayınlanmış günlerini devralır. Aylık taslakta ay başı boştur.
-        saat[p.id] = (sum(d * sure[kod] for _g, kod, d in kendi) + sabit_dk[p.id]
-                      + v.ay_basi_saatler_dk.get(p.id, 0))
+        saat[p.id] = (sum(d * sure[kod] for g, kod, d in kendi if g <= ay_sonu)
+                      + sabit_dk[p.id] + v.ay_basi_saatler_dk.get(p.id, 0))
         gece[p.id] = (sum(d for _g, kod, d in kendi if kod in gece_kodlari) + sabit_gece[p.id]
                       + (v.ay_basi_gece or {}).get(p.id, 0))
         hafta_sonu[p.id] = (sum(d for g, _k, d in kendi if g.isoweekday() >= 6)
@@ -1323,38 +1330,27 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     # İzin/rapor günü kredisi 7,5 saat NET (Edem, 29.09) → 450 dakika.
     dusum_dk = int(Decimal(dusum) * 60) if dusum is not None else 0
 
-    # AY İÇİNDE BİTEN TASLAK (hafta hafta üretim): aylık hedef taslağın bittiği
-    # güne kadar ORANTILI. 5–11 Ekim taslağı 200 saatin 11/31'ini ister (71 sa,
-    # 1–4 Ekim dahil). Eskiden ayın tamamını istiyordu: "200 − (1–4 Ekim)" bir
-    # haftaya sığmaz, solver herkesi alabildiğine yazıyor, haftalar 57–60 saate,
-    # Pazar gecesi 11 kişiye çıkıyordu (01.10 ölçümü).
-    son = v.gunler[-1]
-    ay_son_gunu = calendar.monthrange(son.year, son.month)[1]
-    if v.gunler[0].month == son.month and son.day < ay_son_gunu:
-        oran = (son.day, ay_son_gunu)
-    else:
-        oran = (1, 1)
+    # DÖNEM HEDEFİ — tek formül, her taslak türü için (01.10):
+    #   hedef = önceki saatler + (aylık hedef − önceki) × bu aydaki dönem günü / kalan gün
+    # kalan gün = ilk BİLİNMEYEN günden ay sonuna. Ayın tamamını çözen taslakta
+    # bu, aylık hedefin kendisidir. Hafta hafta üretimde açık kalan günlere
+    # bölünür (Engin: 1–4 Ekim'de 16 sa → açığın 7/27'si 5–11 Ekim'e). Yayınlanmamış
+    # ara günler kendi payını taşır. Ay sınırını geçen haftada yalnız başlangıç
+    # ayının günleri sayılır; eskiden 26 Eki – 1 Kas haftası ayın TAMAMINI
+    # istiyordu (haftalık 60 sa, Pazar gecesi 8 kişi).
+    bu_ay_gunu = sum(1 for g in v.gunler if g <= ay_sonu)
+    bilinmeyen = max(0, (ilk - date(ilk.year, ilk.month, 1)).days - v.ay_basi_bilinen_gun)
+    kalan_gun = (ay_sonu - ilk).days + 1 + bilinmeyen
+    # Hedefi dakikası dakikasına tutturma bonusu yalnız ay sonuna kadar giden ve
+    # arada bilinmeyen günü olmayan taslakta anlamlı.
+    ay_kapaniyor = v.gunler[-1] >= ay_sonu and bilinmeyen == 0
 
     hedef_saat, eksik_saat = {}, {}
     ulasamayanlar = []
     for p in kisiler:
         ay_hedefi = max(0, p.hedef_saat_dk - izin[p.id] * dusum_dk)
-        if oran == (1, 1):
-            hedef = ay_hedefi
-        else:
-            # AÇIK KALAN GÜNLERE BÖLÜNÜR (Baran, 01.10): ayın önceki günlerinde
-            # az çalışan (Engin: 1–4 Ekim'de 16 sa) açığını TEK haftada değil,
-            # ayın kalan günlerine eşit dağıtarak kapatır. 5–11 Ekim kalan 27
-            # günün 7'si → açığın 7/27'si bu hafta. Eskiden açığın tamamı ilk
-            # haftaya biniyor, Engin 60 saate çıkıyordu.
-            # Bilinmeyen (yayınlanmamış) ara günler de kendi payını taşır: açık
-            # İLK BİLİNMEYEN günden ay sonuna bölünür. 5–11 yayınlanmadan 12–18
-            # çözülürse açığın 7/27'si istenir, 7/20'si değil (01.10).
-            onceki = v.ay_basi_saatler_dk.get(p.id, 0)
-            bilinmeyen = (v.gunler[0] - date(son.year, son.month, 1)).days - v.ay_basi_bilinen_gun
-            kalan_gun = ((date(son.year, son.month, ay_son_gunu) - v.gunler[0]).days + 1
-                         + max(0, bilinmeyen))
-            hedef = onceki + max(0, ay_hedefi - onceki) * len(v.gunler) // kalan_gun
+        onceki = v.ay_basi_saatler_dk.get(p.id, 0)
+        hedef = onceki + max(0, ay_hedefi - onceki) * bu_ay_gunu // kalan_gun
         hedef_saat[p.id] = hedef
         e = model.new_int_var(0, hedef, f"saat_eksik_{p.id}")
         model.add(saat[p.id] + e >= hedef)
@@ -1376,7 +1372,7 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     # ait. Ay ortasında biten taslakta (hafta hafta) orantılı hedefi dakikası
     # dakikasına tutturmak anlamsız; bonus solver'ı dönemin son gecesine fazla
     # kişi yazmaya itiyordu (01.10: 5–11 Ekim taslağında Pazar gecesi 10 kişi).
-    if tam_hedef and oran == (1, 1):
+    if tam_hedef and ay_kapaniyor:
         # Kişi SAYAR (adet), zaman taşımaz → model ölçeğine _sayi() ile taşınır.
         terimler.append((_sayi(int(tam_hedef)), sum(ulasamayanlar)))
 

@@ -20,6 +20,11 @@ from app.settings import get_settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await open_pool()
+    # Süreç yeni başladı: önceki süreçte yarıda kalan çözümler "Çalışıyor"
+    # görünmesin, taslakları kilitli tutmasın (01.10).
+    from app.repositories.drafts import olu_kosulari_kapat
+
+    await olu_kosulari_kapat(hepsi=True)
     yield
     await close_pool()
 
