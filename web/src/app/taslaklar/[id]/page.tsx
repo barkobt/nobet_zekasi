@@ -88,12 +88,20 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     refetchInterval: (q) => (q.state.data?.status === "CALISIYOR" ? 1000 : false),
   });
 
+  // Koşu bitince ÖNCE ızgara yeniden yüklenir, buton ancak o zaman serbest kalır.
+  // Eskiden durum "çözüldü"ye dönüp vardiyalar birkaç saniye sonra geliyordu:
+  // ızgara isteği ağır ve ayrı (01.10).
+  const [yukleniyor, setYukleniyor] = useState(false);
   if (kosu && kosu.status !== "CALISIYOR" && runId !== null) {
     setRunId(null);
-    tazele();
+    setYukleniyor(true);
+    qc.refetchQueries({ queryKey: ["schedule", draftId] }).finally(() => {
+      tazele();
+      setYukleniyor(false);
+    });
   }
 
-  const calisiyor = coz.isPending || runId !== null;
+  const calisiyor = coz.isPending || runId !== null || yukleniyor;
 
   return (
     <AppShell>
@@ -129,7 +137,9 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
             {calisiyor ? (
               <>
                 <Loader2 size={16} strokeWidth={1.75} className="animate-spin" />
-                Çözülüyor… {Math.max(0, limit - gecen)} sn
+                {yukleniyor
+                  ? "Sonuçlar yükleniyor…"
+                  : `Çözülüyor… ${Math.max(0, limit - gecen)} sn`}
               </>
             ) : (
               <><Play size={16} strokeWidth={1.75} />Çöz</>

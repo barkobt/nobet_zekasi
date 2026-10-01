@@ -177,6 +177,12 @@ def run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult:
                 cozum = _coz(veri, time_limit_s)
                 atama_sayisi = _atamalari_yaz(cur, draft_id, veri, cozum)
                 teshis_sayisi = _teshisleri_yaz(cur, run_id, veri, cozum)
+                # Atamalar ÖNCE commit edilir (kontrolcü kendi bağlantısıyla okur),
+                # koşunun durumu ise kontrolcü BİTTİKTEN sonra yazılır: arayüz
+                # "çözüldü"yü gördüğünde atamalar da teşhisler de yerinde olsun
+                # (01.10: "çözüldü" yazısı vardiyalardan önce geliyordu).
+                conn.commit()
+                teshis_sayisi += _kontrolcuyu_calistir(cur, run_id, draft_id, veri)
                 cur.execute(
                     """
                     UPDATE solver_runs
@@ -186,10 +192,6 @@ def run_solver(draft_id: int, time_limit_s: int = 60) -> SolveResult:
                     """,
                     (cozum.durum, cozum.amac, Json(_parametre_fotografi(veri, cozum)), run_id),
                 )
-                conn.commit()
-                # Kontrolcü ancak COMMIT'ten SONRA koşabilir: kendi bağlantısını
-                # açıyor ve yazılmamış satırları göremez.
-                teshis_sayisi += _kontrolcuyu_calistir(cur, run_id, draft_id, veri)
                 conn.commit()
             except Exception as hata:  # noqa: BLE001 — koşu kaydı her hâlükârda kapanmalı
                 conn.rollback()
@@ -1336,7 +1338,18 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     hedef_saat, eksik_saat = {}, {}
     ulasamayanlar = []
     for p in kisiler:
-        hedef = max(0, p.hedef_saat_dk * oran[0] // oran[1] - izin[p.id] * dusum_dk)
+        ay_hedefi = max(0, p.hedef_saat_dk - izin[p.id] * dusum_dk)
+        if oran == (1, 1):
+            hedef = ay_hedefi
+        else:
+            # AÇIK KALAN GÜNLERE BÖLÜNÜR (Baran, 01.10): ayın önceki günlerinde
+            # az çalışan (Engin: 1–4 Ekim'de 16 sa) açığını TEK haftada değil,
+            # ayın kalan günlerine eşit dağıtarak kapatır. 5–11 Ekim kalan 27
+            # günün 7'si → açığın 7/27'si bu hafta. Eskiden açığın tamamı ilk
+            # haftaya biniyor, Engin 60 saate çıkıyordu.
+            onceki = v.ay_basi_saatler_dk.get(p.id, 0)
+            kalan_gun = (date(son.year, son.month, ay_son_gunu) - v.gunler[0]).days + 1
+            hedef = onceki + max(0, ay_hedefi - onceki) * len(v.gunler) // kalan_gun
         hedef_saat[p.id] = hedef
         e = model.new_int_var(0, hedef, f"saat_eksik_{p.id}")
         model.add(saat[p.id] + e >= hedef)
@@ -1418,6 +1431,28 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
         hedefler[ad] = hedef_ort
         degerler = [deger[p.id] for p in havuz]
 
+        if ad == "saat" and hedef_saat:
+            # SAAT ADALETİ HERKESİN KENDİ ROTASINA GÖRE (01.10): ölçülen, kişinin
+            # ay başından toplam saatinin kendi dönem hedefinden sapması. Ham
+            # toplamları eşitlemek (ortalamadan sapma) ayın başında geride kalanı
+            # TEK haftada yetiştirmeye zorluyordu; hedef açığı kalan günlere
+            # bölündüğü için rotada olmak = adil.
+            farklar = [deger[p.id] - hedef_saat[p.id] for p in havuz]
+            if UC_FARKI_CEZALANDIR:
+                en_cok = model.new_int_var(-ust, ust, "encok_saat")
+                en_az = model.new_int_var(-ust, ust, "enaz_saat")
+                model.add_max_equality(en_cok, farklar)
+                model.add_min_equality(en_az, farklar)
+                terimler.append((w * olcek, en_cok - en_az))
+            sapmalar = []
+            for p, f in zip(havuz, farklar):
+                sp = model.new_int_var(0, ust, f"sapma_saat_{p.id}")
+                model.add(sp >= f)
+                model.add(sp >= -f)
+                sapmalar.append(sp)
+            terimler.append((w * olcek, sum(sapmalar)))
+            continue
+
         if UC_FARKI_CEZALANDIR:
             en_cok = model.new_int_var(0, ust, f"encok_{ad}")
             en_az = model.new_int_var(0, ust, f"enaz_{ad}")
@@ -1426,7 +1461,7 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
             terimler.append((w * olcek, en_cok - en_az))
 
         sapmalar = []
-        if ad in ("saat", "gece", "hafta_sonu"):
+        if ad in ("gece", "hafta_sonu"):
             # SAPMA ŞABLON HEDEFİNDEN DEĞİL GERÇEK ORTALAMADAN ölçülür.
             # Şablon hedefi asgari kadrodan geliyor; 200 saat hedefinin yazdırdığı
             # fazla vardiyaları görmüyor. Herkes "hedefin üstünde" sayılınca solver

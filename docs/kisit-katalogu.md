@@ -184,8 +184,10 @@ Gündüz+gece hafta kombinasyonları (gündüz net 8 sa 10 dk / brüt 9,5 · gec
 ### Hafta hafta üretim (01.10)
 
 Ay ortasında biten taslak (ör. 5–11 Ekim) ayın başını **devralır**:
-- **C-004 hedefi orantılı:** taslağın bittiği güne kadar (5–11 Ekim → 200 × 11/31 = 71 sa,
-  1–4 Ekim dahil). Eskiden ayın tamamını istiyordu, haftalar 57–60 saate çıkıyordu.
+- **C-004 hedefi: açık kalan günlere bölünür.** Dönem hedefi = ayın önceki saatleri +
+  (aylık hedef − önceki saatler) × dönem günü / ayın kalan günü. 1–4 Ekim'de 16 sa çalışan
+  Engin'in açığı tek haftada değil, ayın kalan 27 gününe eşit yayılır (ilk hafta 60 → 52,2 sa).
+  Saat adaleti de herkesin bu kendi rotasından sapmasıyla ölçülür.
   "Hedefi tam tutturma" bonusu yalnız ay sonuna giden taslakta.
 - **Adalet ay başından toplam:** saat, gece ve hafta sonu, aynı ayın yayınlanmış günleriyle
   birlikte; sapma gerçek ortalamadan ölçülür. Mesai dengesi (O-010) ayın önceki
