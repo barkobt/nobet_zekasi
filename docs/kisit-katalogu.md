@@ -195,6 +195,11 @@ Ay ortasında biten taslak (ör. 5–11 Ekim) ayın başını **devralır**:
   hafta sonu 4–5 (gündüz+gece grubu).
 - Devir **yayınlanmış** çizelgeden okunur: bir hafta yayınlanmadan sonrakinin
   çözülmesi onu görmez.
+- **Ay sınırını geçen hafta** (26 Eki – 1 Kas): hedef başlangıç ayına göre; Kasım'a
+  düşen gün Ekim saatine sayılmaz.
+- **Çözüm süresi taslağın uzunluğuna göre:** 15 sn + gün × 5 sn (hafta ~50, ay ~170),
+  `SOLVER_TIME_LIMIT_S` üst sınır. Ölçüm (01.10): haftalıkta 20 sn = 120 sn; aylıkta sonuç
+  koşudan koşuya değişiyor, 180 sn önerilir.
 
 ### İşlenmiş günler (30.09)
 

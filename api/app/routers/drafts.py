@@ -86,6 +86,8 @@ def _taslak(satir: dict, son_kosu: dict | None) -> Draft:
 
 @router.get("/drafts", response_model=list[Draft], summary="Taslak listesi")
 async def listele() -> list[Draft]:
+    # Ölü koşu listede "Çözülüyor" kalıp taslağı kilitlemesin.
+    await repo.olu_kosulari_kapat()
     satirlar = await repo.listele()
     kosular = await repo.son_kosular()
     return [_taslak(s, kosular.get(s["id"])) for s in satirlar]
@@ -129,6 +131,7 @@ async def olustur(istek: DraftCreate) -> Draft:
 
 @router.get("/drafts/{draft_id}", response_model=Draft, summary="Taslak detayı")
 async def getir(draft_id: int) -> Draft:
+    await repo.olu_kosulari_kapat()
     if (s := await repo.getir(draft_id)) is None:
         raise HTTPException(status_code=404, detail="Taslak bulunamadı.")
     return _taslak(s, await repo.son_kosu(draft_id))
@@ -165,7 +168,12 @@ async def coz(draft_id: int, istek: SolveRequest, arka_plan: BackgroundTasks) ->
             detail="Şu anda başka bir çizelge çözülüyor. Bitmesini bekleyip tekrar deneyin.",
         )
 
-    sure = istek.time_limit_s or ayarlar.solver_time_limit_s
+    # SÜRE TASLAĞIN UZUNLUĞUNA GÖRE (01.10 ölçümü): haftalıkta 20 sn ile 120 sn
+    # aynı sonucu veriyor; aylıkta 60–180 sn arasında sonuç koşudan koşuya
+    # değişiyor ve uzun süre işe yarıyor. Gün başına 5 sn + 15 sn: hafta ~50 sn,
+    # ay ~170 sn. SOLVER_TIME_LIMIT_S üst sınır olarak kalır.
+    gun = (taslak["period_end"] - taslak["period_start"]).days
+    sure = istek.time_limit_s or min(ayarlar.solver_time_limit_s, 15 + 5 * gun)
     run_id = await repo.kosu_ac(draft_id, sure)
 
     def calistir() -> None:
