@@ -48,7 +48,7 @@ BİRİM ÖLÇEĞİ burada, veritabanında değil: ağırlıklar "yarım saat ba�
 anlamındadır, gece/hafta sonu sayıları vardiya süresiyle çarpılarak yarım saate
 çevrilir. Veritabanındaki sayı saf ÖNCELİKTİR.
 
-Bu adımda BİLEREK YOK: C-013 uyumsuz kişi cezası (veri yok).
+C-013 uyumsuz personel (01.10): aynı gün aynı vardiyada uyumsuz iki kişi cezalı.
 """
 
 from __future__ import annotations
@@ -423,6 +423,7 @@ def _coz(v: SolverVerisi, time_limit_s: int) -> Cozum:
     _ardisik_off_siniri(uygulayici, v, atanabilirler, calisiyor, engelli, tum_gunler, donem)  # C-024
     _off_penceresi(model, v, atanabilirler, calisiyor, engelli, donem)    # OFF_OLABILIR
     golge_cezalari = _oryantasyon_esi(model, v, x, takviye, engelli)      # C-020
+    golge_cezalari += _uyumsuz_personel(uygulayici, v, x, sabit_plan, donem)  # C-013
 
     # ----- Çalışma süresi (seeds/034) -----
     haftalik = _HaftaBaglami(v, x, tum_gunler, donem, yok, bos,
@@ -1204,6 +1205,42 @@ def _gunluk_denge(model, v: SolverVerisi, x: dict, kapsama_sayilan: set[int],
             terimler.append((_sayi(k.agirlik), en_cok - en_az))
     return terimler
 
+
+
+def _uyumsuz_personel(kural, v: SolverVerisi, x: dict, sabit_plan, donem: set) -> list:
+    """C-013: uyumsuz iki kişi aynı gün aynı vardiyada olmasın.
+
+    Personel ekranındaki "Uyumsuzluk" kaydı (staff_conflicts) okunuyordu ama
+    hiçbir kısıtta kullanılmıyordu (01.10 tespiti). Esnek (Baran, 01.10): kadro
+    yetmezse yan yana gelebilirler, bedeli kural ağırlığı ve teşhiste görünür.
+    Zorunlu yapılırsa yasaktır.
+
+    Bir taraf sabit (elle yazılmış, kilitli, işlenmiş gün ya da sabit program)
+    olabilir: o zaman ifade değişken + 1'dir. İki taraf da sabitse dokunulmaz.
+    """
+    k = v.kural("C-013")
+    if k is None or not v.uyumsuz_ciftler:
+        return []
+    sabit: dict[tuple[int, date, str], int] = {}
+    for p_id, g, kod in sabit_plan:
+        sabit[p_id, g, kod] = 1
+    for sa in v.sabit_atamalar:
+        sabit[sa.personel_id, sa.gun, sa.vardiya_kodu] = 1
+
+    def var_mi(p_id: int, g: date, kod: str):
+        return x.get((p_id, g, kod), sabit.get((p_id, g, kod), 0))
+
+    for a, b in v.uyumsuz_ciftler:
+        for g in sorted(donem):
+            for s in v.vardiyalar:
+                ia, ib = var_mi(a, g, s.kod), var_mi(b, g, s.kod)
+                if isinstance(ia, int) and isinstance(ib, int):
+                    continue
+                if isinstance(ia, int) and ia == 0 or isinstance(ib, int) and ib == 0:
+                    continue
+                # Birlikte çalışıyorlarsa ifade 2 olur; sınır 1.
+                kural.en_fazla(k, ia + ib, 1)
+    return []
 
 
 def _oryantasyon_esi(model, v: SolverVerisi, x: dict, takviye: dict,
@@ -2111,11 +2148,11 @@ def _parametre_fotografi(v: SolverVerisi, cozum: Cozum) -> dict:
         "kapsanan_kurallar": ["C-002", "C-004", "C-005", "C-006", "C-007",
                               "C-008", "C-009", "C-010", "C-011", "C-014", "C-016",
                               "C-017", "C-019", "C-020", "C-021", "C-023", "C-024", "C-025",
-                              "C-026", "C-027", "C-028",
+                              "C-013", "C-026", "C-027", "C-028",
                               "O-001", "O-002", "O-003", "O-004", "O-005", "O-009", "O-010",
                               "all_crew_triage_or_observation",
                               "count_authority_required"],
-        "kapsam_disi": ["C-013"],
+        "kapsam_disi": [],
         "agirliklar": {"eksik_cezasi_yedek": EKSIK_CEZASI_YEDEK,
                        "saat_eksigi_cezasi": SAAT_EKSIGI_CEZASI,
                        "atama_maliyeti": ATAMA_MALIYETI, "rozet_maliyeti": ROZET_MALIYETI},

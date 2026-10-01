@@ -30,6 +30,9 @@ function durumRozeti(t: Draft): { ad: string; vurgu?: boolean; suruyor?: boolean
   if (t.status === "arsiv") return { ad: "Arşiv" };
   if (t.last_run?.is_reference_copy) return { ad: "Referans kopya" };
   if (t.last_run?.status === "INFEASIBLE") return { ad: "Çözülemedi", vurgu: true };
+  // HATA (çözücü hata verdi ya da koşu yarıda kaldı: deploy/yeniden başlatma)
+  // eskiden "Çözüldü" görünüyordu ve taslak boş açılıyordu (01.10).
+  if (t.last_run?.status === "HATA") return { ad: "Hata — yeniden çözün", vurgu: true };
   if (t.last_run) return { ad: "Çözüldü" };
   return { ad: "Taslak" };
 }

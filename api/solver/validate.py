@@ -38,7 +38,7 @@ SORUMLU_ROL = "sorumlu_hemsire"
 KATI_KURALLAR = frozenset({
     "A-1", "A-2", "A-3", "A-4", "A-5", "A-6", "A-7",
     "C-002", "C-014", "C-021", "C-016", "C-020", "C-023", "C-024",
-    "C-025", "C-026", "C-027", "C-028",
+    "C-013", "C-025", "C-026", "C-027", "C-028",
     "D-3", "D-8", "D-9", "D-11",
 })
 
@@ -243,6 +243,15 @@ def kontrol_et(v: SolverVerisi, atamalar: list[dict]) -> list[Ihlal]:
 
     ihlaller += _izin_deseni_kontrolleri(v, calisiyor, donem_plan, ihlal_disi_gunler(v))
     ihlaller += _calisma_suresi_kontrolleri(v, tam_plan, tum_gunler, donem)
+
+    # C-013: uyumsuz iki kişi aynı gün aynı vardiyada (esnekse gevşek sayılır).
+    if v.kural("C-013") is not None:
+        for a, b in v.uyumsuz_ciftler:
+            for g in sorted(donem):
+                ortak = set(donem_plan.get((a, g), [])) & set(donem_plan.get((b, g), []))
+                for kod in sorted(ortak):
+                    ihlaller.append(Ihlal("C-013", "Uyumsuz personel", f"{ad[a]} + {ad[b]}", g,
+                                          f"{kod} vardiyasında birlikte"))
     ihlaller += _gorev_kontrolleri(v, atamalar, kisi, ad)
 
     # İşlenmiş günlerin bulguları düşer; haftalık bulgular zaten yalnız karar
@@ -659,7 +668,7 @@ def _gorev_kontrolleri(v: SolverVerisi, atamalar: list[dict], kisi: dict, ad: di
 
 KURAL_SIRASI = ["A-1", "A-2", "A-3", "A-4", "A-5", "A-6", "A-7",
                 "C-002", "C-014", "C-021", "C-016", "C-023", "C-024", "C-025",
-                "C-026", "C-027", "C-028", "C-020",
+                "C-026", "C-027", "C-028", "C-013", "C-020",
                 "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7", "D-8", "D-9", "D-11"]
 KURAL_ADI = {
     "A-1": "Günde en fazla 1 vardiya",
@@ -679,6 +688,7 @@ KURAL_ADI = {
     "C-026": "Haftalık yasal asgari NET saat (45)",
     "C-027": "Aylık yasal asgari NET saat (180)",
     "C-028": "Haftada en az 5 gün çalışma, en fazla 2 izin",
+    "C-013": "Uyumsuz personel aynı vardiyada değil",
     "C-020": "Oryantasyon eşiyle aynı gün aynı vardiyada",
     "D-1": "C-011 · triyajda en az 3 kişi",
     "D-2": "C-010 · gözlemde en az 2 kişi",
