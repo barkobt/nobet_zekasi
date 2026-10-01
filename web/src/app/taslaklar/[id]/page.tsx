@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Loader2, Menu, Play } from "lucide-react";
@@ -16,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api, sunucuAciklamasi } from "@/lib/api";
 import { sayi, type Schedule } from "@/lib/cizelge";
-import { aralikEtiketi, type Draft, type SolveAccepted, type SolverRun } from "@/lib/taslak";
+import { aralikEtiketi, type Draft, type SolveAccepted } from "@/lib/taslak";
 import { aralik, iso as isoGun, type Olcek } from "@/lib/donem";
 
 
@@ -24,7 +25,6 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
   const draftId = Number(use(params).id);
   const qc = useQueryClient();
   const [panel, setPanel] = useState(false);
-  const [runId, setRunId] = useState<number | null>(null);
 
   // staleTime 0: sayfaya her girişte taslağın SON koşusu sunucudan okunur.
   const { data: taslak } = useQuery({
@@ -62,12 +62,24 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     enabled: !!bas && !!son && kosuAnahtari !== null,
   });
 
-  // Çözüm bittiğinde TÜM önbellek eskir: rapor, taslak listesi, teşhis, ana sayfa
-  // da bu taslağın sayılarını gösteriyor. Yalnız ızgara yenilenince öteki ekranlar
-  // 30 sn'lik staleTime dolana kadar eski sonucu gösteriyordu (01.10).
+  // Herhangi bir veri yeniden okunacaksa TÜM önbellek eskir: rapor, liste, teşhis
+  // da bu taslağın sayılarını gösteriyor.
   const tazele = () => {
     qc.invalidateQueries();
   };
+
+  // ÇÖZÜM TAKİBİ TEK YERDE: TASLAKLAR LİSTESİ (Baran, 01.10).
+  //   · "Çöz" → koşu sunucuda başlar, kullanıcı listeye gider; orada "Çözülüyor"
+  //     rozeti görünür ve satır kilitlidir.
+  //   · Çözülürken taslak AÇILMAZ: adresi doğrudan yazılsa bile listeye döner.
+  //     Yarım sonuç görülmez, elle değişiklik solver'ın yazdığıyla çakışmaz.
+  //   · Çözüldüğünde liste (otomatik ya da Yenile ile) sonucu gösterir; taslak
+  //     açılınca ızgara o koşunun sonucuyla gelir (önbellek anahtarında koşu var).
+  const router = useRouter();
+  const suruyor = taslak?.last_run?.status === "CALISIYOR";
+  useEffect(() => {
+    if (suruyor) router.replace("/taslaklar");
+  }, [suruyor, router]);
 
   const coz = useMutation({
     mutationFn: () =>
@@ -75,58 +87,15 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({}),
       }),
-    onSuccess: (d) => {
-      setRunId(d.run_id);
-      // Koşu sunucuda başladı: liste ve taslak özeti "Çözülüyor"u hemen görsün.
-      qc.invalidateQueries({ queryKey: ["drafts"] });
-      qc.invalidateQueries({ queryKey: ["draft", draftId] });
+    onSuccess: () => {
+      // Listeye "Çözülüyor" ile girilsin: listenin ve bu taslağın önbelleği düşer.
+      qc.removeQueries({ queryKey: ["drafts"] });
+      qc.removeQueries({ queryKey: ["draft", draftId] });
+      router.push("/taslaklar");
     },
   });
 
-  // KOŞU TAKİBİ SUNUCUDAN (01.10): hangi koşunun sürdüğü tarayıcının hafızasında
-  // değil, taslağın son koşusunda (last_run) durur. Sayfadan çıkıp dönünce ya da
-  // başka bir sekmeden açınca süren koşu yakalanır ve takip kaldığı yerden sürer.
-  const [bitenler] = useState(() => new Set<number>());
-  const sunucudaSuren =
-    taslak?.last_run?.status === "CALISIYOR" && !bitenler.has(taslak.last_run.id)
-      ? taslak.last_run.id
-      : null;
-  const aktifId = runId ?? sunucudaSuren;
-
-  const { data: kosu } = useQuery({
-    queryKey: ["solver-run", aktifId],
-    queryFn: () => api<SolverRun>(`/solver-runs/${aktifId}`),
-    enabled: aktifId !== null,
-    refetchInterval: (q) => (q.state.data?.status === "CALISIYOR" ? 1000 : false),
-  });
-
-  // Geri sayım koşunun BAŞLAMA saatinden hesaplanır: sayfaya sonradan girilse de
-  // doğru süreyi gösterir. Saat yalnız koşu sürerken ilerler.
-  const [simdi, setSimdi] = useState(() => Date.now());
-  useEffect(() => {
-    if (aktifId === null) return;
-    const t = setInterval(() => setSimdi(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [aktifId]);
-  const limit = kosu?.time_limit_seconds ?? 0;
-  const gecen = kosu ? Math.max(0, Math.floor((simdi - +new Date(kosu.started_at)) / 1000)) : 0;
-
-  // Koşu bitince ÖNCE ızgara yeniden yüklenir, "çözüldü" ancak ondan sonra görünür
-  // (sunucu da durumu kontrolcü bittikten sonra yazıyor). Bitmiş koşu bir daha
-  // takibe alınmasın diye `bitenler`e yazılır: önbellekteki last_run birkaç
-  // yüz milisaniye daha "çalışıyor" görünebilir.
-  const [yukleniyor, setYukleniyor] = useState(false);
-  if (kosu && kosu.status !== "CALISIYOR" && aktifId !== null && !bitenler.has(aktifId)) {
-    bitenler.add(aktifId);
-    setRunId(null);
-    setYukleniyor(true);
-    qc.refetchQueries({ queryKey: ["schedule", draftId] }).finally(() => {
-      tazele();
-      setYukleniyor(false);
-    });
-  }
-
-  const calisiyor = coz.isPending || (aktifId !== null && !bitenler.has(aktifId)) || yukleniyor;
+  const calisiyor = coz.isPending || coz.isSuccess || suruyor;
 
   return (
     <AppShell>
@@ -160,14 +129,7 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
 
           <Button onClick={() => coz.mutate()} disabled={calisiyor} className="ml-1">
             {calisiyor ? (
-              <>
-                <Loader2 size={16} strokeWidth={1.75} className="animate-spin" />
-                {yukleniyor
-                  ? "Sonuçlar yükleniyor…"
-                  : limit
-                    ? `Çözülüyor… ${Math.max(0, limit - gecen)} sn`
-                    : "Çözülüyor…"}
-              </>
+              <><Loader2 size={16} strokeWidth={1.75} className="animate-spin" />Başlatılıyor…</>
             ) : (
               <><Play size={16} strokeWidth={1.75} />Çöz</>
             )}
@@ -186,17 +148,11 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
         </p>
       )}
 
-      {/* İlerleme çubuğu: süre limiti biliniyor, ilerleme tahmin değil ölçüm */}
-      {calisiyor && (
-        <div className="mb-3 h-1 overflow-hidden rounded-sm bg-background">
-          <div
-            className="h-full bg-brand transition-[width] duration-1000 ease-linear"
-            style={{ width: `${Math.min(100, (gecen / limit) * 100)}%` }}
-          />
+      {calisiyor && !coz.isError ? (
+        <div className="rounded-lg border bg-card p-6">
+          <p className="text-muted-foreground">Çözülüyor — Taslaklar ekranına dönülüyor…</p>
         </div>
-      )}
-
-      {hata ? (
+      ) : hata ? (
         <HataKutusu hata={hata} onTekrar={() => tazele()} kisa />
       ) : isLoading || !cizelge ? (
         <div className="rounded-lg border bg-card p-6">
