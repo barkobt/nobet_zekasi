@@ -53,9 +53,11 @@ export default function TaslakSayfasi({ params }: { params: Promise<{ id: string
     enabled: !!bas && !!son,
   });
 
+  // Çözüm bittiğinde TÜM önbellek eskir: rapor, taslak listesi, teşhis, ana sayfa
+  // da bu taslağın sayılarını gösteriyor. Yalnız ızgara yenilenince öteki ekranlar
+  // 30 sn'lik staleTime dolana kadar eski sonucu gösteriyordu (01.10).
   const tazele = () => {
-    qc.invalidateQueries({ queryKey: ["schedule", draftId] });
-    qc.invalidateQueries({ queryKey: ["draft", draftId] });
+    qc.invalidateQueries();
   };
 
   // Süre limiti sunucudan gelir (SOLVER_TIME_LIMIT_S, demo: 25 sn);

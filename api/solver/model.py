@@ -53,6 +53,7 @@ Bu adımda BİLEREK YOK: C-013 uyumsuz kişi cezası (veri yok).
 
 from __future__ import annotations
 
+import calendar
 import threading
 import time
 from collections import Counter, defaultdict
@@ -1095,12 +1096,14 @@ def _fazla_mesai(model, v: SolverVerisi, h: _HaftaBaglami) -> list[tuple[int, ob
             if (p.id, pzt) in mesai:
                 toplam += mesai[p.id, pzt]
                 continue
-            # Tamamen işlenmiş (ya da geçmişte kalan) hafta: mesaisi sabit.
+            # Tamamen işlenmiş hafta: mesaisi sabit.
             gunler = [pzt + timedelta(days=i) for i in range(7)
                       if pzt + timedelta(days=i) in bilinen]
             hafta = sum(h.brut(p.id, g) for g in gunler)
             if isinstance(hafta, int):
                 toplam += max(0, hafta - sinir_dk * len(gunler) // 7)
+        # Ayın dönemden ÖNCEKİ haftaları (hafta hafta üretimde önceki taslaklar).
+        toplam += sum(max(0, b - sinir_dk) for b in (v.ay_basi_hafta_brut or {}).get(p.id, ()))
         aylik[p.id] = toplam
     if all(isinstance(m, int) for m in aylik.values()):
         return terimler
@@ -1173,6 +1176,16 @@ def _gunluk_denge(model, v: SolverVerisi, x: dict, kapsama_sayilan: set[int],
             fazlalar[satir.vardiya_kodu].append(ekip - satir.min_sayi)
 
     terimler: list[tuple[int, object]] = []
+    # GECE FAZLASI doğrudan cezalı (01.10): gecede asgarinin üstü kadro istenmiyor.
+    # Dönemin son gecelerinin ertesi gün dinlenme bedeli bu taslakta görünmediği
+    # için solver eksik saatleri oraya yığıyordu (5–11 Ekim: Cmt 7, Paz 8–10 gece).
+    gece_kodlari = {vd.kod for vd in v.vardiyalar if vd.gece_mi}
+    if not k.hard_mi:
+        for kod in gece_kodlari & set(fazlalar):
+            for i, d in enumerate(fazlalar[kod]):
+                f = model.new_int_var(0, 50, f"gece_fazla_{kod}_{i}")
+                model.add(f >= d)
+                terimler.append((_sayi(k.agirlik), f))
     for kod, degerler in fazlalar.items():
         if len(degerler) < 2:
             continue
@@ -1288,10 +1301,14 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     saat, gece, hafta_sonu, ambulans = {}, {}, {}, {}
     for p in kisiler:
         kendi = kisi_gunleri[p.id]
-        saat[p.id] = sum(d * sure[kod] for _g, kod, d in kendi) + sabit_dk[p.id]
-        gece[p.id] = sum(d for _g, kod, d in kendi if kod in gece_kodlari) + sabit_gece[p.id]
+        # AY BAŞINDAN İTİBAREN toplam (01.10): hafta hafta üretilen taslak, ayın
+        # önceki yayınlanmış günlerini devralır. Aylık taslakta ay başı boştur.
+        saat[p.id] = (sum(d * sure[kod] for _g, kod, d in kendi) + sabit_dk[p.id]
+                      + v.ay_basi_saatler_dk.get(p.id, 0))
+        gece[p.id] = (sum(d for _g, kod, d in kendi if kod in gece_kodlari) + sabit_gece[p.id]
+                      + (v.ay_basi_gece or {}).get(p.id, 0))
         hafta_sonu[p.id] = (sum(d for g, _k, d in kendi if g.isoweekday() >= 6)
-                            + sabit_hs[p.id])
+                            + sabit_hs[p.id] + (v.ay_basi_hafta_sonu or {}).get(p.id, 0))
     for p in kisiler:
         ambulans[p.id] = sum(
             d for (p_id, _g, _v, gorev), d in t.items()
@@ -1304,13 +1321,25 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     # İzin/rapor günü kredisi 7,5 saat NET (Edem, 29.09) → 450 dakika.
     dusum_dk = int(Decimal(dusum) * 60) if dusum is not None else 0
 
+    # AY İÇİNDE BİTEN TASLAK (hafta hafta üretim): aylık hedef taslağın bittiği
+    # güne kadar ORANTILI. 5–11 Ekim taslağı 200 saatin 11/31'ini ister (71 sa,
+    # 1–4 Ekim dahil). Eskiden ayın tamamını istiyordu: "200 − (1–4 Ekim)" bir
+    # haftaya sığmaz, solver herkesi alabildiğine yazıyor, haftalar 57–60 saate,
+    # Pazar gecesi 11 kişiye çıkıyordu (01.10 ölçümü).
+    son = v.gunler[-1]
+    ay_son_gunu = calendar.monthrange(son.year, son.month)[1]
+    if v.gunler[0].month == son.month and son.day < ay_son_gunu:
+        oran = (son.day, ay_son_gunu)
+    else:
+        oran = (1, 1)
+
     hedef_saat, eksik_saat = {}, {}
     ulasamayanlar = []
     for p in kisiler:
-        hedef = max(0, p.hedef_saat_dk - izin[p.id] * dusum_dk)
+        hedef = max(0, p.hedef_saat_dk * oran[0] // oran[1] - izin[p.id] * dusum_dk)
         hedef_saat[p.id] = hedef
         e = model.new_int_var(0, hedef, f"saat_eksik_{p.id}")
-        model.add(saat[p.id] + v.ay_basi_saatler_dk.get(p.id, 0) + e >= hedef)
+        model.add(saat[p.id] + e >= hedef)
         eksik_saat[p.id] = e
 
         # HEDEFE TAM ULAŞMA — açığın BÜYÜKLÜĞÜNDEN bağımsız, sabit ek ceza.
@@ -1325,7 +1354,11 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
     terimler.append((SAAT_EKSIGI_CEZASI, sum(eksik_saat.values())))
 
     tam_hedef = v.kural("C-004").parametreler.get("exact_target_penalty")
-    if tam_hedef:
+    # Yalnız AY SONUNA giden taslakta: "hedefin 10 dk altı" sorunu ayın toplamına
+    # ait. Ay ortasında biten taslakta (hafta hafta) orantılı hedefi dakikası
+    # dakikasına tutturmak anlamsız; bonus solver'ı dönemin son gecesine fazla
+    # kişi yazmaya itiyordu (01.10: 5–11 Ekim taslağında Pazar gecesi 10 kişi).
+    if tam_hedef and oran == (1, 1):
         # Kişi SAYAR (adet), zaman taşımaz → model ölçeğine _sayi() ile taşınır.
         terimler.append((_sayi(int(tam_hedef)), sum(ulasamayanlar)))
 
@@ -1340,7 +1373,7 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
         asgari_dk = int(Decimal(yasal.parametreler["monthly_legal_min_net_hours"]) * 60)
         for p in kisiler:
             gerek = max(0, asgari_dk - izin[p.id] * dusum_dk)
-            kural.en_az(yasal, saat[p.id] + v.ay_basi_saatler_dk.get(p.id, 0), gerek,
+            kural.en_az(yasal, saat[p.id], gerek,
                         olcek=1, ust=gerek, acil=True)
 
     # ---- O-002…O-005: adalet ----
@@ -1393,12 +1426,14 @@ def _adalet_ve_saat(model, v: SolverVerisi, x: dict, t: dict,
             terimler.append((w * olcek, en_cok - en_az))
 
         sapmalar = []
-        if ad == "hafta_sonu":
-            # HAFTA SONU: sapma şablon hedefinden değil GERÇEK ORTALAMADAN ölçülür.
+        if ad in ("saat", "gece", "hafta_sonu"):
+            # SAPMA ŞABLON HEDEFİNDEN DEĞİL GERÇEK ORTALAMADAN ölçülür.
             # Şablon hedefi asgari kadrodan geliyor; 200 saat hedefinin yazdırdığı
             # fazla vardiyaları görmüyor. Herkes "hedefin üstünde" sayılınca solver
             # fazlayı hafta içine yığıyordu (30.09 ölçümü: hafta sonu gündüz 5,
-            # hafta içi 8). Bölme yapmadan ortalamadan sapma: |n·xᵢ − Σx|, ağırlık /n.
+            # hafta içi 8). Değerler ay başından toplam olduğu için (hafta hafta
+            # üretim) şablon hedefi zaten karşılaştırılamaz. 200 saati C-004 korur.
+            # Bölme yapmadan ortalamadan sapma: |n·xᵢ − Σx|, ağırlık /n.
             n = len(havuz)
             toplam = sum(degerler)
             for p in havuz:

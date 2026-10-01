@@ -258,6 +258,13 @@ class SolverVerisi:
     # sayar: önceki ay yayınlanmamışsa 26–31 Ekim boş değil BİLİNMİYORDUR ve
     # "6 gün izin" gibi okunmamalı.
     gecmis_bilinen_gunler: frozenset[date] = frozenset()
+    # AY BAŞINDAN DEVİR (01.10): taslak ayın ortasından başlıyorsa (hafta hafta
+    # üretim) aynı ayın daha önce yayınlanmış günleri adalete de girer — 5–11 Ekim
+    # taslağında 1–4 Ekim'in gecesi, hafta sonu ve mesaisi sayılır.
+    ay_basi_gece: Mapping[int, int] = None            # type: ignore[assignment]
+    ay_basi_hafta_sonu: Mapping[int, int] = None      # type: ignore[assignment]
+    # Pazar'ı ay içinde, dönemden ÖNCE kalan her haftanın BRÜT dakikası (O-010)
+    ay_basi_hafta_brut: Mapping[int, tuple[int, ...]] = None   # type: ignore[assignment]
 
     def kisi(self, personel_id: int) -> Personel:
         return next(p for p in self.personel if p.id == personel_id)
@@ -302,7 +309,10 @@ def veriyi_oku(draft_id: int) -> SolverVerisi:
                 kurallar=kurallar,
                 uyumsuz_ciftler=_uyumsuz_ciftler(cur),
                 gecmis=_gecmis(cur, draft_id),
-                ay_basi_saatler_dk=_ay_basi_saatler(cur, draft_id),
+                ay_basi_saatler_dk=(ay_basi := _ay_basi_ozeti(cur, draft_id))["saat"],
+                ay_basi_gece=ay_basi["gece"],
+                ay_basi_hafta_sonu=ay_basi["hafta_sonu"],
+                ay_basi_hafta_brut=ay_basi["hafta_brut"],
                 islenmis_gunler=islenmis,
                 gecmis_bilinen_gunler=_gecmis_bilinen_gunler(cur, draft_id),
             )
@@ -802,7 +812,11 @@ def _gecmis_pencere(cur, draft_id: int) -> list[dict]:
             SELECT id, unit_id, lower(period) AS bas FROM schedule_drafts WHERE id = %s
         ),
         pencere AS (
-            SELECT LEAST(bas - 7, date_trunc('month', bas)::date) AS bas, bas AS bit FROM d
+            -- Ayın ilk gününün HAFTASININ Pazartesi'sinden: ay başına taşan haftanın
+            -- mesaisi (O-010) bütün olarak bilinsin.
+            SELECT LEAST(bas - 7,
+                         date_trunc('week', date_trunc('month', bas))::date) AS bas,
+                   bas AS bit FROM d
         ),
         ham AS (
             -- 1) Aynı taslağın bağlam satırları
@@ -860,19 +874,40 @@ def _gecmis(cur, draft_id: int) -> tuple[GecmisAtama, ...]:
     )
 
 
-def _ay_basi_saatler(cur, draft_id: int) -> dict[int, int]:
-    """Dönem ayın ortasından başlıyorsa, aynı ayın önceki günlerinde çalışılmış NET dakika.
+def _ay_basi_ozeti(cur, draft_id: int) -> dict[str, dict]:
+    """Dönem ayın ortasından başlıyorsa, aynı ayın önceki günlerinin özeti.
 
-    Aylık hedef (C-004) ay bazlıdır; dönem ayın 12'sinde başlıyorsa 1-11 arasında
-    çalışılmış saatler hedeften düşülmüş sayılmalı. Dönem ayın 1'inde başlıyorsa boş döner.
+    saat        NET dakika — aylık hedef (C-004) ay bazlıdır, önceki günler sayılır.
+    gece        gece sayısı      ┐ adalet (O-003, O-004) ay bazında: hafta hafta
+    hafta_sonu  hafta sonu sayısı┘ üretilen taslak ayın başını devralır.
+    hafta_brut  Pazar'ı ay içinde ve dönemden önce kalan haftaların BRÜT dakikası
+                (O-010 mesai dengesi; mesai Pazar'ın ayına yazılır).
+    Kaynak geçmiş penceresi: yayınlanmış çizelgeler + taslağın dönem dışı satırları.
+    Dönem ayın 1'inde başlıyorsa hepsi boş döner.
     """
     cur.execute(
-        "SELECT date_trunc('month', lower(period))::date AS ay_basi FROM schedule_drafts WHERE id = %s",
+        "SELECT date_trunc('month', lower(period))::date AS ay_basi, lower(period) AS bas "
+        "FROM schedule_drafts WHERE id = %s",
         (draft_id,),
     )
-    ay_basi = cur.fetchone()["ay_basi"]
-    toplam: dict[int, int] = {}
+    r0 = cur.fetchone()
+    ay_basi, bas = r0["ay_basi"], r0["bas"]
+    saat: dict[int, int] = {}
+    gece: dict[int, int] = {}
+    hafta_sonu: dict[int, int] = {}
+    haftalik: dict[tuple[int, date], int] = {}
     for r in _gecmis_pencere(cur, draft_id):
-        if r["work_date"] >= ay_basi:
-            toplam[r["staff_id"]] = toplam.get(r["staff_id"], 0) + r["net_minutes"]
-    return toplam
+        p, g = r["staff_id"], r["work_date"]
+        pazar = g + timedelta(days=7 - g.isoweekday())
+        if ay_basi <= pazar < bas:
+            haftalik[p, pazar] = haftalik.get((p, pazar), 0) + r["gross_minutes"]
+        if g < ay_basi:
+            continue
+        saat[p] = saat.get(p, 0) + r["net_minutes"]
+        gece[p] = gece.get(p, 0) + int(r["crosses_midnight"])
+        hafta_sonu[p] = hafta_sonu.get(p, 0) + int(g.isoweekday() >= 6)
+    hafta_brut: dict[int, list[int]] = {}
+    for (p, _pazar), dk in sorted(haftalik.items()):
+        hafta_brut.setdefault(p, []).append(dk)
+    return {"saat": saat, "gece": gece, "hafta_sonu": hafta_sonu,
+            "hafta_brut": {p: tuple(x) for p, x in hafta_brut.items()}}

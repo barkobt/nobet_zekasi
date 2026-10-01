@@ -158,7 +158,7 @@ Edem + Baran kararları. Sayıların hepsi E-03'ten düzenlenir.
 | C-027 | Hard · **yasal** | Ay | Aylık NET çalışma **en az 180 sa** (tam takvim ayı). C-004'ün 200 sa'lik **hedefi** ayrı kalır. |
 | C-028 | Hard | Hafta | Haftada **en az 5 gün** çalışma, **en fazla 2 gün** izin. İzin/rapor/kesin istek günleri sayılmaz. 2 gün üst üste izin serbest. |
 | O-001 | Soft (200) | Hafta | **Fazla mesai = haftalık BRÜT 51 sa üstü** (51 × 4 = aylık 204). Hafta Pazar'ın düştüğü aya yazılır. Raporlar ekranında "Mesai" sütunu. |
-| O-009 | Soft (2.000) | Gün | Asgarinin üstündeki fazla kadro günlere eşit dağılır (en kalabalık − en seyrek gün). |
+| O-009 | Soft (20.000, `seeds/036`) | Gün | Asgarinin üstündeki fazla kadro günlere eşit dağılır (en kalabalık − en seyrek gün). **Gece fazlası ayrıca cezalı**: gecede asgarinin üstü istenmez. |
 | O-010 | Soft (200) | Ay | **Mesai dengesi:** mesai oluyorsa kişiler arasında eşit dağılır. Denge çalışma tipi İÇİNDE kurulur (gündüzcünün 6 sa/hafta mesaisi yapısal). İşlenmiş haftanın mesaisi sabit olarak sayılır. |
 | ~~C-003~~ | kaldırıldı | — | Haftalık 50 sa referansı; yerini C-026 ve O-001 aldı. |
 
@@ -180,6 +180,19 @@ Gündüz+gece hafta kombinasyonları (gündüz net 8 sa 10 dk / brüt 9,5 · gec
 | 2N + 3G | 46,5 | ✓ | 57,5 | 6,5 |
 | 3N + 2G | 49,3 | ✓ | 62,5 | 11,5 |
 | Gündüzcü 6G | 49,0 | ✓ | 57,0 | 6 |
+
+### Hafta hafta üretim (01.10)
+
+Ay ortasında biten taslak (ör. 5–11 Ekim) ayın başını **devralır**:
+- **C-004 hedefi orantılı:** taslağın bittiği güne kadar (5–11 Ekim → 200 × 11/31 = 71 sa,
+  1–4 Ekim dahil). Eskiden ayın tamamını istiyordu, haftalar 57–60 saate çıkıyordu.
+  "Hedefi tam tutturma" bonusu yalnız ay sonuna giden taslakta.
+- **Adalet ay başından toplam:** saat, gece ve hafta sonu, aynı ayın yayınlanmış günleriyle
+  birlikte; sapma gerçek ortalamadan ölçülür. Mesai dengesi (O-010) ayın önceki
+  haftalarını da sayar. Ölçüm: iki haftalık taslak art arda → 1–18 Ekim gece 7–8,
+  hafta sonu 4–5 (gündüz+gece grubu).
+- Devir **yayınlanmış** çizelgeden okunur: bir hafta yayınlanmadan sonrakinin
+  çözülmesi onu görmez.
 
 ### İşlenmiş günler (30.09)
 
